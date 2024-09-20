@@ -22,7 +22,7 @@ Set to True in config file.
 
 
 ## Directory Structure
-
+`
 EagleID/
 
 ├── data/                  # Dataset cache and data-related scripts
@@ -52,3 +52,4 @@ EagleID/
 ├── requirements.txt       # Dependencies list
 
 └── .gitignore             # Files to ignore in version control
+`
