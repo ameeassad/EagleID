@@ -1,0 +1,15 @@
+.DS_Store
+yolov8x-seg.pt
+results/
+age-classifier/
+gradcam_outputs/
+checkpoints/
+lightning_logs/
+results_pred/
+testing/
+wandb/
+notebooks/data_cache/
+data_cache/
+__pycache__/
+__pycache__/dataset.cpython-312.pyc
+__pycache__/model.cpython-312.pyc
