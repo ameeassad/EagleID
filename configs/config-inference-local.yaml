@@ -1,0 +1,50 @@
+project_name: age-classifier
+notes: 
+use_wandb: False
+wandb_entity: winniethepooh
+
+annot_dir:
+annot_train_file: 
+annot_val_file: 
+annot_test_file: 
+
+outdir: results_pred/
+dataset: experiments/testing/images
+
+model_name: resnet152
+checkpoint: checkpoints/last-v3.ckpt
+preprocess_lvl: 2
+num_classes: 5
+batch_size: 1
+img_size: 256
+epochs: 0
+save_interval: 1
+n_gpu: 0
+num_workers: 2
+gpu_ids: 
+seed: 42
+
+
+local_checkpoint_interval: 10
+max_epochs: 100
+
+transforms:
+  mean: 0.5
+  std: 0.5
+
+early_stopping:
+  monitor: val/loss
+  min_delta: 0.001
+  patience: 10
+  verbose: true
+  mode: min
+
+solver:
+  OPT: adam  # adam, sgd
+  WEIGHT_DECAY: 0.0001
+  MOMENTUM: 0.9  # only when OPT is sgd
+  BASE_LR: 0.001
+  LR_SCHEDULER: step  # step, multistep, reduce_on_plateau
+  LR_DECAY_RATE: 0.1
+  LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
+  LR_STEP_MILESTONES: [10, 15]  # only when LR_SCHEDULER is multistep

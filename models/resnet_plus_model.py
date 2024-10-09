@@ -15,18 +15,17 @@ from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
-from dataset import ArtportalenDataModule, unnormalize
+from data.artportalen_goleag import ArtportalenDataModule
+from data.data_utils import unnormalize
 
-from utils import TripletLoss
-from utils import get_optimizer, get_lr_scheduler_config, weights_init_kaiming, weights_init_classifier
-
-# Load configuration from YAML file
-with open('config.yaml', 'r') as file:
-    config = yaml.safe_load(file)
+from utils.triplet_loss_utils import TripletLoss
+from utils.optimizer import get_optimizer, get_lr_scheduler_config
+from utils.weights_initializer import weights_init_kaiming, weights_init_classifier
 
 class ResNetPlusModel(LightningModule):
     def __init__(
         self,
+        config: dict,
         model_name: str = 'resnet18',
         pretrained: bool = True, # Use ImageNet pre-trained weights
         num_classes: int | None = None,
@@ -35,6 +34,7 @@ class ResNetPlusModel(LightningModule):
     ):
         super().__init__()
         self.save_hyperparameters()
+        self.config = config
 
         self.model = timm.create_model(model_name=model_name, pretrained=pretrained, num_classes=0)  # No classification head yet
 
@@ -178,6 +178,6 @@ class ResNetPlusModel(LightningModule):
     
     def configure_optimizers(self):
         # Only optimize the parameters of the added fully connected layers
-        optimizer = get_optimizer(config, filter(lambda p: p.requires_grad, self.parameters()))
-        lr_scheduler_config = get_lr_scheduler_config(config, optimizer)
+        optimizer = get_optimizer(self.config, filter(lambda p: p.requires_grad, self.parameters()))
+        lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}

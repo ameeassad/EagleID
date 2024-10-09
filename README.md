@@ -33,9 +33,11 @@ EagleID/
 ├── notebooks/             # Jupyter notebooks for prototyping and demo
 ├── scripts/               # BASH scripts for running programs
 ├── utils/                 # Utility functions and helper scripts
-├── tools/                 # Training, evaluation, and inference
 ├── checkpoints/           # Model checkpoints and saved weights
 ├── results/               #Generated results (e.g., GradCAM outputs, predictions)
+├── train.py               # Training
+├── test.py                # Testing
+├── prediction.py          # Prediction
 ├── README.md              # Project description and usage guide
 ├── requirements.txt       # Dependencies list
 └── .gitignore             # Files to ignore in version control

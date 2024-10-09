@@ -3,13 +3,13 @@ notes:
 use_wandb: True
 wandb_entity: winniethepooh
 
-annot_dir: /proj/nobackup/aiforeagles/AgeClassifier/annot/
+annot_dir: /proj/nobackup/aiforeagles/EagleID/dataset/annot/
 annot_train_file: final_train_sep_sightings.csv
 annot_val_file: final_val_sep_sightings.csv
 annot_test_file: 
 
 
-outdir: /proj/nobackup/aiforeagles/AgeClassifier/results
+outdir: /proj/nobackup/aiforeagles/EagleID/results
 dataset: /proj/nobackup/aiforeagles/artportalen/artportalen_goeag
 
 model_name: resnet50

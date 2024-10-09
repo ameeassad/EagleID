@@ -13,28 +13,25 @@ from PIL import Image
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from torchmetrics import Accuracy
 
-from utils import get_optimizer, get_lr_scheduler_config, weights_init_kaiming, weights_init_classifier
-
-# Load configuration from YAML file
-with open('config.yaml', 'r') as file:
-    config = yaml.safe_load(file)
+from utils.triplet_loss_utils import TripletLoss
+from utils.optimizer import get_optimizer, get_lr_scheduler_config
+from utils.weights_initializer import weights_init_kaiming, weights_init_classifier
 
 class SimpleModel(LightningModule):
     def __init__(
         self,
-        model_name: str = 'resnet18',
+        config: dict,
         pretrained: bool = False,
         num_classes: int | None = None,
-        outdir: str = 'results',
-        skeleton: bool = False,
     ):
         super().__init__()
         self.save_hyperparameters()
+        self.config = config
 
-        self.model = timm.create_model(model_name=model_name, pretrained=pretrained, num_classes=num_classes)
+        self.model = timm.create_model(model_name=config['model_name'], pretrained=pretrained, num_classes=num_classes)
 
         # if skeleton, accept 4 channels instead of 3
-        if skeleton and model_name.startswith('resnet'):
+        if config['preprocess_lvl']==3 and config['model_name'].startswith('resnet'):
             self.model.conv1 = nn.Conv2d(4, self.model.conv1.out_channels, kernel_size=self.model.conv1.kernel_size,
                                          stride=self.model.conv1.stride, padding=self.model.conv1.padding, bias=False)
         
@@ -43,7 +40,7 @@ class SimpleModel(LightningModule):
         self.val_loss = nn.CrossEntropyLoss()
         self.val_acc = Accuracy(task='multiclass', num_classes=num_classes)
         self.gradient = None
-        self.outdir = outdir
+        self.outdir = self.config['outdir']
     
     def activations_hook(self, grad):
         self.gradient = grad
@@ -111,6 +108,6 @@ class SimpleModel(LightningModule):
 
     
     def configure_optimizers(self):
-        optimizer = get_optimizer(config, self.parameters())
-        lr_scheduler_config = get_lr_scheduler_config(config, optimizer)
+        optimizer = get_optimizer(self.config, self.parameters())
+        lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}

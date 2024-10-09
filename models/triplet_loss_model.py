@@ -15,145 +15,227 @@ from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
-from dataset import ArtportalenDataModule, unnormalize
+from data.artportalen_goleag import ArtportalenDataModule
+from data.data_utils import unnormalize
 
-from utils import TripletLoss
-from utils import get_optimizer, get_lr_scheduler_config, weights_init_kaiming, weights_init_classifier
+from utils.triplet_loss_utils import TripletLoss
+from utils.optimizer import get_optimizer, get_lr_scheduler_config
+from utils.weights_initializer import weights_init_kaiming, weights_init_classifier
 
-# Load configuration from YAML file
-with open('config.yaml', 'r') as file:
-    config = yaml.safe_load(file)
+import torch
+import torch.nn.functional as F
+import pytorch_lightning as pl
+from pytorch_metric_learning import losses, miners
+from torch import nn
+import timm
 
-class TripletLossModel(LightningModule):
-    def __init__(
-        self,
-        model_name: str = 'resnet18',
-        pretrained: bool = False,
-        num_classes: int | None = None,
-        outdir: str = 'results',
-        margin: float = 0.3,
-    ):
+from wildlife_tools.similarity.cosine import CosineSimilarity
+from utils.metrics import evaluate_map, compute_average_precision
+
+class TripletSimpleModel(pl.LightningModule):
+    def __init__(self, backbone_model_name, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001):
         super().__init__()
-        self.save_hyperparameters()
-
-        self.model = timm.create_model(model_name=model_name, pretrained=pretrained, num_classes=num_classes)
-        
-        self.train_loss = TripletLoss(margin=margin) 
-        self.train_acc = Accuracy(task='multiclass', num_classes=num_classes)
-        self.val_loss = TripletLoss(margin=margin)
-        self.val_acc = Accuracy(task='multiclass', num_classes=num_classes)
-        self.gradient = None
-        self.outdir = outdir
-
-        self.triplet_loss = TripletLoss(margin=margin)
-    
-    def activations_hook(self, grad):
-        self.gradient = grad
-
-    def get_gradient(self):
-        return self.gradient
-
-    def get_activations(self, x):
-        for name, module in self.model.named_modules():
-            if name == 'layer4':
-                x = module(x)
-                x.register_hook(self.activations_hook)
-                return x
-        return None
+        # Backbone (ResNet without the final FC layer)
+        self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=True, num_classes=0)
+        # Embedder (to project features into the desired embedding space)
+        self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)
+        # self.fc = nn.Linear(self.model.output_size, embedding_size)  # Embedding layer
+        self.loss_fn = losses.TripletMarginLoss(margin=margin)
+        self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
+        self.lr = lr
 
     def forward(self, x):
-        # Get features from the backbone
-        features = self.model(x)
-        # Optionally normalize features for triplet loss
-        normalized_features = nn.functional.normalize(features, p=2, dim=1)
-        # Get classification logits
-        logits = self.fc(features)
-        return logits, normalized_features
-
+        features = self.backbone(x)  # Extract features using the backbone
+        embeddings = self.embedder(features)  # Project features into the embedding space
+        return embeddings  # Project features to embedding space
 
     def training_step(self, batch, batch_idx):
-        x, target = batch
-        logits, features = self(x)
-
-        loss, _, _ = self.train_loss(features, target)
-        
-        # Accuracy
-        _, pred = logits.max(1)
-        acc = self.train_acc(pred, target)
-
-        self.log_dict({'train/loss': loss, 'train/acc': acc}, prog_bar=True)
-
+        images, labels = batch
+        embeddings = self(images)
+        mined_triplets = self.miner(embeddings, labels)
+        loss = self.loss_fn(embeddings, labels, mined_triplets)
+        self.log("train_loss", loss)
         return loss
 
-    def validation_step(self, batch, batch_idx):
-        if config['use_gradcam']:
-            with torch.enable_grad():
-                x, target = batch
-                out = self(x)
-                _, pred = out.max(1)
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        return optimizer
 
-                loss = self.val_loss(out, target)
-                acc = self.val_acc(pred, target)
-                self.log_dict({'val/loss': loss, 'val/acc': acc})
+class TripletModel(pl.LightningModule):
+    def __init__(self, backbone_model_name, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001, config=None):
+        super().__init__()
+        self.save_hyperparameters()
+        self.config = config
+        # Backbone (ResNet without the final FC layer)
+        self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=True, num_classes=0)
+        # Embedder (to project features into the desired embedding space)
+        self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)
+        # self.fc = nn.Linear(self.model.output_size, embedding_size)  # Embedding layer
+        self.loss_fn = losses.TripletMarginLoss(margin=margin)
+        self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
+        self.lr = lr
 
-                unnormalized_x = unnormalize(x[0].cpu(), config['transforms']['mean'], config['transforms']['std']).permute(1, 2, 0).numpy()
-                unnormalized_x = np.clip(unnormalized_x, 0, 1)  # Ensure the values are within [0, 1]
+    # Can experiment with different embedders or need to adjust the embedding layer frequently.
+    def forward(self, x):
+        features = self.backbone(x) # Extract features using the backbone
+        embeddings = self.embedder(features) # Project features into the embedding space
+        embeddings = nn.functional.normalize(embeddings, p=2, dim=1)  # L2 normalization
+        return embeddings
 
+    def training_step(self, batch, batch_idx):
+        images, labels = batch
+        embeddings = self(images)
+        mined_triplets = self.miner(embeddings, labels)
+        loss = self.loss_fn(embeddings, labels, mined_triplets)
+        self.log("train_loss", loss)
+        return loss
 
-                cam = GradCAM(model=self.model, target_layers=[self.model.layer4[-1]])
-                targets = [ClassifierOutputTarget(class_idx) for class_idx in target]
-                grayscale_cam = cam(input_tensor=x, targets=targets)
-                grayscale_cam = grayscale_cam[0, :]
-                visualization = show_cam_on_image(unnormalized_x, grayscale_cam, use_rgb=True)
-                img = Image.fromarray((visualization * 255).astype(np.uint8))
+    def on_validation_epoch_start(self):
+        self.query_embeddings = []
+        self.query_labels = []
+        self.gallery_embeddings = []
+        self.gallery_labels = []
 
-                # Log image to 
-                if config['use_wandb']:
-                    wandb_img = wandb.Image(visualization, caption=f"GradCAM Batch {batch_idx} Image 0")
-                    self.logger.experiment.log({"GradCAM Images": wandb_img})
-
-                
-                # save locally
-                os.makedirs(self.outdir, exist_ok=True)
-                img.save(os.path.join(self.outdir, f'cam_image_val_batch{batch_idx}_img0.png'))
-                
-                # To save all images in batch:
-                # for i in range(len(x)):
-                #     grayscale_cam_img = 
-                # grayscale_cam[i]
-                #     visualization = show_cam_on_image(x[i].cpu().numpy().transpose(1, 2, 0), grayscale_cam_img, use_rgb=True)
-                #     img = Image.fromarray((visualization * 255).astype(np.uint8))
-                #     os.makedirs(self.hparams.outdir, exist_ok=True)
-                #     img.save(os.path.join(self.hparams.outdir, f'cam_image_val_batch{batch_idx}_img{i}.png'))
-                
-                # self.model.train()
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        x, target = batch
+        embeddings = self(x)
+        if dataloader_idx == 0:
+            # Query data
+            self.query_embeddings.append(embeddings)
+            self.query_labels.append(target)
         else:
-            x, target = batch
-            out = self(x)
-            _, pred = out.max(1)
+            # Gallery data
+            self.gallery_embeddings.append(embeddings)
+            self.gallery_labels.append(target)
 
-            loss = self.val_loss(out, target)
-            acc = self.val_acc(pred, target)
-            self.log_dict({'val/loss': loss, 'val/acc': acc})
+    def on_validation_epoch_end(self):
+        # Concatenate all embeddings and labels
+        query_embeddings = torch.cat(self.query_embeddings)
+        query_labels = torch.cat(self.query_labels)
+        gallery_embeddings = torch.cat(self.gallery_embeddings)
+        gallery_labels = torch.cat(self.gallery_labels)
 
-    def test_step(self, batch, batch_idx):
-            x, target = batch
+        # Compute distance matrix
+        distmat = self.compute_distance_matrix(query_embeddings, gallery_embeddings)
 
-            x = x.to(torch.device('cpu'))
-            target = target.to(torch.device('cpu'))
+        # Compute mAP
+        # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
+        mAP = evaluate_map(distmat, query_labels, gallery_labels)
+        self.log('val/mAP', mAP)
 
-            x.requires_grad = True
-        
-            out = self(x)
-
-            _, pred = out.max(1)
-            if pred.numel() == 1:
-                print(f"BATCH {batch_idx} PREDICTION: {pred.item()}")
+    def compute_distance_matrix(self, query_embeddings, gallery_embeddings, wildlife=True, euclidean=False):
+        if euclidean:
+        # Compute Euclidean distance between query and gallery embeddings
+            distmat = torch.cdist(query_embeddings, gallery_embeddings)
+        else:
+            if wildlife:
+                similarity_function = CosineSimilarity()
+                similarity = similarity_function(query_embeddings, gallery_embeddings)['default']
+                distmat = 1 - similarity # Convert similarity to distance if necessary
+                return distmat
             else:
-                print(f"BATCH {batch_idx} PREDICTIONS: {pred.tolist()}")
+                query_embeddings = F.normalize(query_embeddings, p=2, dim=1)
+                gallery_embeddings = F.normalize(gallery_embeddings, p=2, dim=1)
+                cosine_similarity = torch.mm(query_embeddings, gallery_embeddings.t())
+                distmat = 1 - cosine_similarity # Convert similarity to distance if necessary
+                return distmat
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        return optimizer
+    
+
+# class TripletLossModel(LightningModule):
+#     def __init__(
+#         self,
+#         config: dict,
+#         model_name: str = 'resnet18',
+#         pretrained: bool = False,
+#         num_classes: int | None = None,
+#         outdir: str = 'results',
+#         margin: float = 0.3,
+#     ):
+#         super().__init__()
+#         self.save_hyperparameters()
+#         self.config = config
+
+#         self.model = timm.create_model(model_name=model_name, pretrained=pretrained, num_classes=num_classes)
+#         self.train_loss = TripletLoss(margin=margin) 
+#         self.train_acc = Accuracy(task='multiclass', num_classes=num_classes)
+#         self.val_loss = TripletLoss(margin=margin)
+#         self.val_acc = Accuracy(task='multiclass', num_classes=num_classes)
+#         self.gradient = None
+#         self.outdir = outdir
+
+#         self.triplet_loss = TripletLoss(margin=margin)
+    
+#     def activations_hook(self, grad):
+#         self.gradient = grad
+
+#     def get_gradient(self):
+#         return self.gradient
+
+#     def get_activations(self, x):
+#         for name, module in self.model.named_modules():
+#             if name == 'layer4':
+#                 x = module(x)
+#                 x.register_hook(self.activations_hook)
+#                 return x
+#         return None
+
+#     def forward(self, x):
+#         # Get features from the backbone
+#         features = self.model(x)
+#         # Optionally normalize features for triplet loss
+#         normalized_features = nn.functional.normalize(features, p=2, dim=1)
+#         # Get classification logits
+#         logits = self.fc(features)
+#         return logits, normalized_features
+
+
+#     def training_step(self, batch, batch_idx):
+#         x, target = batch
+#         logits, features = self(x)
+
+#         loss, _, _ = self.train_loss(features, target)
+        
+#         # Accuracy
+#         _, pred = logits.max(1)
+#         acc = self.train_acc(pred, target)
+
+#         self.log_dict({'train/loss': loss, 'train/acc': acc}, prog_bar=True)
+
+#         return loss
+
+#     def validation_step(self, batch, batch_idx):
+#         x, target = batch
+#         out = self(x)
+#         _, pred = out.max(1)
+
+#         loss = self.val_loss(out, target)
+#         acc = self.val_acc(pred, target)
+#         self.log_dict({'val/loss': loss, 'val/acc': acc})
+
+#     def test_step(self, batch, batch_idx):
+#             x, target = batch
+
+#             x = x.to(torch.device('cpu'))
+#             target = target.to(torch.device('cpu'))
+
+#             x.requires_grad = True
+        
+#             out = self(x)
+
+#             _, pred = out.max(1)
+#             if pred.numel() == 1:
+#                 print(f"BATCH {batch_idx} PREDICTION: {pred.item()}")
+#             else:
+#                 print(f"BATCH {batch_idx} PREDICTIONS: {pred.tolist()}")
 
     
-    def configure_optimizers(self):
-        optimizer = get_optimizer(config, self.parameters())
-        lr_scheduler_config = get_lr_scheduler_config(config, optimizer)
-        return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
+#     def configure_optimizers(self):
+#         optimizer = get_optimizer(self.config, self.parameters())
+#         lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
+#         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
+    
+
