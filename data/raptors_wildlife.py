@@ -223,16 +223,24 @@ class WildlifeReidDataModule(pl.LightningDataModule):
     def __init__(self, data_dir, metadata, preprocess_lvl=0, batch_size=8, size=256, mean=0.5, std=0.5, num_workers=2, config = None):
         super().__init__()
         self.config = config
-        self.data_dir = data_dir
-        self.num_workers = num_workers
-        self.preprocess_lvl = preprocess_lvl
-        self.batch_size = batch_size
-        self.size = size
-        self.mean = (mean, mean, mean) if isinstance(mean, float) else tuple(mean)
-        self.std = (std, std, std) if isinstance(std, float) else tuple(std)
+        if config:
+            self.data_dir = config.data_dir
+            self.preprocess_lvl = config.preprocess_lvl
+            self.batch_size = config.batch_size
+            self.size = config.size
+            self.mean = (config.mean, config.mean, config.mean) if isinstance(config.mean, float) else tuple(config.mean)
+            self.std = (config.std, config.std, config.std) if isinstance(config.std, float) else tuple(config.std)
+        else:
+            self.data_dir = data_dir
+            self.num_workers = num_workers
+            self.preprocess_lvl = preprocess_lvl
+            self.batch_size = batch_size
+            self.size = size
+            self.mean = (mean, mean, mean) if isinstance(mean, float) else tuple(mean)
+            self.std = (std, std, std) if isinstance(std, float) else tuple(std)
 
         transform = transforms.Compose([
-            transforms.Resize((256, 256)),
+            transforms.Resize((self.size, self.size)),
             transforms.ToTensor(),
         ])
 
@@ -246,6 +254,36 @@ class WildlifeReidDataModule(pl.LightningDataModule):
 
 
         df_query, df_gallery = self.split_query_database(df_test)
+
+        # preprocessing
+        if self.preprocess_lvl > 0: # 1: bounding box cropped image or 2: masked image
+            from preprocess.segmenter import add_segmentations
+
+            df_train = add_segmentations(df_train, self.data_dir)
+            df_query = add_segmentations(df_query, self.data_dir)
+            df_gallery = add_segmentations(df_gallery, self.data_dir)
+        
+        if self.preprocess_lvl == 3: # 3: masked + pose (skeleton) image in 1 channel
+            from preprocess.mmpose_fill import fill_keypoints
+
+            self.keypoints =["Head_Mid_Top","Eye_Left","Eye_Right","Mouth_Front_Top","Mouth_Back_Left",
+                             "Mouth_Back_Right","Mouth_Front_Bottom","Shoulder_Left","Shoulder_Right",
+                             "Elbow_Left","Elbow_Right","Wrist_Left","Wrist_Right","Torso_Mid_Back",
+                             "Hip_Left","Hip_Right","Knee_Left","Knee_Right","Ankle_Left","Ankle_Right",
+                             "Tail_Top_Back","Tail_Mid_Back","Tail_End_Back"]
+            self.skeleton = [
+                                [2,1],[3,1],[4,5],[4,6],[7,5],[7,6],[1,14],[14,21],
+                                [21,22],[22,23],[1,8],[1,9],[8,10],[9,11],[10,12],[11,13],
+                                [21,15],[21,16],[15,17],[16,18],[17,19],[18,20]
+                            ]
+
+            df_train = fill_keypoints(df_train, self.data_dir)
+            df_query = fill_keypoints(df_query, self.data_dir)
+            df_gallery = fill_keypoints(df_gallery, self.data_dir)
+
+        elif self.preprocess_lvl == 4: # 4: masked + body part clusters in channels
+            pass
+
 
         self.train_dataset = RaptorsWildlife(metadata=df_train, root=data_dir, transform=transform)
         self.val_query_dataset = RaptorsWildlife(metadata=df_query, root=data_dir, transform=transform)

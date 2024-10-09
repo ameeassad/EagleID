@@ -13,6 +13,15 @@ import numpy as np
 import ast
 from PIL import Image
 
+# mask_prediction = False # Does not work well with mask
+
+# def create_mask(image_size, segmentation):
+#         mask = np.zeros(image_size[::-1], dtype=np.uint8)
+#         for seg in segmentation:
+#             poly = np.array(seg).reshape((len(seg) // 2, 2)).astype(np.int32)
+#             cv2.fillPoly(mask, [poly], 1)
+#         return mask
+
 # Load your COCO annotations file
 with open('/Users/amee/Documents/code/master-thesis/AgeClassifier/annot/modified_train_annotations.json', 'r') as f:
     coco_data = json.load(f)
@@ -100,6 +109,16 @@ for annotation in coco_data['annotations']:
 
     # Crop the image using the bounding box
     x, y, w, h = [int(v) for v in bbox]
+    
+    # if mask_prediction:
+    #     image = Image.open(img_path).convert("RGB")
+    #     mask = create_mask(image.size, segmentation)
+    #     masked_image = np.array(image) * np.expand_dims(mask, axis=2)
+    #     masked_image = Image.fromarray(masked_image.astype('uint8'))
+    #     # Crop the masked image to the bounding box
+    #     masked_img = masked_image.crop((x, y, x + w, y + h))
+    #     cropped_img = np.array(masked_img)
+    # else:
     cropped_img = img[y:y+h, x:x+w]
         
     # Save the cropped image temporarily
@@ -124,11 +143,17 @@ for annotation in coco_data['annotations']:
             # handle cropping
             original_x = int(keypoint[0]) + x
             original_y = int(keypoint[1]) + y
-            if score > 0.2:  # threshold to consider the keypoint
+            if score > 0.5:  # threshold to consider the keypoint
                 formatted_keypoints.extend([original_x, original_y, 2])
             else:
                 formatted_keypoints.extend([original_x, original_y, 0])
             #end crop
+
+            # if score > 0.5:  # threshold to consider the keypoint
+            #     formatted_keypoints.extend([int(keypoint[0]), int(keypoint[1]), 2])
+            # else:
+            #     formatted_keypoints.extend([int(keypoint[0]), int(keypoint[1]), 0])
+
         # Update the annotation with keypoints
         annotation['keypoints'] = formatted_keypoints
         annotation['num_keypoints'] = len(keypoint_scores) # keep all keypoints, even if not visible
@@ -162,6 +187,22 @@ for annotation in coco_data['annotations']:
         # # Show the image with keypoints, skeleton, and joint names
         # cv2.imwrite(f'results/output_image-{image_id}.jpg', img)
         # #end visualization
+
+        # another type of visualization:
+
+        # img = cv2.imread(img_path)
+        # x, y, w, h = [int(v) for v in bbox]
+        # cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        
+        # for j in range(0, len(formatted_keypoints), 3):
+        #     kp_x, kp_y, v = formatted_keypoints[j:j+3]
+        #     if v > 0:  # Only plot visible keypoints
+        #         cv2.circle(img, (kp_x, kp_y), 3, (0, 255, 0), -1)
+        
+        # plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        # plt.show()
+
+        # break  # Stop after the first visualization
 
 # Save the updated annotations back to a file
 with open('results/final_annotations.json', 'w') as f:
