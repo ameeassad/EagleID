@@ -471,7 +471,7 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             df_query = fill_keypoints(df_query, self.data_dir, cache_path=self.cache_path)
             df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path)
 
-        self.img_channels = 3 # are we doing something with img_channels?
+        self.img_channels = 3 
         if preprocess_lvl == 0:
             self.method = 'full'
         elif preprocess_lvl == 1:
@@ -483,7 +483,7 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.img_channels = 4
         elif preprocess_lvl == 4:
             self.method = "bbox_mask_components"
-            self.img_channels = 3 + 3*5
+            self.img_channels = 3 + 3 * 5
 
         print(f"length of training dataset: {len(df_train)}")
         self.train_dataset = RaptorsWildlife(metadata=df_train, root=data_dir, transform=self.train_transforms, img_load=self.method, preprocess_lvl=preprocess_lvl)

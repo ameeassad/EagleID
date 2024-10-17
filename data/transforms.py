@@ -272,6 +272,10 @@ class ComponentGenerationTransforms:
             for component_name in cropped_images:
                 if cropped_images[component_name] is not None:
                     cropped_images[component_name] = np.fliplr(cropped_images[component_name])
+                else:
+                    # Create a blank black image of the same height and width as rgb_img
+                    height, width, _ = rgb_img.shape
+                    cropped_images[component_name] = np.zeros((height, width, 3), dtype=np.uint8)
 
         # Apply the same random rotation
         angle = random.uniform(-self.degrees, self.degrees)

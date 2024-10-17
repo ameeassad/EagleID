@@ -62,12 +62,33 @@ class TripletSimpleModel(pl.LightningModule):
         return optimizer
 
 class TripletModel(pl.LightningModule):
-    def __init__(self, backbone_model_name, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001, config=None):
+    def __init__(self, backbone_model_name, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001, config=None, preprocess_lvl=0):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
         # Backbone (ResNet without the final FC layer)
         self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=True, num_classes=0)
+
+        if preprocess_lvl >= 3:
+            # Modify the first convolutional layer to accept 4 or 18 channels instead of 3
+            if preprocess_lvl == 3: 
+                num_channels = 4
+            elif preprocess_lvl == 4: 
+                num_channels = 18
+            else:
+                num_channels = 3
+            if hasattr(self.backbone, 'conv1'):
+                self.backbone.conv1 = nn.Conv2d(
+                    in_channels=num_channels,
+                    out_channels=self.backbone.conv1.out_channels,
+                    kernel_size=self.backbone.conv1.kernel_size,
+                    stride=self.backbone.conv1.stride,
+                    padding=self.backbone.conv1.padding,
+                    bias=False
+                )
+                # Reinitialize the weights of the new convolutional layer
+                nn.init.kaiming_normal_(self.backbone.conv1.weight, mode='fan_out', nonlinearity='relu')
+
         # Embedder (to project features into the desired embedding space)
         self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)
         # self.fc = nn.Linear(self.model.output_size, embedding_size)  # Embedding layer
