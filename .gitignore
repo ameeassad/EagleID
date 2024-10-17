@@ -13,3 +13,4 @@ data_cache/
 __pycache__/
 __pycache__/dataset.cpython-312.pyc
 __pycache__/model.cpython-312.pyc
+dataset/dataframe/

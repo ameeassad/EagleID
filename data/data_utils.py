@@ -12,6 +12,7 @@ def unnormalize(x, mean, std):
     Returns:
         torch.Tensor: Unnormalized tensor.
     """
+    
     x = x.clone().detach()[:3]
 
     mean = (mean, mean, mean) if isinstance(mean, float) else tuple(mean)
@@ -19,7 +20,8 @@ def unnormalize(x, mean, std):
 
     mean = torch.tensor(mean)
     std = torch.tensor(std)
-    
+
+
     if x.dim() == 3:  # Ensure the tensor has 3 dimensions
         unnormalized_x = x.clone()
         for t, m, s in zip(unnormalized_x, mean, std):
@@ -27,3 +29,5 @@ def unnormalize(x, mean, std):
         return unnormalized_x
     else:
         raise ValueError(f"Expected input tensor to have 3 dimensions, but got {x.dim()} dimensions.")
+    
+

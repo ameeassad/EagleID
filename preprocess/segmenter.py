@@ -13,7 +13,8 @@ from ultralytics import YOLO
 from shapely.geometry import Polygon
 
 
-def get_segs(self, polygon, image):
+
+def get_segs(polygon, image):
     segmentation = [polygon]
 
     poly = Polygon(polygon)
@@ -25,7 +26,7 @@ def get_segs(self, polygon, image):
     # [x, y, w, h] = cv2.boundingRect(polygon)
     return seg, bbox, area
 
-def display_annotations(self,image,polygon=None):
+def display_annotations(image,polygon=None):
     # Create a subplot
     fig, ax = plt.pyplot.subplots(1, 2, figsize=(10, 5))
 
@@ -53,18 +54,41 @@ def display_annotations(self,image,polygon=None):
         # Show the plot
         plt.pyplot.show()
 
+def add_segmentations(df, image_dir="", testing=False, cache_path=None):
+    """
+    Uses the YOLOv8 model to make predictions for bbox and segmentations. 
+    Bbox format is [x_min, y_min, width, height]
+    Segmentations format is a flattened list of x , y values
+    """
 
-def add_segmentations(df, image_dir="", testing=False):
+    # Load or initialize the cache DataFrame
+    if cache_path and os.path.exists(cache_path):
+        cache_df = pd.read_csv(cache_path)
+    else:
+        cache_df = pd.DataFrame(columns=df.columns)
 
     model = YOLO('../checkpoints/yolov8x-seg.pt')
 
     updated_rows = []
     for _, row in df.iterrows():
+        # Check if the row exists in the cache and has 'segmentation' data
+        if cache_path and 'path' in cache_df.columns:
+            cached_row = cache_df[cache_df['path'] == row['path']]
+            if not cached_row.empty and pd.notnull(cached_row.iloc[0]['segmentation']):
+                # Use cached data
+                updated_rows.append(cached_row.iloc[0].to_dict())
+                continue
+
+        # else:
         image_path = os.path.join(image_dir, row['path'])
+
         image = Image.open(image_path)
         W, H = image.size
 
+        # If no cache or segmentation is missing, run YOLOv8 model
         results = model(image)
+        if len(results)>1:
+            print("WARNING: Multiple objects detected in image")
         for result in results:
             if result.masks is None:
                 print("No mask found in result, printing result")
@@ -80,14 +104,26 @@ def add_segmentations(df, image_dir="", testing=False):
                 iscrowd = 0 if len(results) <= 1 else 1
 
                 updated_row = row.to_dict()
-                updated_row['segmentations'] = [segmentation]
+                updated_row['segmentation'] = [segmentation]
                 updated_row['height'] = H
                 updated_row['width'] = W
                 updated_row['bbox'] = bbox
                 updated_row['area'] = int(area)
                 updated_row['iscrowd'] = iscrowd
+                
+                # Update the cache
+                if cache_path:
+                    cache_df = cache_df[cache_df['path'] != row['path']]  # Remove old row if exists
+                    cache_df = pd.concat(
+                        [cache_df, pd.DataFrame([updated_row])], ignore_index=True
+                    )
 
                 updated_rows.append(updated_row)
+
+                break # only process the first result
+            
+    if cache_path:
+        cache_df.to_csv(cache_path, index=False)
 
     updated_df = pd.DataFrame(updated_rows)
     return updated_df

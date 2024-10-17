@@ -386,7 +386,7 @@ class EagleDataset(Dataset):
             masked_image, skeleton_channel = resize_and_pad(masked_image, self.size, skeleton_channel=skeleton_channel)
             masked_image = self.transform(masked_image, skeleton_channel)
         elif self.transform:
-            masked_image, _ = resize_and_pad(masked_image, self.size)
+            masked_image = resize_and_pad(masked_image, self.size)
             masked_image = self.transform(masked_image)
         
         return masked_image, label

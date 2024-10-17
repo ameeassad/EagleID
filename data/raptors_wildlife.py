@@ -6,10 +6,24 @@ from PIL import Image
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+from typing import Callable
 
+import pycocotools.mask as mask_coco
+import numpy as np
+import json
+import math
 
 import cv2
 import re, os
+import data. transforms as t
+from data.transforms import RGBTransforms, ResizeAndPadRGB, ValTransforms, SynchTransforms, resize_and_pad, rotate_image
+
+import ast
+from .skeleton_category import AKSkeletonCategory
+from preprocess.preprocess_utils import create_mask, create_skeleton_channel
+from preprocess.component_gen import component_generation_module
+from preprocess.mmpose_fill import get_keypoints_info
+
 
 """
 datasets.DatasetFactory:
@@ -48,16 +62,16 @@ span 	        The span of the dataset (the time difference between the last and 
 
 class Raptors(datasets.DatasetFactory):
 
-    def __init__(self, root: str, df = None):
+    def __init__(self, root: str, df = None, include_video = True):
         self.root = root
         if df is None:
-            self.df = self.create_catalogue()
+            self.df = self.create_catalogue(include_video)
         else:
             self.df = df.copy()
 
         super().__init__(root=root, df=self.df)
 
-    def create_catalogue(self) -> pd.DataFrame:
+    def create_catalogue(self, include_video=True) -> pd.DataFrame:
         """
         Create a DataFrame catalog of the dataset, including species, animal ID, image paths, and metadata.
         
@@ -78,6 +92,7 @@ class Raptors(datasets.DatasetFactory):
             
             for animal_id in os.listdir(species_path):
                 animal_path = os.path.join(species_path, animal_id)
+                directory = os.path.join(species_name, animal_id)
 
                 # Assign a unique identity_id if it's not already assigned
                 if animal_id not in identity_map:
@@ -89,9 +104,10 @@ class Raptors(datasets.DatasetFactory):
                 
                 # Check for either images directly or video-based screenshots
                 for sub_entry in os.listdir(animal_path):
+                    # sub_entry is either a video folder or an image file
                     sub_path = os.path.join(animal_path, sub_entry)
                     
-                    if os.path.isdir(sub_path):
+                    if os.path.isdir(sub_path) and include_video:
                         # It's a video folder; get screenshots inside the folder
                         for screenshot in os.listdir(sub_path):
                             if screenshot.endswith(('.jpg', '.jpeg', '.png')):
@@ -101,7 +117,7 @@ class Raptors(datasets.DatasetFactory):
                                     'species': species_name,
                                     'identity_id': identity_map[animal_id],
                                     'identity': animal_id,
-                                    'path': os.path.join(sub_path, screenshot),
+                                    'path': os.path.join(directory, sub_entry, screenshot),
                                     'from_video': True,
                                     'video': sub_entry,
                                     'date': date
@@ -115,7 +131,7 @@ class Raptors(datasets.DatasetFactory):
                             'species': species_name,
                             'identity_id': identity_map[animal_id],
                             'identity': animal_id,
-                            'path': sub_path,
+                            'path': os.path.join(directory, sub_entry),
                             'from_video': False,
                             'video': None,
                             'date': date
@@ -166,26 +182,20 @@ class Raptors(datasets.DatasetFactory):
 class RaptorsWildlife(WildlifeDataset):
     """
     Custom Dataset for Raptors, inheriting from WildlifeDataset.
-
-    Args:
-        metadata (pd.DataFrame): Dataframe containing image metadata.
-        root (str): Root directory for images.
-        transform (callable, optional): Transform to be applied to the images.
-        img_load (str, optional): How to load images ('full', 'bbox', etc.).
-        col_path (str, optional): Column in metadata with image paths.
-        col_label (str, optional): Column in metadata with class labels.
-        load_label (bool, optional): Whether to load labels or not.
+    Can be used to also call on Raptors class without already having the dataframe ready.
     """
 
     def __init__(
         self,
         metadata: pd.DataFrame | None = None,
         root: str | None = None,
+        split: Callable | None = None,
         transform: callable = None,
         img_load: str = "full",
         col_path: str = "path",
         col_label: str = "identity", 
         load_label: bool = True, 
+        preprocess_lvl: int = 0,
     ):
         
         if metadata is None:
@@ -202,7 +212,13 @@ class RaptorsWildlife(WildlifeDataset):
             load_label=load_label
         )
         self.raptor_dataset = Raptors(root, metadata)
-        self.metadata = metadata
+        self.split = split
+        if self.split:
+            metadata = self.split(metadata)
+        self.metadata = metadata.reset_index(drop=True)
+
+        if img_load == "bbox_mask_skeleton":
+            self.skeleton_category = AKSkeletonCategory()
         
     # def get_image(self, path):
     #     """
@@ -212,15 +228,166 @@ class RaptorsWildlife(WildlifeDataset):
     #     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     #     img = Image.fromarray(img)
     #     return img
+
+    def __getitem__(self, idx):
+        data = self.metadata.iloc[idx]
+        if self.root:
+            img_path = os.path.join(self.root, data[self.col_path])
+        else:
+            img_path = data[self.col_path]
+        img = self.get_image(img_path)
+
+        # print(img_path)
+
+        if self.img_load in ["full_mask", "full_hide", "bbox_mask", "bbox_hide", "bbox_mask_skeleton", "bbox_mask_components"]:
+            if not ("segmentation" in data):
+                raise ValueError(f"{self.img_load} selected but no segmentation found.")
+            if type(data["segmentation"]) == str:
+                segmentation = eval(data["segmentation"])
+            else:
+                segmentation = data["segmentation"]
+            seg_coco = segmentation
+
+            if isinstance(segmentation, list):
+                # Convert polygon to RLE
+                height, width = data['height'], data['width']
+                # height, width = img.size[1], img.size[0]
+                rle = mask_coco.frPyObjects(segmentation, height, width)
+                segmentation = mask_coco.merge(rle)
+
+        if self.img_load in ["bbox", "bbox_mask", "bbox_hide", "bbox_mask_skeleton", "bbox_mask_components"]:
+            if not ("bbox" in data):
+                raise ValueError(f"{self.img_load} selected but no bbox found.")
+            if type(data["bbox"]) == str:
+                bbox = json.loads(data["bbox"])
+            else:
+                bbox = data["bbox"]
+
+        # Load full image as it is.
+        if self.img_load == "full":
+            img = img
+
+        # Mask background using segmentation mask.
+        elif self.img_load == "full_mask":
+            mask = mask_coco.decode(segmentation).astype("bool")
+            img = Image.fromarray(img * mask[..., np.newaxis])
+
+        # Hide object using segmentation mask
+        elif self.img_load == "full_hide":
+            mask = mask_coco.decode(segmentation).astype("bool")
+            img = Image.fromarray(img * ~mask[..., np.newaxis])
+
+        # Crop to bounding box
+        elif self.img_load == "bbox":
+            img = img.crop((bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]))
+
+        # Mask background using segmentation mask and crop to bounding box.
+        elif self.img_load == "bbox_mask" or self.img_load == "bbox_mask_skeleton" or self.img_load == "bbox_mask_components":
+            mask = mask_coco.decode(segmentation).astype("bool")
+            img = Image.fromarray(img * mask[..., np.newaxis])
+            img = img.crop((bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]))
+
+        # Hide object using segmentation mask and crop to bounding box.
+        elif self.img_load == "bbox_hide":
+            mask = mask_coco.decode(segmentation).astype("bool")
+            img = Image.fromarray(img * ~mask[..., np.newaxis])
+            img = img.crop((bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]))
+
+        # Crop black background around images
+        elif self.img_load == "crop_black":
+            y_nonzero, x_nonzero, _ = np.nonzero(img)
+            img = img.crop(
+                (
+                    np.min(x_nonzero),
+                    np.min(y_nonzero),
+                    np.max(x_nonzero),
+                    np.max(y_nonzero),
+                )
+            )
+
+        else:
+            raise ValueError(f"Invalid img_load argument: {self.img_load}")
+        
+        if self.img_load in ["bbox_mask_skeleton", "bbox_mask_components"]:
+            if not ("keypoints" in data):
+                raise ValueError(f"{self.img_load} selected but no keypoints found.")
+            if type(data["keypoints"]) == str:
+                keypoints = eval(data["keypoints"])
+            else:
+                keypoints = data["keypoints"]
+        
+        if self.img_load == "bbox_mask_skeleton":
+            x_min = math.floor(bbox[0])
+            y_min = math.floor(bbox[1])
+            w = math.ceil(bbox[2])
+            h = math.ceil(bbox[3])
+            bbox = [x_min, y_min, w, h]
+            # Create skeleton channel:
+            connections = self.skeleton_category.get_connections()
+            # Convert connections from string to list if necessary
+            if isinstance(connections, str):
+                connections = ast.literal_eval(connections)
+            skeleton_channel = create_skeleton_channel(keypoints, connections, height=int(height), width=int(width))
+            skeleton_channel = skeleton_channel[y_min:y_min + h, x_min:x_min + w]
+            # print(skeleton_channel.shape)
+            # print(skeleton_channel)
+
+        if self.img_load == "bbox_mask_components":
+            img_cv = cv2.imread(img_path)
+            img_cv = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
+            keypoint_labels = get_keypoints_info()
+            cropped_images = component_generation_module(img_cv, bbox, keypoints, keypoint_labels, True, seg_coco)
+
+        if self.transform:
+            if self.img_load == "bbox_mask_skeleton":
+                img, skeleton_channel = self.transform[0](img, skeleton_channel)
+                img = self.transform[1](img, skeleton_channel) #concatenated 
+
+            elif self.img_load == "bbox_mask_components":
+                img = self.transform[0](img)
+                img = self.transform[1](img, cropped_images) #concatenated 
+
+            else:
+                # img = resize_and_pad(img, self.size)
+                img = self.transform(img)
+
+        if self.load_label:
+            return img, self.labels[idx]
+        else:
+            return img
+        
     
     def wildlife_dataset(self) -> Raptors:
         return self.raptor_dataset
     
     def get_df(self) -> pd.DataFrame:
         return self.metadata
+
+    
+class GoldensWildlife(RaptorsWildlife):
+    """
+    Calls on Raptors directory and creates the dataset but only for golden eagles.
+    """
+    def __init__(
+        self,
+        metadata: pd.DataFrame | None = None,
+        root: str | None = None,
+        transform: callable = None,
+        **kwargs
+    ):
+        if metadata is None:
+            raptor_dataset = Raptors(root)
+            metadata = raptor_dataset.df[raptor_dataset.df['species'] == 'goleag']
+        else:
+            metadata = metadata[metadata['species'] == 'goleag']
+
+        super().__init__(metadata=metadata, root=root, transform=transform, **kwargs)
+        # if metadata is None:
+        #     raptor_dataset = Raptors(root)
+        #     metadata = raptor_dataset.df['species'] == 'goleag'
     
 class WildlifeReidDataModule(pl.LightningDataModule):
-    def __init__(self, data_dir, metadata, preprocess_lvl=0, batch_size=8, size=256, mean=0.5, std=0.5, num_workers=2, config = None):
+    def __init__(self, data_dir, metadata, preprocess_lvl=0, batch_size=8, size=256, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], num_workers=2, config = None):
         super().__init__()
         self.config = config
         if config:
@@ -230,6 +397,8 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.size = config.size
             self.mean = (config.mean, config.mean, config.mean) if isinstance(config.mean, float) else tuple(config.mean)
             self.std = (config.std, config.std, config.std) if isinstance(config.std, float) else tuple(config.std)
+            self.split_ratio = config.split_ratio # percent of individuals used for training
+            self.cache_path = config.cache_path
         else:
             self.data_dir = data_dir
             self.num_workers = num_workers
@@ -238,13 +407,42 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.size = size
             self.mean = (mean, mean, mean) if isinstance(mean, float) else tuple(mean)
             self.std = (std, std, std) if isinstance(std, float) else tuple(std)
+            self.split_ratio = 0.8
+            self.cache_path = "../dataset/dataframe/cache.csv"
 
-        transform = transforms.Compose([
-            transforms.Resize((self.size, self.size)),
-            transforms.ToTensor(),
-        ])
+        if preprocess_lvl == 3:
+            resize_and_pad = t.ResizeAndPadRGBSkeleton(self.size)
+            sync_transform = t.SynchTransforms(mean=self.mean, std=self.std)
+            sync_val_transform = t.SynchTransforms(mean=self.mean, std=self.std, color_and_gaussian=False)
+            self.train_transforms =  [resize_and_pad, sync_transform]
+            self.val_transforms = [resize_and_pad, sync_val_transform]  # everything except for color / gaussian transforms aka no someOf transforms
+        elif preprocess_lvl == 4:
+            resize_and_pad = t.ResizeAndPadRGB(self.size)
+            sync_transform = t.ComponentGenerationTransforms(mean=self.mean, std=self.std)
+            sync_val_transform = t.ComponentGenerationTransforms(mean=self.mean, std=self.std, color_and_gaussian=False)
+            self.train_transforms =  [resize_and_pad, sync_transform]
+            self.val_transforms = [resize_and_pad, sync_val_transform]  # everything except for color / gaussian transforms
+        else:
+            self.train_transforms =  transforms.Compose([
+                                            t.ResizeAndPadRGB(self.size),
+                                            t.RGBTransforms(mean=self.mean, std=self.std),
+            ])
+            self.val_transforms = transforms.Compose([
+                                            t.ResizeAndPadRGB(self.size),
+                                            t.RGBTransforms(mean=self.mean, std=self.std, color_and_gaussian=False),
+            ])  # everything except for color / gaussian transforms
 
-        splitter = splits.ClosedSetSplit(0.8)
+        # self.val_transforms = Compose([
+        #     # Resize(self.size),
+        #     # Pad((self.size - 1, self.size - 1), padding_mode='constant'),
+        #     ToTensor(),
+        #     Normalize(mean=self.mean, std=self.std)
+        # ])
+
+        # Need to fix splits
+        #  will i also offer open set split? aka some individuals in the query might not be present in the gallery. 
+        # This implies that a query can return "unknown" results if the individual is not part of the gallery.
+        splitter = splits.ClosedSetSplit(self.split_ratio) # each identity is either in the training set or the testing set but not in both.
         for idx_train, idx_test in splitter.split(metadata):
             splits.analyze_split(metadata, idx_train, idx_test)
 
@@ -252,42 +450,48 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         df_train.reset_index(drop=True, inplace=True)
         df_test.reset_index(drop=True, inplace=True)
 
-
+        df_test = self.filter_identities(df_test)
         df_query, df_gallery = self.split_query_database(df_test)
 
         # preprocessing
         if self.preprocess_lvl > 0: # 1: bounding box cropped image or 2: masked image
             from preprocess.segmenter import add_segmentations
 
-            df_train = add_segmentations(df_train, self.data_dir)
-            df_query = add_segmentations(df_query, self.data_dir)
-            df_gallery = add_segmentations(df_gallery, self.data_dir)
+            df_train = add_segmentations(df_train, self.data_dir, cache_path=self.cache_path)
+            df_query = add_segmentations(df_query, self.data_dir, cache_path=self.cache_path)
+            df_gallery = add_segmentations(df_gallery, self.data_dir, cache_path=self.cache_path)
         
-        if self.preprocess_lvl == 3: # 3: masked + pose (skeleton) image in 1 channel
-            from preprocess.mmpose_fill import fill_keypoints
+        if self.preprocess_lvl >= 3: # 3: masked + pose (skeleton) image in 1 channel or 4: masked + body part clusters in channels
+            from preprocess.mmpose_fill import fill_keypoints, get_skeleton_info, get_keypoints_info
 
-            self.keypoints =["Head_Mid_Top","Eye_Left","Eye_Right","Mouth_Front_Top","Mouth_Back_Left",
-                             "Mouth_Back_Right","Mouth_Front_Bottom","Shoulder_Left","Shoulder_Right",
-                             "Elbow_Left","Elbow_Right","Wrist_Left","Wrist_Right","Torso_Mid_Back",
-                             "Hip_Left","Hip_Right","Knee_Left","Knee_Right","Ankle_Left","Ankle_Right",
-                             "Tail_Top_Back","Tail_Mid_Back","Tail_End_Back"]
-            self.skeleton = [
-                                [2,1],[3,1],[4,5],[4,6],[7,5],[7,6],[1,14],[14,21],
-                                [21,22],[22,23],[1,8],[1,9],[8,10],[9,11],[10,12],[11,13],
-                                [21,15],[21,16],[15,17],[16,18],[17,19],[18,20]
-                            ]
+            self.keypoints = get_keypoints_info()
+            self.skeleton = get_skeleton_info()
 
-            df_train = fill_keypoints(df_train, self.data_dir)
-            df_query = fill_keypoints(df_query, self.data_dir)
-            df_gallery = fill_keypoints(df_gallery, self.data_dir)
+            df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path)
+            df_query = fill_keypoints(df_query, self.data_dir, cache_path=self.cache_path)
+            df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path)
 
-        elif self.preprocess_lvl == 4: # 4: masked + body part clusters in channels
-            pass
+        self.img_channels = 3 # are we doing something with img_channels?
+        if preprocess_lvl == 0:
+            self.method = 'full'
+        elif preprocess_lvl == 1:
+            self.method = 'bbox'
+        elif preprocess_lvl == 2: 
+            self.method = "bbox_mask"
+        elif preprocess_lvl == 3: 
+            self.method = "bbox_mask_skeleton"
+            self.img_channels = 4
+        elif preprocess_lvl == 4:
+            self.method = "bbox_mask_components"
+            self.img_channels = 3 + 3*5
 
-
-        self.train_dataset = RaptorsWildlife(metadata=df_train, root=data_dir, transform=transform)
-        self.val_query_dataset = RaptorsWildlife(metadata=df_query, root=data_dir, transform=transform)
-        self.val_gallery_dataset = RaptorsWildlife(metadata=df_gallery, root=data_dir, transform=transform)
+        print(f"length of training dataset: {len(df_train)}")
+        self.train_dataset = RaptorsWildlife(metadata=df_train, root=data_dir, transform=self.train_transforms, img_load=self.method, preprocess_lvl=preprocess_lvl)
+        # do i add the preprocess/method to all 3 datasets? like also gallery? i think yes bc they will go thru embeddings
+        print(f"length of query dataset: {len(df_query)}")
+        self.val_query_dataset = RaptorsWildlife(metadata=df_query, root=data_dir, transform=self.val_transforms, img_load=self.method, preprocess_lvl=preprocess_lvl)
+        print(f"length of gallery dataset: {len(df_gallery)}")
+        self.val_gallery_dataset = RaptorsWildlife(metadata=df_gallery, root=data_dir, transform=self.val_transforms, img_load=self.method, preprocess_lvl=preprocess_lvl)
         self.val_query_dataset.metadata.reset_index(drop=True, inplace=True)
         self.val_gallery_dataset.metadata.reset_index(drop=True, inplace=True)
 
@@ -331,21 +535,18 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         return query_metadata, database_metadata
 
 
-class GoldensWildlife(RaptorsWildlife):
-    def __init__(
-        self,
-        metadata: pd.DataFrame | None = None,
-        root: str | None = None,
-        transform: callable = None,
-        **kwargs
-    ):
-        if metadata is None:
-            raptor_dataset = Raptors(root)
-            metadata = raptor_dataset.df[raptor_dataset.df['species'] == 'goleag']
-        else:
-            metadata = metadata[metadata['species'] == 'goleag']
+    def filter_identities(self, metadata, min_images=2):
+        """
+        Filters out identities with fewer than a minimum number of images.
 
-        super().__init__(metadata=metadata, root=root, transform=transform, **kwargs)
-        # if metadata is None:
-        #     raptor_dataset = Raptors(root)
-        #     metadata = raptor_dataset.df['species'] == 'goleag'
+        Args:
+            metadata (pd.DataFrame): Dataframe containing image metadata.
+            min_images (int): Minimum number of images required per identity.
+
+        Returns:
+            filtered_metadata (pd.DataFrame): Metadata filtered to only include identities with the required number of images.
+        """
+        identity_counts = metadata['identity'].value_counts()
+        valid_identities = identity_counts[identity_counts >= min_images].index
+        return metadata[metadata['identity'].isin(valid_identities)].reset_index(drop=True)
+

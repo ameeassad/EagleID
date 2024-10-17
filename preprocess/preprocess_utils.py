@@ -1,13 +1,19 @@
 import cv2
 import numpy as np
+import os
+import pickle
+import json
+import pandas as pd
+import ast
+
 
 def create_mask(image_size, segmentation):
         """
-        Creates a binary mask based on the segmentation of the object.
+        Creates a *binary mask* based on the segmentation of the object.
 
         Args:
             image_size (tuple): Size of the original image.
-            segmentation (list): COCO-style segmentation of the object.
+            segmentation (list): COCO-style segmentation of the object (flattened x y values).
 
         Returns:
             np.array: Binary mask of the object.
@@ -66,3 +72,48 @@ def create_skeleton_channel(keypoints, connections, height, width, sigma=2, thic
     skeleton_channel = np.clip(skeleton_channel, 0, 1)  # Normalize to [0, 1] range
 
     return skeleton_channel
+
+
+# def cache_load_seg(cache_path, row):
+#     with open(cache_path, 'rb') as cache_file:
+#         cached_data = pickle.load(cache_file)
+#         updated_row = row.to_dict()
+#         updated_row.update(cached_data)
+#     return updated_row
+
+# def cache_load_keypoint(cache_path, row):
+#     with open(cache_path, 'rb') as cache_file:
+#         cached_data = pickle.load(cache_file)
+#         if 'keypoints' in cached_data:
+#             updated_row = row.to_dict()
+#             updated_row.update(cached_data)
+#     return updated_row
+
+
+# def cache_save(updated_row, cache_path):
+#     # Save the segmentation data to cache
+#     cached_data = {
+#         'segmentation': updated_row['segmentation'],
+#         'height': updated_row['height'],
+#         'width': updated_row['width'],
+#         'bbox': updated_row['bbox'],
+#         'area': updated_row['area'],
+#         'iscrowd': updated_row['iscrowd'],
+#     }
+#     if os.path.exists(cache_path):
+#         # Update existing cache
+#         with open(cache_path, 'rb') as cache_file:
+#             existing_data = pickle.load(cache_file)
+#         existing_data.update(cached_data)
+#         with open(cache_path, 'wb') as cache_file:
+#             pickle.dump(existing_data, cache_file)
+#     else:
+#         # Ensure the directory exists
+#         cache_dir = os.path.dirname(cache_path)
+#         if not os.path.exists(cache_dir):
+#             os.makedirs(cache_dir)
+#         # Create new cache
+#         with open(cache_path, 'wb') as cache_file:
+#             pickle.dump(cached_data, cache_file)
+
+
