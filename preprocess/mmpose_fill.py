@@ -9,6 +9,7 @@ import os, ast
 from mmpose.apis import MMPoseInferencer
 import cv2
 import pandas as pd
+import numpy as np
 
 
 def fill_keypoints(df, image_dir="", cache_path=None):
@@ -17,7 +18,7 @@ def fill_keypoints(df, image_dir="", cache_path=None):
     inferencer = MMPoseInferencer(
         pose2d='td-hm_hrnet-w32_8xb32-300e_animalkingdom_P3_bird-256x256',
         pose2d_weights='https://download.openmmlab.com/mmpose/v1/animal_2d_keypoint/topdown_heatmap/animal_kingdom/td-hm_hrnet-w32_8xb32-300e_animalkingdom_P3_bird-256x256-566feff5_20230519.pth',
-        device='cpu'
+        device='cpu',
     )
 
     if 'keypoints' not in df.columns:
@@ -70,6 +71,8 @@ def fill_keypoints(df, image_dir="", cache_path=None):
         # Perform pose estimation using the bounding box from the annotation
         result = next(result_generator)
 
+        # Retrieve and process heatmaps
+
         formatted_keypoints = []
         keypoint_scores = []
         
@@ -91,7 +94,7 @@ def fill_keypoints(df, image_dir="", cache_path=None):
                     formatted_keypoints.extend([original_x, original_y, 0])
 
         # Update the annotation with keypoints
-        df.at[idx, 'keypoints'] = formatted_keypoints
+        df.at[idx, 'keypoints'] = str(formatted_keypoints)
         df.at[idx, 'num_keypoints'] = len(keypoint_scores)
 
         if cache_path:

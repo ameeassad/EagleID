@@ -151,7 +151,7 @@ class TripletModel(pl.LightningModule):
         else:
             if wildlife:
                 similarity_function = CosineSimilarity()
-                similarity = similarity_function(query_embeddings, gallery_embeddings)['default']
+                similarity = similarity_function(query_embeddings, gallery_embeddings)['cosine']
                 distmat = 1 - similarity # Convert similarity to distance if necessary
                 return distmat
             else:

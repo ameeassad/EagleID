@@ -487,7 +487,6 @@ class WildlifeReidDataModule(pl.LightningDataModule):
 
         print(f"length of training dataset: {len(df_train)}")
         self.train_dataset = RaptorsWildlife(metadata=df_train, root=data_dir, transform=self.train_transforms, img_load=self.method, preprocess_lvl=preprocess_lvl)
-        # do i add the preprocess/method to all 3 datasets? like also gallery? i think yes bc they will go thru embeddings
         print(f"length of query dataset: {len(df_query)}")
         self.val_query_dataset = RaptorsWildlife(metadata=df_query, root=data_dir, transform=self.val_transforms, img_load=self.method, preprocess_lvl=preprocess_lvl)
         print(f"length of gallery dataset: {len(df_gallery)}")

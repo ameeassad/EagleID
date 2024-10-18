@@ -91,7 +91,7 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None):
             print("WARNING: Multiple objects detected in image")
         for result in results:
             if result.masks is None:
-                print("No mask found in result, printing result")
+                print(f"No mask found for image: {row['path']}")
                 # display_annotations(image)
                 continue
             for mask in result.masks:

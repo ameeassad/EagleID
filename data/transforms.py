@@ -48,10 +48,16 @@ def get_blur_transforms():
             A.GaussNoise(var_limit=(0.0, 0.01 * 255), p=1.0),
         ], p=0.5)
 
-def rotate_image(image, angle):
+def rotate_image(image, angle):    
+
     # Convert PIL image to NumPy array if necessary
     if isinstance(image, Image.Image):
         image = np.array(image)
+
+    # Check if the image is entirely black
+    if np.sum(image) == 0:
+        # Return the black image as is, since rotating an all-black image will still be black
+        return image
 
     height, width = image.shape[:2]
     center = (width // 2, height // 2)
@@ -283,6 +289,10 @@ class ComponentGenerationTransforms:
         for component_name in cropped_images:
             if cropped_images[component_name] is not None:
                 cropped_images[component_name] = rotate_image(cropped_images[component_name], angle)
+            else:
+                # Create a blank black image of the same height and width as rgb_img
+                height, width, _ = rgb_img.shape
+                cropped_images[component_name] = np.zeros((height, width, 3), dtype=np.uint8)
 
         if self.color_and_gaussian:
             #  Apply the transform to rgb_img and record the replay data
@@ -292,8 +302,17 @@ class ComponentGenerationTransforms:
 
             # Apply the recorded replay data to all cropped images
             for component_name in cropped_images:
-                if cropped_images[component_name] is not None:
-                    cropped_images[component_name] = A.ReplayCompose.replay(replay_data, image=cropped_images[component_name])['image']
+                if cropped_images[component_name] is not None and cropped_images[component_name].shape[0] > 0 and cropped_images[component_name].shape[1] > 0:
+                    try:
+                        cropped_images[component_name] = A.ReplayCompose.replay(replay_data, image=cropped_images[component_name])['image']
+                    except Exception as e:
+                        # Handle any exceptions by replacing the invalid image with a fallback black image
+                        print(f"Warning: Error applying replay to component '{component_name}', using a black image. Error: {e}")
+                        cropped_images[component_name] = np.zeros((height, width, 3), dtype=np.uint8)
+                else:
+                    # Ensure cropped images are not None
+                    height, width, _ = rgb_img.shape
+                    cropped_images[component_name] = np.zeros((height, width, 3), dtype=np.uint8)
 
             # only apply gaussian to rgb_img
             rgb_img = self.gaussian_transform(image=rgb_img)['image']
@@ -311,16 +330,27 @@ class ComponentGenerationTransforms:
         component_tensors = []
         for component_name, cropped_img in cropped_images.items():
             if cropped_img is not None:
-                component_tensor = torch.tensor(cropped_img, dtype=torch.float32).permute(2, 0, 1)  # [C, H, W]
+                component_tensor = torch.tensor(cropped_img.copy(), dtype=torch.float32).permute(2, 0, 1)  # [C, H, W]
                 component_tensors.append(component_tensor)
 
         # Concatenate the original image tensor with all component tensors along the channel dimension
         target_size = (rgb_img_tensor.shape[1], rgb_img_tensor.shape[2])  # (height, width)
-        # Use interpolate to resize tensors
-        resized_component_tensors = [
-            torch.nn.functional.interpolate(tensor.unsqueeze(0), size=target_size, mode='bilinear', align_corners=False).squeeze(0)
-            for tensor in component_tensors
-        ]
+        # # Use interpolate to resize tensors
+        # resized_component_tensors = [
+        #     torch.nn.functional.interpolate(tensor.unsqueeze(0), size=target_size, mode='bilinear', align_corners=False).squeeze(0)
+        #     for tensor in component_tensors
+        # ]
+        resized_component_tensors = []
+        for tensor in component_tensors:
+            if tensor.size(1) > 0 and tensor.size(2) > 0:
+                # Interpolate to resize tensors
+                resized_tensor = torch.nn.functional.interpolate(tensor.unsqueeze(0), size=target_size, mode='bilinear', align_corners=False).squeeze(0)
+            else:
+                # Handle invalid dimensions by creating a fallback black tensor
+                resized_tensor = torch.zeros((3, target_size[0], target_size[1]), dtype=torch.float32)
+                print("Warning: Component tensor has invalid dimensions, creating a fallback black tensor.")
+            resized_component_tensors.append(resized_tensor)
+
         # Concatenate tensors along channel dimension
         concatenated = torch.cat([rgb_img_tensor] + resized_component_tensors, dim=0)  # [C_total, H, W]
 
