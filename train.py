@@ -11,8 +11,10 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import seed_everything
 
 from data.artportalen_goleag import ArtportalenDataModule
+from data.raptors_wildlife import WildlifeReidDataModule, Raptors
 from models.simple_model import SimpleModel
 from models.resnet_plus_model import ResNetPlusModel
+from models.triplet_loss_model import TripletModel
 from utils.gradcam_callback import GradCAMCallback
 
 def get_args() -> argparse.Namespace:
@@ -144,33 +146,26 @@ if __name__ == '__main__':
     seed_everything(config['seed'], workers=True)
 
     # setup dataset
-    data = ArtportalenDataModule(data_dir=config['dataset'], preprocess_lvl=config['preprocess_lvl'], batch_size=config['batch_size'], size=config['img_size'], mean=config['transforms']['mean'], std=config['transforms']['std'])
-    
-    if config['annot_train_file'].endswith('.csv'):
-        print('Setting up from CSV')
-        data.setup_from_csv(config['annot_dir'] + config['annot_train_file'], config['annot_dir'] + config['annot_val_file'])
-    elif config['annot_train_file'].endswith('.json'):
-        print('Setting up from COCO')
-        data.setup_from_coco(config['annot_dir'] + config['annot_train_file'], config['annot_dir'] + config['annot_val_file'])
-    else:
-        raise ValueError('Unknown annotation file format')
+    dataset = Raptors(root=config['dataset'], include_video=False)
+    data = WildlifeReidDataModule(metadata=dataset.df, config = config)
 
     # setup model
     if config['checkpoint']:
         print(f"Loading model {config['model_architecture']} from checkpoint")
-        if config['model_architecture']=='ResNetPlusModel':
-            model = ResNetPlusModel(config=config, model_name=config['model_name'], pretrained=False, num_classes=data.num_classes, outdir=config['outdir'])
+        if config['model_architecture']=='TripletModel':
+            # pretrained=True,
+            model = TripletModel(config=config, pretrained=False)
         else:
-            model = SimpleModel(config=config, pretrained=False, num_classes=data.num_classes)
+            model = SimpleModel(config=config, pretrained=False)
+
         checkpoint = torch.load(config['checkpoint'])
         model.load_state_dict(checkpoint["state_dict"])
     else:
         print(f"Start training {config['model_architecture']} from pretrained model")
-        if config['model_architecture']=='ResNetPlusModel':
-            model = ResNetPlusModel(config=config, model_name=config['model_name'], pretrained=True, num_classes=data.num_classes, outdir=config['outdir'])
+        if config['model_architecture']=='TripletModel':
+            model = TripletModel(config=config, pretrained=True)
         else:
-            model = SimpleModel(config=config, pretrained=True, num_classes=data.num_classes)
-
+            model = SimpleModel(config=config, pretrained=True)
 
     trainer = get_trainer(config)
 

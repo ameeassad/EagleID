@@ -27,7 +27,6 @@ import torchvision.transforms.functional as F
 from torchvision.transforms.functional import resize, pad
 import pytorch_lightning as pl
 
-from .data_utils import unnormalize
 from .skeleton_category import AKSkeletonCategory
 from preprocess.segmenterCOCO import COCOBuilder
 from data.transforms import SynchTransforms, RGBTransforms, ValTransforms, resize_and_pad, rotate_image

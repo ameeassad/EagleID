@@ -16,7 +16,6 @@ from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 from data.artportalen_goleag import ArtportalenDataModule
-from data.data_utils import unnormalize
 
 from utils.triplet_loss_utils import TripletLoss
 from utils.optimizer import get_optimizer, get_lr_scheduler_config
@@ -31,6 +30,8 @@ import timm
 
 from wildlife_tools.similarity.cosine import CosineSimilarity
 from utils.metrics import evaluate_map, compute_average_precision
+
+from utils.re_ranking import re_ranking
 
 class TripletSimpleModel(pl.LightningModule):
     def __init__(self, backbone_model_name, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001):
@@ -62,12 +63,32 @@ class TripletSimpleModel(pl.LightningModule):
         return optimizer
 
 class TripletModel(pl.LightningModule):
-    def __init__(self, backbone_model_name, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001, config=None, preprocess_lvl=0):
+    def __init__(self, backbone_model_name="resnet50", config=None, pretrained=True, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001, preprocess_lvl=0, re_ranking=True, outdir="results"):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
+        self.re_ranking = re_ranking
+        if config:
+            backbone_model_name=config['backbone_name']
+            embedding_size=config['triplet_loss']['embedding_size']
+            margin=config['triplet_loss']['margin']
+            mining_type=config['triplet_loss']['mining_type']
+            preprocess_lvl=config['preprocess_lvl'],
+            self.re_ranking=config['re_ranking']
+            self.distance_matrix = config['triplet_loss']['distance_matrix']
+            outdir=config['outdir']
+        else:
+            backbone_model_name=backbone_model_name
+            embedding_size=embedding_size
+            margin=margin
+            mining_type=mining_type
+            preprocess_lvl=preprocess_lvl
+            self.re_ranking=re_ranking
+            self.distance_matrix = 'euclidean'
+            outdir="logs"
+            
         # Backbone (ResNet without the final FC layer)
-        self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=True, num_classes=0)
+        self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=pretrained, num_classes=0)
 
         if preprocess_lvl >= 3:
             # Modify the first convolutional layer to accept 4 or 18 channels instead of 3
@@ -137,33 +158,44 @@ class TripletModel(pl.LightningModule):
         gallery_labels = torch.cat(self.gallery_labels)
 
         # Compute distance matrix
-        distmat = self.compute_distance_matrix(query_embeddings, gallery_embeddings)
+        if self.re_ranking:
+            distmat = re_ranking(query_embeddings, gallery_embeddings, k1=20, k2=6, lambda_value=0.3)
+        else:
+            distmat = self.compute_distance_matrix(query_embeddings, gallery_embeddings)
 
         # Compute mAP
         # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
         mAP = evaluate_map(distmat, query_labels, gallery_labels)
         self.log('val/mAP', mAP)
 
-    def compute_distance_matrix(self, query_embeddings, gallery_embeddings, wildlife=True, euclidean=False):
-        if euclidean:
-        # Compute Euclidean distance between query and gallery embeddings
+    def compute_distance_matrix(self, query_embeddings, gallery_embeddings, wildlife=True):
+        if self.distance_matrix == "euclidean":
+            # Compute Euclidean distance between query and gallery embeddings
             distmat = torch.cdist(query_embeddings, gallery_embeddings)
-        else:
+        elif self.distance_matrix == "cosine":
             if wildlife:
                 similarity_function = CosineSimilarity()
                 similarity = similarity_function(query_embeddings, gallery_embeddings)['cosine']
                 distmat = 1 - similarity # Convert similarity to distance if necessary
+                print(f"Distance matrix type should be np for rerankin: {type(distmat)}")
                 return distmat
             else:
                 query_embeddings = F.normalize(query_embeddings, p=2, dim=1)
                 gallery_embeddings = F.normalize(gallery_embeddings, p=2, dim=1)
                 cosine_similarity = torch.mm(query_embeddings, gallery_embeddings.t())
                 distmat = 1 - cosine_similarity # Convert similarity to distance if necessary
+                print(f"Distance matrix type should be np for reranking: {type(distmat)}")
                 return distmat
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        return optimizer
+        if self.config:
+            optimizer = get_optimizer(self.config, self.parameters())
+            lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
+            return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
+        else:
+            optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+            return optimizer
+    
     
 
 # class TripletLossModel(LightningModule):

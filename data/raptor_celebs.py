@@ -17,10 +17,6 @@ from torchvision.transforms import (
 from torchvision.transforms.functional import resize, pad
 import pytorch_lightning as pl
 
-from .data_utils import create_skeleton_channel, unnormalize
-from .skeleton_category import AKSkeletonCategory
-from preprocess.segmenterCOCO import COCOBuilder
-from data.transforms import SynchTransforms, RGBTransforms, ValTransforms
 
 
 class RaptorCelebs(pl.LightningDataModule):

@@ -227,6 +227,7 @@ class SynchTransforms:
         # if random.random() < 0.5:
         #     rgb_img = rgb_img.transpose(Image.FLIP_LEFT_RIGHT)  # Flip RGB
         #     skeleton_channel = cv2.flip(skeleton_channel, 1)  # Flip skeleton
+
         if random.random() < 0.5:
             rgb_img = np.fliplr(rgb_img)  # Flip RGB (NumPy array)
             skeleton_channel = np.fliplr(skeleton_channel)  # Flip skeleton (NumPy array)
@@ -254,7 +255,7 @@ class SynchTransforms:
         
         # Convert both channels to tensors
         rgb_img = torch.tensor(rgb_img, dtype=torch.float32).permute(2, 0, 1)  # [C, H, W]
-        skeleton_channel = torch.tensor(skeleton_channel, dtype=torch.float32).unsqueeze(0)  # [1, H, W]
+        skeleton_channel = torch.tensor(skeleton_channel.copy(), dtype=torch.float32).unsqueeze(0)  # [1, H, W]
 
         # Concatenate RGB and skeleton channels
         concatenated = torch.cat((rgb_img, skeleton_channel), dim=0)
@@ -380,8 +381,6 @@ class RGBTransforms:
         #     Normalize(mean=mean, std=std),
         # ])
     def __call__(self, rgb_img):
-        # return self.transforms(img)
-
         # Flip RGB (NumPy array)
         if random.random() < 0.5:
             rgb_img = np.fliplr(rgb_img)

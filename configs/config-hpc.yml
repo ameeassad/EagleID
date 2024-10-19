@@ -1,0 +1,57 @@
+project_name: age-classifier
+notes: 
+use_wandb: True
+wandb_entity: winniethepooh
+
+annot_dir: /proj/nobackup/aiforeagles/EagleID/dataset/annot/
+annot_train_file: final_train_sep_sightings.csv
+annot_val_file: final_val_sep_sightings.csv
+annot_test_file: 
+
+
+outdir: /proj/nobackup/aiforeagles/EagleID/results
+dataset: /proj/nobackup/aiforeagles/artportalen/artportalen_goeag
+
+backbone_name: resnet50
+model_architecture: SimpleModel
+checkpoint: 
+preprocess_lvl: 3
+batch_size: 128
+img_size: 256
+epochs: 150
+save_interval: 10
+n_gpu: 1
+num_workers: 12
+gpu_ids: 
+seed: 42
+
+use_gradcam: True
+
+transforms:
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+
+triplet_loss:
+  embedding_size: 128
+  margin: 0.2
+  mining_type: semihard
+  distance_matrix: euclidean
+
+early_stopping:
+  monitor: val/loss
+  min_delta: 0.0005
+  patience: 50
+  verbose: true
+  mode: min
+
+solver:
+  OPT: adam  # adam, sgd
+  WEIGHT_DECAY: 0.001
+  MOMENTUM: 0.9  # only when OPT is sgd
+  BASE_LR: 0.0001
+  LR_SCHEDULER: reduce_on_plateau  # step, multistep, reduce_on_plateau
+  LR_DECAY_RATE: 0.1
+  LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
+  LR_STEP_MILESTONES: [10, 15]  # only when LR_SCHEDULER is multistep
+
+re_ranking: True

@@ -109,7 +109,7 @@ def _score_embeddings_parallel(score_func, map_iter, **kwargs) -> dict[str, floa
 
 
 def evaluate_model_open_set(
-    model: torch.nn.Model,
+    model: torch.nn.Module,
     test_data: DataLoader,
     device: torch.device = torch.device('cpu'),
     top_k: tuple[int] = (1,),
@@ -131,7 +131,7 @@ def evaluate_model_open_set(
 
 
 def evaluate_model_closed_set(
-    model: torch.nn.Model,
+    model: torch.nn.Module,
     train_data: DataLoader,
     test_data: DataLoader,
     device: torch.device = torch.device('cpu'),

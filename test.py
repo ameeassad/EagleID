@@ -21,6 +21,8 @@ from data.artportalen_goleag import ArtportalenDataModule
 from models.simple_model import SimpleModel
 from models.resnet_plus_model import ResNetPlusModel
 
+# re-ranking option
+
 def get_args():
     parser = argparse.ArgumentParser(description='Inference without GradCAM visualization.')
     parser.add_argument('--config', type=str, default='config.yaml', help='Path to the config.')

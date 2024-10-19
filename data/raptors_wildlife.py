@@ -195,7 +195,6 @@ class RaptorsWildlife(WildlifeDataset):
         col_path: str = "path",
         col_label: str = "identity", 
         load_label: bool = True, 
-        preprocess_lvl: int = 0,
     ):
         
         if metadata is None:
@@ -363,42 +362,43 @@ class RaptorsWildlife(WildlifeDataset):
     def get_df(self) -> pd.DataFrame:
         return self.metadata
 
-    
-class GoldensWildlife(RaptorsWildlife):
-    """
-    Calls on Raptors directory and creates the dataset but only for golden eagles.
-    """
-    def __init__(
-        self,
-        metadata: pd.DataFrame | None = None,
-        root: str | None = None,
-        transform: callable = None,
-        **kwargs
-    ):
-        if metadata is None:
-            raptor_dataset = Raptors(root)
-            metadata = raptor_dataset.df[raptor_dataset.df['species'] == 'goleag']
-        else:
-            metadata = metadata[metadata['species'] == 'goleag']
+# class GoldensWildlife(RaptorsWildlife):
+#     """
+#     Calls on Raptors directory and creates the dataset but only for golden eagles.
+#     """
+#     def __init__(
+#         self,
+#         metadata: pd.DataFrame | None = None,
+#         root: str | None = None,
+#         transform: callable = None,
+#         **kwargs
+#     ):
+#         if metadata is None:
+#             raptor_dataset = Raptors(root)
+#             metadata = raptor_dataset.df[raptor_dataset.df['species'] == 'goleag']
+#         else:
+#             metadata = metadata[metadata['species'] == 'goleag']
 
-        super().__init__(metadata=metadata, root=root, transform=transform, **kwargs)
-        # if metadata is None:
-        #     raptor_dataset = Raptors(root)
-        #     metadata = raptor_dataset.df['species'] == 'goleag'
+#         super().__init__(metadata=metadata, root=root, transform=transform, **kwargs)
+#         # if metadata is None:
+#         #     raptor_dataset = Raptors(root)
+#         #     metadata = raptor_dataset.df['species'] == 'goleag'
     
 class WildlifeReidDataModule(pl.LightningDataModule):
-    def __init__(self, data_dir, metadata, preprocess_lvl=0, batch_size=8, size=256, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], num_workers=2, config = None):
+    def __init__(self, metadata, config = None, data_dir="", preprocess_lvl=0, batch_size=8, size=256, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], num_workers=2):
         super().__init__()
         self.config = config
+        self.metadata = metadata
         if config:
-            self.data_dir = config.data_dir
-            self.preprocess_lvl = config.preprocess_lvl
-            self.batch_size = config.batch_size
-            self.size = config.size
-            self.mean = (config.mean, config.mean, config.mean) if isinstance(config.mean, float) else tuple(config.mean)
-            self.std = (config.std, config.std, config.std) if isinstance(config.std, float) else tuple(config.std)
-            self.split_ratio = config.split_ratio # percent of individuals used for training
-            self.cache_path = config.cache_path
+            self.data_dir = config['data_dir']
+            self.preprocess_lvl = config["preprocess_lvl"]
+            self.batch_size = config['batch_size']
+            self.size = config['size']
+            self.mean = (config['mean'], config['mean'], config['mean']) if isinstance(config['mean'], float) else tuple(config['mean'])
+            self.std = (config['std'], config['std'], config['std']) if isinstance(config['std'], float) else tuple(config['std'])
+            self.split_ratio = config['split_ratio'] # percent of individuals used for training
+            self.num_workers = config['num_workers']
+            self.cache_path = config['cache_path']
         else:
             self.data_dir = data_dir
             self.num_workers = num_workers
@@ -410,26 +410,26 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.split_ratio = 0.8
             self.cache_path = "../dataset/dataframe/cache.csv"
 
-        if preprocess_lvl == 3:
+        if self.preprocess_lvl == 3:
             resize_and_pad = t.ResizeAndPadRGBSkeleton(self.size)
-            sync_transform = t.SynchTransforms(mean=self.mean, std=self.std)
-            sync_val_transform = t.SynchTransforms(mean=self.mean, std=self.std, color_and_gaussian=False)
+            sync_transform = t.SynchTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
+            sync_val_transform = t.SynchTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
             self.train_transforms =  [resize_and_pad, sync_transform]
             self.val_transforms = [resize_and_pad, sync_val_transform]  # everything except for color / gaussian transforms aka no someOf transforms
-        elif preprocess_lvl == 4:
+        elif self.preprocess_lvl == 4:
             resize_and_pad = t.ResizeAndPadRGB(self.size)
-            sync_transform = t.ComponentGenerationTransforms(mean=self.mean, std=self.std)
-            sync_val_transform = t.ComponentGenerationTransforms(mean=self.mean, std=self.std, color_and_gaussian=False)
+            sync_transform = t.ComponentGenerationTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
+            sync_val_transform = t.ComponentGenerationTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
             self.train_transforms =  [resize_and_pad, sync_transform]
             self.val_transforms = [resize_and_pad, sync_val_transform]  # everything except for color / gaussian transforms
         else:
             self.train_transforms =  transforms.Compose([
                                             t.ResizeAndPadRGB(self.size),
-                                            t.RGBTransforms(mean=self.mean, std=self.std),
+                                            t.RGBTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True),
             ])
             self.val_transforms = transforms.Compose([
                                             t.ResizeAndPadRGB(self.size),
-                                            t.RGBTransforms(mean=self.mean, std=self.std, color_and_gaussian=False),
+                                            t.RGBTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False),
             ])  # everything except for color / gaussian transforms
 
         # self.val_transforms = Compose([
@@ -444,9 +444,9 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         # This implies that a query can return "unknown" results if the individual is not part of the gallery.
         splitter = splits.ClosedSetSplit(self.split_ratio) # each identity is either in the training set or the testing set but not in both.
         for idx_train, idx_test in splitter.split(metadata):
-            splits.analyze_split(metadata, idx_train, idx_test)
+            splits.analyze_split(self.metadata, idx_train, idx_test)
 
-        df_train, df_test = metadata.loc[idx_train], metadata.loc[idx_test]
+        df_train, df_test = self.metadata.loc[idx_train], metadata.loc[idx_test]
         df_train.reset_index(drop=True, inplace=True)
         df_test.reset_index(drop=True, inplace=True)
 
@@ -486,11 +486,11 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.img_channels = 3 + 3 * 5
 
         print(f"length of training dataset: {len(df_train)}")
-        self.train_dataset = RaptorsWildlife(metadata=df_train, root=data_dir, transform=self.train_transforms, img_load=self.method, preprocess_lvl=preprocess_lvl)
+        self.train_dataset = RaptorsWildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, img_load=self.method)
         print(f"length of query dataset: {len(df_query)}")
-        self.val_query_dataset = RaptorsWildlife(metadata=df_query, root=data_dir, transform=self.val_transforms, img_load=self.method, preprocess_lvl=preprocess_lvl)
+        self.val_query_dataset = RaptorsWildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, img_load=self.method)
         print(f"length of gallery dataset: {len(df_gallery)}")
-        self.val_gallery_dataset = RaptorsWildlife(metadata=df_gallery, root=data_dir, transform=self.val_transforms, img_load=self.method, preprocess_lvl=preprocess_lvl)
+        self.val_gallery_dataset = RaptorsWildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, img_load=self.method)
         self.val_query_dataset.metadata.reset_index(drop=True, inplace=True)
         self.val_gallery_dataset.metadata.reset_index(drop=True, inplace=True)
 
