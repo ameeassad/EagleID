@@ -1,21 +1,7 @@
-import os
-import numpy as np
-import yaml
-
 import wandb
 import timm
 import torch
 import torch.nn as nn
-import torchvision.transforms as transforms
-from PIL import Image
-from pytorch_lightning import LightningDataModule, LightningModule, Trainer
-from torchmetrics import Accuracy
-
-from pytorch_grad_cam import GradCAM
-from pytorch_grad_cam.utils.image import show_cam_on_image
-from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-
-from data.artportalen_goleag import ArtportalenDataModule
 
 from utils.triplet_loss_utils import TripletLoss
 from utils.optimizer import get_optimizer, get_lr_scheduler_config
@@ -26,12 +12,12 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 from pytorch_metric_learning import losses, miners
 from torch import nn
-import timm
 
 from wildlife_tools.similarity.cosine import CosineSimilarity
 from utils.metrics import evaluate_map, compute_average_precision
 
 from utils.re_ranking import re_ranking
+from data.data_utils import calculate_num_channels
 
 class TripletSimpleModel(pl.LightningModule):
     def __init__(self, backbone_model_name, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001):
@@ -70,10 +56,10 @@ class TripletModel(pl.LightningModule):
         self.re_ranking = re_ranking
         if config:
             backbone_model_name=config['backbone_name']
-            embedding_size=config['triplet_loss']['embedding_size']
+            embedding_size=int(config['triplet_loss']['embedding_size'])
             margin=config['triplet_loss']['margin']
             mining_type=config['triplet_loss']['mining_type']
-            preprocess_lvl=config['preprocess_lvl'],
+            preprocess_lvl=int(config['preprocess_lvl'])
             self.re_ranking=config['re_ranking']
             self.distance_matrix = config['triplet_loss']['distance_matrix']
             outdir=config['outdir']
@@ -85,19 +71,14 @@ class TripletModel(pl.LightningModule):
             preprocess_lvl=preprocess_lvl
             self.re_ranking=re_ranking
             self.distance_matrix = 'euclidean'
-            outdir="logs"
+            outdir=outdir
             
         # Backbone (ResNet without the final FC layer)
         self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=pretrained, num_classes=0)
 
         if preprocess_lvl >= 3:
-            # Modify the first convolutional layer to accept 4 or 18 channels instead of 3
-            if preprocess_lvl == 3: 
-                num_channels = 4
-            elif preprocess_lvl == 4: 
-                num_channels = 18
-            else:
-                num_channels = 3
+            num_channels = calculate_num_channels(preprocess_lvl)
+
             if hasattr(self.backbone, 'conv1'):
                 self.backbone.conv1 = nn.Conv2d(
                     in_channels=num_channels,

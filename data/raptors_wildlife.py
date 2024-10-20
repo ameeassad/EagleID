@@ -20,9 +20,9 @@ from data.transforms import RGBTransforms, ResizeAndPadRGB, ValTransforms, Synch
 
 import ast
 from .skeleton_category import AKSkeletonCategory
-from preprocess.preprocess_utils import create_mask, create_skeleton_channel
+from preprocess.preprocess_utils import create_mask, create_skeleton_channel, create_multichannel_heatmaps
 from preprocess.component_gen import component_generation_module
-from preprocess.mmpose_fill import get_keypoints_info
+from preprocess.mmpose_fill import get_keypoints_info, get_skeleton_info
 
 
 """
@@ -215,9 +215,6 @@ class RaptorsWildlife(WildlifeDataset):
         if self.split:
             metadata = self.split(metadata)
         self.metadata = metadata.reset_index(drop=True)
-
-        if img_load == "bbox_mask_skeleton":
-            self.skeleton_category = AKSkeletonCategory()
         
     # def get_image(self, path):
     #     """
@@ -238,7 +235,7 @@ class RaptorsWildlife(WildlifeDataset):
 
         # print(img_path)
 
-        if self.img_load in ["full_mask", "full_hide", "bbox_mask", "bbox_hide", "bbox_mask_skeleton", "bbox_mask_components"]:
+        if self.img_load in ["full_mask", "full_hide", "bbox_mask", "bbox_hide", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
             if not ("segmentation" in data):
                 raise ValueError(f"{self.img_load} selected but no segmentation found.")
             if type(data["segmentation"]) == str:
@@ -254,7 +251,7 @@ class RaptorsWildlife(WildlifeDataset):
                 rle = mask_coco.frPyObjects(segmentation, height, width)
                 segmentation = mask_coco.merge(rle)
 
-        if self.img_load in ["bbox", "bbox_mask", "bbox_hide", "bbox_mask_skeleton", "bbox_mask_components"]:
+        if self.img_load in ["bbox", "bbox_mask", "bbox_hide", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
             if not ("bbox" in data):
                 raise ValueError(f"{self.img_load} selected but no bbox found.")
             if type(data["bbox"]) == str:
@@ -281,7 +278,7 @@ class RaptorsWildlife(WildlifeDataset):
             img = img.crop((bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]))
 
         # Mask background using segmentation mask and crop to bounding box.
-        elif self.img_load == "bbox_mask" or self.img_load == "bbox_mask_skeleton" or self.img_load == "bbox_mask_components":
+        elif self.img_load in ["bbox_mask", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
             mask = mask_coco.decode(segmentation).astype("bool")
             img = Image.fromarray(img * mask[..., np.newaxis])
             img = img.crop((bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]))
@@ -307,7 +304,7 @@ class RaptorsWildlife(WildlifeDataset):
         else:
             raise ValueError(f"Invalid img_load argument: {self.img_load}")
         
-        if self.img_load in ["bbox_mask_skeleton", "bbox_mask_components"]:
+        if self.img_load in ["bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
             if not ("keypoints" in data):
                 raise ValueError(f"{self.img_load} selected but no keypoints found.")
             if type(data["keypoints"]) == str:
@@ -322,7 +319,7 @@ class RaptorsWildlife(WildlifeDataset):
             h = math.ceil(bbox[3])
             bbox = [x_min, y_min, w, h]
             # Create skeleton channel:
-            connections = self.skeleton_category.get_connections()
+            connections = get_skeleton_info()
             # Convert connections from string to list if necessary
             if isinstance(connections, str):
                 connections = ast.literal_eval(connections)
@@ -330,25 +327,37 @@ class RaptorsWildlife(WildlifeDataset):
             skeleton_channel = skeleton_channel[y_min:y_min + h, x_min:x_min + w]
             # print(skeleton_channel.shape)
             # print(skeleton_channel)
-
-        if self.img_load == "bbox_mask_components":
+        elif self.img_load == "bbox_mask_components":
             img_cv = cv2.imread(img_path)
             img_cv = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
             keypoint_labels = get_keypoints_info()
             cropped_images = component_generation_module(img_cv, bbox, keypoints, keypoint_labels, True, seg_coco)
+        elif self.img_load == "bbox_mask_heatmaps":
+            x_min = math.floor(bbox[0])
+            y_min = math.floor(bbox[1])
+            w = math.ceil(bbox[2])
+            h = math.ceil(bbox[3])
+            bbox = [x_min, y_min, w, h]
+            # Create keypoint heatmaps
+            keypoint_heatmaps = create_multichannel_heatmaps(keypoints, height=int(height), width=int(width), sigma=25)
+            # Crop each heatmap to the bounding box
+            cropped_heatmaps = [heatmap[y_min:y_min + h, x_min:x_min + w] for heatmap in keypoint_heatmaps]
 
         if self.transform:
             if self.img_load == "bbox_mask_skeleton":
                 img, skeleton_channel = self.transform[0](img, skeleton_channel)
                 img = self.transform[1](img, skeleton_channel) #concatenated 
-
+            elif self.img_load == "bbox_mask_heatmaps":
+                img, heatmap_channels = self.transform[0](img, cropped_heatmaps)
+                img = self.transform[1](img, heatmap_channels) #concatenated 
             elif self.img_load == "bbox_mask_components":
                 img = self.transform[0](img)
                 img = self.transform[1](img, cropped_images) #concatenated 
 
             else:
                 # img = resize_and_pad(img, self.size)
-                img = self.transform(img)
+                img = self.transform[0](img)
+                img = self.transform[1](img)
 
         if self.load_label:
             return img, self.labels[idx]
@@ -390,12 +399,12 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         self.config = config
         self.metadata = metadata
         if config:
-            self.data_dir = config['data_dir']
-            self.preprocess_lvl = config["preprocess_lvl"]
-            self.batch_size = config['batch_size']
-            self.size = config['size']
-            self.mean = (config['mean'], config['mean'], config['mean']) if isinstance(config['mean'], float) else tuple(config['mean'])
-            self.std = (config['std'], config['std'], config['std']) if isinstance(config['std'], float) else tuple(config['std'])
+            self.data_dir = config['dataset']
+            self.preprocess_lvl = int(config["preprocess_lvl"])
+            self.batch_size = int(config['batch_size'])
+            self.size = int(config['img_size'])
+            self.mean = (config['transforms']['mean'], config['transforms']['mean'], config['transforms']['mean']) if isinstance(config['transforms']['mean'], float) else tuple(config['transforms']['mean'])
+            self.std = (config['transforms']['std'], config['transforms']['std'], config['transforms']['std']) if isinstance(config['transforms']['std'], float) else tuple(config['transforms']['std'])
             self.split_ratio = config['split_ratio'] # percent of individuals used for training
             self.num_workers = config['num_workers']
             self.cache_path = config['cache_path']
@@ -411,7 +420,7 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.cache_path = "../dataset/dataframe/cache.csv"
 
         if self.preprocess_lvl == 3:
-            resize_and_pad = t.ResizeAndPadRGBSkeleton(self.size)
+            resize_and_pad = t.ResizeAndPadBoth(self.siz, skeleton=True)
             sync_transform = t.SynchTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
             sync_val_transform = t.SynchTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
             self.train_transforms =  [resize_and_pad, sync_transform]
@@ -422,22 +431,18 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             sync_val_transform = t.ComponentGenerationTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
             self.train_transforms =  [resize_and_pad, sync_transform]
             self.val_transforms = [resize_and_pad, sync_val_transform]  # everything except for color / gaussian transforms
+        elif self.preprocess_lvl == 5:
+            resize_and_pad = t.ResizeAndPadBoth(self.size, skeleton=False)
+            sync_transform = t.SynchMultiChannelTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
+            sync_val_transform = t.SynchMultiChannelTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
+            self.train_transforms =  [resize_and_pad, sync_transform]
+            self.val_transforms = [resize_and_pad, sync_val_transform]
         else:
-            self.train_transforms =  transforms.Compose([
-                                            t.ResizeAndPadRGB(self.size),
-                                            t.RGBTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True),
-            ])
-            self.val_transforms = transforms.Compose([
-                                            t.ResizeAndPadRGB(self.size),
-                                            t.RGBTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False),
-            ])  # everything except for color / gaussian transforms
-
-        # self.val_transforms = Compose([
-        #     # Resize(self.size),
-        #     # Pad((self.size - 1, self.size - 1), padding_mode='constant'),
-        #     ToTensor(),
-        #     Normalize(mean=self.mean, std=self.std)
-        # ])
+            resize_and_pad = t.ResizeAndPadRGB(self.size)
+            rgb_transform = t.RGBTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
+            rgb_val_tranform = t.RGBTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
+            self.train_transforms =  [resize_and_pad, rgb_transform]
+            self.val_transforms = [resize_and_pad, rgb_val_tranform]
 
         # Need to fix splits
         #  will i also offer open set split? aka some individuals in the query might not be present in the gallery. 
@@ -471,19 +476,18 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             df_query = fill_keypoints(df_query, self.data_dir, cache_path=self.cache_path)
             df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path)
 
-        self.img_channels = 3 
-        if preprocess_lvl == 0:
+        if self.preprocess_lvl == 0:
             self.method = 'full'
-        elif preprocess_lvl == 1:
+        elif self.preprocess_lvl == 1:
             self.method = 'bbox'
-        elif preprocess_lvl == 2: 
+        elif self.preprocess_lvl == 2: 
             self.method = "bbox_mask"
-        elif preprocess_lvl == 3: 
+        elif self.preprocess_lvl == 3: 
             self.method = "bbox_mask_skeleton"
-            self.img_channels = 4
-        elif preprocess_lvl == 4:
+        elif self.preprocess_lvl == 4:
             self.method = "bbox_mask_components"
-            self.img_channels = 3 + 3 * 5
+        elif self.preprocess_lvl == 5:
+            self.method = "bbox_mask_heatmaps"
 
         print(f"length of training dataset: {len(df_train)}")
         self.train_dataset = RaptorsWildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, img_load=self.method)
@@ -548,4 +552,7 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         identity_counts = metadata['identity'].value_counts()
         valid_identities = identity_counts[identity_counts >= min_images].index
         return metadata[metadata['identity'].isin(valid_identities)].reset_index(drop=True)
+    
+    def get_img_channels(self):
+        return self.img_channels
 

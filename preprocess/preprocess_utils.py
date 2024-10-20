@@ -40,8 +40,11 @@ def create_skeleton_channel(keypoints, connections, height, width, sigma=2, thic
         skeleton_channel (np.array): The skeleton channel.
     """
     # Initialize heatmap and skeleton channel
-    heatmap = np.zeros((height, width), dtype=np.float32)
-    skeleton_channel = np.zeros((height, width), dtype=np.float32)
+    if heatmap:
+        keypoint_heatmaps = []
+    else:
+        heatmap = np.zeros((height, width), dtype=np.float32)
+        skeleton_channel = np.zeros((height, width), dtype=np.float32)
     
     # Create heatmaps for keypoints
     for i in range(0, len(keypoints), 3):
@@ -72,6 +75,56 @@ def create_skeleton_channel(keypoints, connections, height, width, sigma=2, thic
     skeleton_channel = np.clip(skeleton_channel, 0, 1)  # Normalize to [0, 1] range
 
     return skeleton_channel
+
+def create_multichannel_heatmaps(keypoints, height, width, sigma=25):
+    """
+    Create individual heatmaps for each keypoint in the given image dimensions.
+    
+    Args:
+        keypoints (list): List of flattened COCO-style keypoints (x, y, visibility).
+        height (int): Height of the image.
+        width (int): Width of the image.
+        sigma (int): Gaussian spread for the keypoints.
+
+    Returns:
+        keypoint_heatmaps (list): A list of heatmaps, one for each keypoint.
+    """
+    keypoint_heatmaps = []
+
+    # Create heatmaps for keypoints
+    for i in range(0, len(keypoints), 3):
+        x, y, visibility = float(keypoints[i]), float(keypoints[i+1]), int(keypoints[i+2])
+        
+        # Initialize an empty heatmap for the current keypoint
+        heatmap = np.zeros((height, width), dtype=np.float32)
+
+        # Skip keypoints that are not visible or invalid
+        if visibility == 0 or x < 0 or y < 0:
+            keypoint_heatmaps.append(heatmap)
+            continue
+
+        # Create a Gaussian blob centered at (x, y)
+        for h in range(height):
+            for w in range(width):
+                heatmap[h, w] = np.exp(-((w - x) ** 2 + (h - y) ** 2) / (2 * sigma ** 2))
+
+        # Normalize the heatmap to range [0, 1]
+        heatmap = heatmap / np.max(heatmap) if np.max(heatmap) > 0 else heatmap
+        
+        keypoint_heatmaps.append(heatmap)
+
+    return keypoint_heatmaps
+
+def create_heatmaps():
+    """
+    ["Head_Mid_Top","Eye_Left","Eye_Right","Mouth_Front_Top","Mouth_Back_Left",
+            "Mouth_Back_Right","Mouth_Front_Bottom","Shoulder_Left","Shoulder_Right",
+            "Elbow_Left","Elbow_Right","Wrist_Left","Wrist_Right","Torso_Mid_Back",
+            "Hip_Left","Hip_Right","Knee_Left","Knee_Right","Ankle_Left","Ankle_Right",
+            "Tail_Top_Back","Tail_Mid_Back","Tail_End_Back"]
+    """
+
+
 
 
 # def cache_load_seg(cache_path, row):

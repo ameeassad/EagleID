@@ -1,4 +1,5 @@
 import torch
+from preprocess.mmpose_fill import get_keypoints_info
 
 def unnormalize(x, mean, std):
     """
@@ -31,3 +32,22 @@ def unnormalize(x, mean, std):
         raise ValueError(f"Expected input tensor to have 3 dimensions, but got {x.dim()} dimensions.")
     
 
+def calculate_num_channels(preprocess_lvl):
+    img_channels = 3 
+    if preprocess_lvl == 0:
+        method = 'full'
+    if preprocess_lvl == 1:
+        method = 'bbox'
+    elif preprocess_lvl == 2: 
+        method = "bbox_mask"
+    elif preprocess_lvl == 3: 
+        method = "bbox_mask_skeleton"
+        img_channels = 4
+    elif preprocess_lvl == 4:
+        method = "bbox_mask_components"
+        img_channels = 3 + 3 * 5
+    elif preprocess_lvl == 5:
+        method = "bbox_mask_heatmaps"
+        img_channels = 3 + len(get_keypoints_info())
+    
+    return img_channels

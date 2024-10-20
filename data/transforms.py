@@ -115,19 +115,22 @@ def resize_and_pad(image, size, skeleton_channel=None):
         return padded_image
 
 
-class ResizeAndPadRGBSkeleton:
-    def __init__(self, size):
+class ResizeAndPadBoth:
+    def __init__(self, size, skeleton=True):
         self.size = size
 
         self.resize_and_pad_rgb = ResizeAndPadRGB(size)
-        self.resize_and_pad_skeleton = ResizeAndPadSkeleton(size)
+        if skeleton:
+            self.resize_and_pad_skeleton = ResizeAndPadSkeleton(size)
+        else:  # Heatmaps
+            self.resize_and_pad_skeleton = ResizeAndPadHeatmaps(size)
 
 
-    def __call__(self, image, skeleton):
+    def __call__(self, image, skeleton_or_heatmaps):
         rgb = self.resize_and_pad_rgb(image)
         new_width, new_height, pad_width, pad_height = self.resize_and_pad_rgb.get_img_parameters(image)
-        skeleton = self.resize_and_pad_skeleton(skeleton, new_width, new_height, pad_width, pad_height)
-        return rgb, skeleton
+        skeleton_or_heatmaps = self.resize_and_pad_skeleton(skeleton_or_heatmaps, new_width, new_height, pad_width, pad_height)
+        return rgb, skeleton_or_heatmaps
 
 
 
@@ -183,6 +186,35 @@ class ResizeAndPadSkeleton:
             padded_skeleton_channel = np.zeros((self.size, self.size), dtype=np.float32)
 
         return padded_skeleton_channel
+    
+class ResizeAndPadHeatmaps:
+    def __init__(self, size):
+        self.size = size
+
+    def __call__(self, heatmap_channels, new_width, new_height, pad_width, pad_height):
+        # Initialize a list to store resized and padded heatmaps
+        padded_heatmaps = []
+
+        # Process each heatmap channel independently
+        for heatmap in heatmap_channels:
+            if heatmap is not None and heatmap.size > 0:
+                # Resize the heatmap to the new dimensions
+                heatmap_resized = cv2.resize(heatmap, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+
+                # Pad the resized heatmap to the desired final size
+                padding = ((pad_height // 2, pad_height - (pad_height // 2)),
+                           (pad_width // 2, pad_width - (pad_width // 2)))
+                padded_heatmap = np.pad(heatmap_resized, padding, mode='constant', constant_values=0)
+
+                padded_heatmaps.append(padded_heatmap)
+            else:
+                # If heatmap is invalid, append a zero array with the target size
+                padded_heatmaps.append(np.zeros((self.size, self.size), dtype=np.float32))
+
+        # Stack all heatmaps into a single array with multiple channels
+        padded_heatmaps = np.stack(padded_heatmaps, axis=0)  # Shape: (num_channels, size, size)
+
+        return padded_heatmaps
 
 class ValTransforms:
     def __init__(self, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5), skeleton=False):
@@ -228,7 +260,7 @@ class SynchTransforms:
         #     rgb_img = rgb_img.transpose(Image.FLIP_LEFT_RIGHT)  # Flip RGB
         #     skeleton_channel = cv2.flip(skeleton_channel, 1)  # Flip skeleton
 
-        if random.random() < 0.5:
+        if random.random() < 0.5 and self.degrees !=0: # Don't flip if validation
             rgb_img = np.fliplr(rgb_img)  # Flip RGB (NumPy array)
             skeleton_channel = np.fliplr(skeleton_channel)  # Flip skeleton (NumPy array)
 
@@ -262,6 +294,54 @@ class SynchTransforms:
 
         return concatenated
     
+class SynchMultiChannelTransforms:
+    def __init__(self, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5), degrees=15, color_and_gaussian=True):
+        self.mean = mean
+        self.std = std
+        self.degrees = degrees
+        self.color_and_gaussian = color_and_gaussian
+        self.some_of_transforms = get_some_transforms()
+
+        self.normalize_transform = A.Normalize(mean=mean, std=std)
+        
+    def __call__(self, rgb_img, heatmap_channels=None):
+        """
+        Args:
+            rgb_img (np.array): The RGB image (H, W, 3).
+            heatmap_channels (list or np.array): List of heatmap channels (each H, W) or array with shape (H, W, num_keypoints).
+        Returns:
+            concatenated (torch.Tensor): Concatenated tensor of RGB and heatmap channels (C, H, W).
+        """
+
+        # Apply the same random horizontal flip
+        if random.random() < 0.5 and self.degrees !=0:
+            rgb_img = np.fliplr(rgb_img)  # Flip RGB (NumPy array)
+            heatmap_channels = [np.fliplr(hm) for hm in heatmap_channels]  # Flip all heatmap channels
+
+        # Apply the same random rotation
+        angle = random.uniform(-self.degrees, self.degrees)
+        rgb_img = rotate_image(rgb_img, angle)  # Rotate RGB (NumPy array)
+        heatmap_channels = [rotate_image(hm, angle) for hm in heatmap_channels]  # Rotate all heatmap channels
+
+        # Apply some of the transforms to the RGB image
+        if self.color_and_gaussian:
+            rgb_img = self.some_of_transforms(image=rgb_img)['image']
+
+        # Apply normalization to the RGB image
+        rgb_img = self.normalize_transform(image=rgb_img)['image']
+        
+        # Convert both RGB image and heatmap channels to tensors
+        rgb_img = torch.tensor(rgb_img, dtype=torch.float32).permute(2, 0, 1)  # [3, H, W] for RGB
+        heatmap_channels = [torch.tensor(hm.copy(), dtype=torch.float32).unsqueeze(0) for hm in heatmap_channels]  # [1, H, W] for each heatmap
+
+        # Concatenate all heatmap channels together along the channel dimension
+        heatmap_tensor = torch.cat(heatmap_channels, dim=0)  # [num_keypoints, H, W]
+
+        # Concatenate RGB and heatmap channels together along the channel dimension
+        concatenated = torch.cat((rgb_img, heatmap_tensor), dim=0)  # [3 + num_keypoints, H, W]
+
+        return concatenated
+    
 
 class ComponentGenerationTransforms:
     def __init__(self, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5), degrees=15, color_and_gaussian=True):
@@ -274,7 +354,7 @@ class ComponentGenerationTransforms:
 
     def __call__(self, rgb_img, cropped_images):
         # Apply the same random horizontal flip
-        if random.random() < 0.5:
+        if random.random() < 0.5 and self.degrees !=0:
             rgb_img = np.fliplr(rgb_img)  # Flip RGB (NumPy array)
             for component_name in cropped_images:
                 if cropped_images[component_name] is not None:
@@ -382,7 +462,7 @@ class RGBTransforms:
         # ])
     def __call__(self, rgb_img):
         # Flip RGB (NumPy array)
-        if random.random() < 0.5:
+        if random.random() < 0.5 and self.degrees !=0:
             rgb_img = np.fliplr(rgb_img)
 
         # Random rotation

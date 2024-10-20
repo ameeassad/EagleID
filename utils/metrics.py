@@ -10,7 +10,7 @@ def evaluate_map(distmat, query_labels, gallery_labels):
         # Sort distances and get indices
         indices = np.argsort(q_dist)
         # Compare gallery labels with query label
-        matches = (gallery_labels[indices] == q_label).numpy()
+        matches = (gallery_labels[indices] == q_label).cpu().numpy()
         # Compute Average Precision
         ap = compute_average_precision(matches)
         aps.append(ap)

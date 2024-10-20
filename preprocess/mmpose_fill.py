@@ -12,13 +12,32 @@ import pandas as pd
 import numpy as np
 
 
-def fill_keypoints(df, image_dir="", cache_path=None):
+def fill_keypoints(df, image_dir="", cache_path=None, device='cpu', animal_cat='bird'):
+
+    pose2d = f'td-hm_hrnet-w32_8xb32-300e_animalkingdom_P3_{animal_cat}-256x256'
+
+    if animal_cat == 'bird':
+        download_id = '-566feff5'
+    elif animal_cat == 'mammal':
+        download_id = '-e8aadf02'
+    elif animal_cat == 'amphibian':
+        download_id = '-845085f9'
+    elif animal_cat == 'reptile':
+        download_id = '-e8440c16'
+    elif animal_cat == 'fish':
+        download_id = '-76c3999f'
+    else:
+        print(f"Invalid animal category: {animal_cat}, using default top-down model.")
+        pose2d = 'td-hm_hrnet-w32_8xb32-300e_animalkingdom_P1-256x256'
+        download_id - '-08bf96cb'
+    
+    pose2d_weights = f'https://download.openmmlab.com/mmpose/v1/animal_2d_keypoint/topdown_heatmap/animal_kingdom/{pose2d}{download_id}_20230519.pth'
 
     # Initialize the MMPoseInferencer 
     inferencer = MMPoseInferencer(
-        pose2d='td-hm_hrnet-w32_8xb32-300e_animalkingdom_P3_bird-256x256',
-        pose2d_weights='https://download.openmmlab.com/mmpose/v1/animal_2d_keypoint/topdown_heatmap/animal_kingdom/td-hm_hrnet-w32_8xb32-300e_animalkingdom_P3_bird-256x256-566feff5_20230519.pth',
-        device='cpu',
+        pose2d=pose2d,
+        pose2d_weights=pose2d_weights,
+        device=device,
     )
 
     if 'keypoints' not in df.columns:
@@ -119,6 +138,11 @@ def get_skeleton_info():
             ]
 
 def get_keypoints_info():
+    """"
+    Returns the list of keypoints for any Animal Kingdom dataset for pose estimation.
+    For more info on keypoint structure see:
+    https://github.com/sutdcv/Animal-Kingdom/blob/master/Animal_Kingdom/pose_estimation/code/code_new/mmpose/mmpose/datasets/datasets/animal/animal_ak_dataset.py
+    """
     return ["Head_Mid_Top","Eye_Left","Eye_Right","Mouth_Front_Top","Mouth_Back_Left",
             "Mouth_Back_Right","Mouth_Front_Bottom","Shoulder_Left","Shoulder_Right",
             "Elbow_Left","Elbow_Right","Wrist_Left","Wrist_Right","Torso_Mid_Back",

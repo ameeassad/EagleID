@@ -55,6 +55,7 @@ def main():
     trainer = Trainer(accelerator="cpu")
     # trainer.fit(model, data)
     trainer.test(model, dataloaders=dataloader, ckpt_path=config['checkpoint'])
+    trainer.validate(model, dataloaders=data.val_dataloader())
 
 if __name__ == '__main__':
     main()

@@ -1,27 +1,30 @@
-project_name: age-classifier
+project_name: eagleID
 notes: 
-use_wandb: True
+use_wandb: False
 wandb_entity: winniethepooh
 
-annot_dir: /proj/nobackup/aiforeagles/EagleID/dataset/annot/
-annot_train_file: final_train_sep_sightings.csv
-annot_val_file: final_val_sep_sightings.csv
+annot_dir: 
+annot_train_file:
+annot_val_file: 
 annot_test_file: 
 
 
-outdir: /proj/nobackup/aiforeagles/EagleID/results
-dataset: /proj/nobackup/aiforeagles/artportalen/artportalen_goeag
+outdir: 
+dataset: ../datasets/raptor_individuals_cropped
+split_ratio: 0.8
+cache_path: dataset/dataframe/cache.csv
 
 backbone_name: resnet50
-model_architecture: SimpleModel
+model_architecture: TripletModel
 checkpoint: 
 preprocess_lvl: 3
-batch_size: 128
+
+batch_size: 4
 img_size: 256
 epochs: 150
 save_interval: 10
 n_gpu: 1
-num_workers: 12
+num_workers: 2
 gpu_ids: 
 seed: 42
 
