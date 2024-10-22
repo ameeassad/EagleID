@@ -9,6 +9,8 @@ results_pred/
 testing/
 wandb/
 notebooks/data_cache/
+notebooks/data/
+notebooks/logs
 data_cache/
 __pycache__/
 __pycache__/dataset.cpython-312.pyc

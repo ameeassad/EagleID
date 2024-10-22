@@ -39,12 +39,9 @@ def create_skeleton_channel(keypoints, connections, height, width, sigma=2, thic
     Returns:
         skeleton_channel (np.array): The skeleton channel.
     """
-    # Initialize heatmap and skeleton channel
-    if heatmap:
-        keypoint_heatmaps = []
-    else:
-        heatmap = np.zeros((height, width), dtype=np.float32)
-        skeleton_channel = np.zeros((height, width), dtype=np.float32)
+
+    heatmap = np.zeros((height, width), dtype=np.float32)
+    skeleton_channel = np.zeros((height, width), dtype=np.float32)
     
     # Create heatmaps for keypoints
     for i in range(0, len(keypoints), 3):
@@ -76,7 +73,7 @@ def create_skeleton_channel(keypoints, connections, height, width, sigma=2, thic
 
     return skeleton_channel
 
-def create_multichannel_heatmaps(keypoints, height, width, sigma=25):
+def create_multichannel_heatmaps(keypoints, height, width, bbox_width, bbox_height, sigma=25):
     """
     Create individual heatmaps for each keypoint in the given image dimensions.
     
@@ -90,6 +87,10 @@ def create_multichannel_heatmaps(keypoints, height, width, sigma=25):
         keypoint_heatmaps (list): A list of heatmaps, one for each keypoint.
     """
     keypoint_heatmaps = []
+    if bbox_width > bbox_height:
+        sigma = bbox_width * 0.05
+    else:
+        sigma = bbox_height * 0.05
 
     # Create heatmaps for keypoints
     for i in range(0, len(keypoints), 3):
@@ -103,7 +104,7 @@ def create_multichannel_heatmaps(keypoints, height, width, sigma=25):
             keypoint_heatmaps.append(heatmap)
             continue
 
-        # Create a Gaussian blob centered at (x, y)
+        # Create a Gaussian blob centered at (x, y) by computung the value for every pixel
         for h in range(height):
             for w in range(width):
                 heatmap[h, w] = np.exp(-((w - x) ** 2 + (h - y) ** 2) / (2 * sigma ** 2))
@@ -114,15 +115,6 @@ def create_multichannel_heatmaps(keypoints, height, width, sigma=25):
         keypoint_heatmaps.append(heatmap)
 
     return keypoint_heatmaps
-
-def create_heatmaps():
-    """
-    ["Head_Mid_Top","Eye_Left","Eye_Right","Mouth_Front_Top","Mouth_Back_Left",
-            "Mouth_Back_Right","Mouth_Front_Bottom","Shoulder_Left","Shoulder_Right",
-            "Elbow_Left","Elbow_Right","Wrist_Left","Wrist_Right","Torso_Mid_Back",
-            "Hip_Left","Hip_Right","Knee_Left","Knee_Right","Ankle_Left","Ankle_Right",
-            "Tail_Top_Back","Tail_Mid_Back","Tail_End_Back"]
-    """
 
 
 

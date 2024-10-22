@@ -19,7 +19,6 @@ import data. transforms as t
 from data.transforms import RGBTransforms, ResizeAndPadRGB, ValTransforms, SynchTransforms, resize_and_pad, rotate_image
 
 import ast
-from .skeleton_category import AKSkeletonCategory
 from preprocess.preprocess_utils import create_mask, create_skeleton_channel, create_multichannel_heatmaps
 from preprocess.component_gen import component_generation_module
 from preprocess.mmpose_fill import get_keypoints_info, get_skeleton_info
@@ -339,7 +338,7 @@ class RaptorsWildlife(WildlifeDataset):
             h = math.ceil(bbox[3])
             bbox = [x_min, y_min, w, h]
             # Create keypoint heatmaps
-            keypoint_heatmaps = create_multichannel_heatmaps(keypoints, height=int(height), width=int(width), sigma=25)
+            keypoint_heatmaps = create_multichannel_heatmaps(keypoints, int(height), int(width), w, h, 25)
             # Crop each heatmap to the bounding box
             cropped_heatmaps = [heatmap[y_min:y_min + h, x_min:x_min + w] for heatmap in keypoint_heatmaps]
 
@@ -394,7 +393,7 @@ class RaptorsWildlife(WildlifeDataset):
 #         #     metadata = raptor_dataset.df['species'] == 'goleag'
     
 class WildlifeReidDataModule(pl.LightningDataModule):
-    def __init__(self, metadata, config = None, data_dir="", preprocess_lvl=0, batch_size=8, size=256, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], num_workers=2):
+    def __init__(self, metadata, config = None, data_dir="", preprocess_lvl=0, batch_size=8, size=256, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], num_workers=2, cache_path="../dataset/dataframe/cache.csv", animal_cat='bird', splitter ='closed'):
         super().__init__()
         self.config = config
         self.metadata = metadata
@@ -408,6 +407,8 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.split_ratio = config['split_ratio'] # percent of individuals used for training
             self.num_workers = config['num_workers']
             self.cache_path = config['cache_path']
+            self.animal_cat = config['animal_cat']
+            self.splitter = config['splitter']
         else:
             self.data_dir = data_dir
             self.num_workers = num_workers
@@ -417,10 +418,12 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.mean = (mean, mean, mean) if isinstance(mean, float) else tuple(mean)
             self.std = (std, std, std) if isinstance(std, float) else tuple(std)
             self.split_ratio = 0.8
-            self.cache_path = "../dataset/dataframe/cache.csv"
+            self.cache_path = cache_path
+            self.animal_cat = animal_cat
+            self.splitter = splitter
 
         if self.preprocess_lvl == 3:
-            resize_and_pad = t.ResizeAndPadBoth(self.siz, skeleton=True)
+            resize_and_pad = t.ResizeAndPadBoth(self.size, skeleton=True)
             sync_transform = t.SynchTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
             sync_val_transform = t.SynchTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
             self.train_transforms =  [resize_and_pad, sync_transform]
@@ -447,7 +450,13 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         # Need to fix splits
         #  will i also offer open set split? aka some individuals in the query might not be present in the gallery. 
         # This implies that a query can return "unknown" results if the individual is not part of the gallery.
-        splitter = splits.ClosedSetSplit(self.split_ratio) # each identity is either in the training set or the testing set but not in both.
+        if 'date' in self.metadata.columns and self.metadata['date'].isna().any():
+            self.metadata.loc[pd.isna(self.metadata['date']), 'date'] = "unknown" 
+        
+        if self.splitter == 'closed':
+            splitter = splits.ClosedSetSplit(self.split_ratio) # All individuals are both in the training and testing set.
+        elif self.splitter == 'open':
+            splitter = splits.OpenSetSplit(self.split_ratio, 0.1) # Some individuals are in the testing but not in the training set
         for idx_train, idx_test in splitter.split(metadata):
             splits.analyze_split(self.metadata, idx_train, idx_test)
 
@@ -455,7 +464,10 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         df_train.reset_index(drop=True, inplace=True)
         df_test.reset_index(drop=True, inplace=True)
 
-        df_test = self.filter_identities(df_test)
+        print(f"Train set size: {len(df_train)}")
+        print(f"Test set size: {len(df_test)}")
+
+        # df_test = self.filter_identities(df_test)
         df_query, df_gallery = self.split_query_database(df_test)
 
         # preprocessing
@@ -472,9 +484,9 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.keypoints = get_keypoints_info()
             self.skeleton = get_skeleton_info()
 
-            df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path)
-            df_query = fill_keypoints(df_query, self.data_dir, cache_path=self.cache_path)
-            df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path)
+            df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat)
+            df_query = fill_keypoints(df_query, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat)
+            df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat)
 
         if self.preprocess_lvl == 0:
             self.method = 'full'
@@ -492,11 +504,12 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         print(f"length of training dataset: {len(df_train)}")
         self.train_dataset = RaptorsWildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, img_load=self.method)
         print(f"length of query dataset: {len(df_query)}")
-        self.val_query_dataset = RaptorsWildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, img_load=self.method)
-        print(f"length of gallery dataset: {len(df_gallery)}")
-        self.val_gallery_dataset = RaptorsWildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, img_load=self.method)
-        self.val_query_dataset.metadata.reset_index(drop=True, inplace=True)
-        self.val_gallery_dataset.metadata.reset_index(drop=True, inplace=True)
+        if not (len(df_query) == 0 or len(df_gallery) == 0):
+            self.val_query_dataset = RaptorsWildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, img_load=self.method)
+            print(f"length of gallery dataset: {len(df_gallery)}")
+            self.val_gallery_dataset = RaptorsWildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, img_load=self.method)
+            self.val_query_dataset.metadata.reset_index(drop=True, inplace=True)
+            self.val_gallery_dataset.metadata.reset_index(drop=True, inplace=True)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
@@ -529,8 +542,8 @@ class WildlifeReidDataModule(pl.LightningDataModule):
                 query_indices.append(identity_indices[0])
                 database_indices.extend(identity_indices[1:])
             else:
-                # Skip identities with less than 2 images, avoid data leakage
-                continue
+                # If only one image, add to gallery but not query
+                database_indices.append(identity_indices[0])
 
         query_metadata = test_metadata.loc[query_indices].reset_index(drop=True)
         database_metadata = test_metadata.loc[database_indices].reset_index(drop=True)

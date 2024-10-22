@@ -1,5 +1,6 @@
 import torch
 from preprocess.mmpose_fill import get_keypoints_info
+import pandas as pd
 
 def unnormalize(x, mean, std):
     """
@@ -51,3 +52,41 @@ def calculate_num_channels(preprocess_lvl):
         img_channels = 3 + len(get_keypoints_info())
     
     return img_channels
+
+
+def create_df_from_coco(coco_obj):
+    # Extract image info and create a dictionary to map image IDs to filenames, height, and width
+    images_info = coco_obj.dataset['images']
+    image_id_to_info = {image['id']: {'file_name': image['file_name'], 'height': image['height'], 'width': image['width']} for image in images_info}
+
+    # Extract category info and create a dictionary to map category IDs to category names
+    categories_info = coco_obj.dataset['categories']
+    category_id_to_name = {category['id']: category['name'] for category in categories_info}
+
+    # Extract annotations info and prepare data for the DataFrame
+    annotations_info = coco_obj.dataset['annotations']
+    annotations_data = []
+
+    for annotation in annotations_info:
+        image_id = annotation['image_id']
+        category_id = annotation['category_id']
+        image_info = image_id_to_info[image_id]
+        
+        annotation_data = {
+            'image_id': annotation['image_id'],
+            'image_filename': image_info['file_name'],
+            'height': image_info['height'],        # Save height
+            'width': image_info['width'],          # Save width
+            'category_id': annotation['category_id'],
+            'category_name': category_id_to_name[category_id],
+            'bbox': annotation['bbox'],
+            'area': annotation['area'],
+            'iscrowd': annotation['iscrowd'],
+            'segmentation': annotation['segmentation']
+        }
+        annotations_data.append(annotation_data)
+
+    # Create the DataFrame
+    df = pd.DataFrame(annotations_data)
+
+    return df

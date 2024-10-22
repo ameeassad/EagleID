@@ -83,6 +83,17 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None):
         image_path = os.path.join(image_dir, row['path'])
 
         image = Image.open(image_path)
+        og_width, og_height = image.size
+
+        if 'bbox' in row:
+            bbox_exists = True
+            print("running segmentation on pre-existing bbox")
+            bbox = row['bbox']
+            x, y, w, h = bbox
+            image = image.crop((x, y, x + w, y + h))
+        else:
+            bbox_exists = False
+
         W, H = image.size
 
         # If no cache or segmentation is missing, run YOLOv8 model
@@ -99,14 +110,18 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None):
 
                 # FOR VISUALISATION - uncomment
                 # display_annotations(image, polygon)
+                # Adjust segmentation coordinates to the original image's coordinate system
+                if bbox_exists:
+                    polygon = [(pt[0] + x, pt[1] + y) for pt in polygon]  # Shift by (x, y)
+                    polygon = np.array(polygon) # Convert polygon back to a NumPy array
 
                 segmentation, bbox, area = get_segs(polygon, image)
                 iscrowd = 0 if len(results) <= 1 else 1
 
                 updated_row = row.to_dict()
                 updated_row['segmentation'] = [segmentation]
-                updated_row['height'] = H
-                updated_row['width'] = W
+                updated_row['height'] = og_height
+                updated_row['width'] = og_width
                 updated_row['bbox'] = bbox
                 updated_row['area'] = int(area)
                 updated_row['iscrowd'] = iscrowd

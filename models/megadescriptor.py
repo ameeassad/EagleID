@@ -22,34 +22,82 @@ from utils.metrics import evaluate_map, compute_average_precision
 
 from utils.re_ranking import re_ranking
 
+import pytorch_lightning as pl
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import timm
+from pytorch_metric_learning import losses
 
-# Arcface loss - needs backbone output size and number of classes.
-objective = ArcFaceLoss(
-    num_classes=dataset.num_classes,
-    embedding_size=768,
-    margin=0.5,
-    scale=64
-    )
+class MegadescriptorModel(pl.LightningModule):
+    def __init__(self, backbone_model_name="swin_base_patch4_window7_224", img_size=224, num_classes=1000, config=None, pretrained=True, embedding_size=768, margin=0.5, scale=64, lr=0.001, preprocess_lvl=0, re_ranking=True, outdir="results"):
+        super().__init__()
+        self.save_hyperparameters()
+        self.config = config
+        self.re_ranking = re_ranking
+        self.lr = lr
+        self.num_classes = num_classes
+        self.outdir = outdir
 
-# Optimize parameters in backbone and in objective using single optimizer.
-params = itertools.chain(backbone.parameters(), objective.parameters())
-optimizer = SGD(params=params, lr=0.001, momentum=0.9)
+        # Backbone model
+        self.backbone = timm.create_model(backbone_model_name, num_classes=0, pretrained=pretrained)
+        
+        # Adjust input channels if necessary based on preprocess level
+        if preprocess_lvl >= 3:
+            if preprocess_lvl == 3:
+                num_channels = 4
+            elif preprocess_lvl == 4:
+                num_channels = 18
+            else:
+                num_channels = 3
+            if hasattr(self.backbone, 'conv1'):
+                self.backbone.conv1 = nn.Conv2d(
+                    in_channels=num_channels,
+                    out_channels=self.backbone.conv1.out_channels,
+                    kernel_size=self.backbone.conv1.kernel_size,
+                    stride=self.backbone.conv1.stride,
+                    padding=self.backbone.conv1.padding,
+                    bias=False
+                )
+                nn.init.kaiming_normal_(self.backbone.conv1.weight, mode='fan_out', nonlinearity='relu')
 
+        # Embedder: Linear layer to project backbone output to embedding size
+        self.embedding_size = embedding_size
+        self.embedder = nn.Linear(self.backbone.num_features, embedding_size)
+        
+        # ArcFace Loss: Initializes the margin-based loss function
+        self.loss_fn = losses.ArcFaceLoss(num_classes=self.num_classes, embedding_size=self.embedding_size, margin=margin, scale=scale)
 
-trainer = BasicTrainer(
-    dataset=dataset,
-    model=backbone,
-    objective=objective,
-    optimizer=optimizer,
-    epochs=20,
-    device='cpu',
-)
+    def forward(self, x):
+        features = self.backbone(x)  # Get features from the backbone
+        embeddings = self.embedder(features)  # Project to embedding space
+        embeddings = F.normalize(embeddings, p=2, dim=1)  # Normalize the embeddings
+        return embeddings
 
-trainer.train()
+    def training_step(self, batch, batch_idx):
+        images, labels = batch
+        embeddings = self(images)  # Extract embeddings
+        loss = self.loss_fn(embeddings, labels)  # Compute ArcFace loss
+        self.log("train_loss", loss)  # Log the loss for monitoring
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        images, labels = batch
+        embeddings = self(images)
+        self.log('val_loss', self.loss_fn(embeddings, labels))
+
+    def configure_optimizers(self):
+        if self.config:
+            optimizer = get_optimizer(self.config, self.parameters())
+            lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
+            return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
+        else:
+            optimizer = torch.optim.SGD(self.parameters(), lr=self.lr)
+            return optimizer
 
 
 class MegadescriptorModel(pl.LightningModule):
-    def __init__(self, backbone_model_name="MegaDescriptor-T", img_size=224, config=None, pretrained=True, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001, preprocess_lvl=0, re_ranking=True, outdir="results"):
+    def __init__(self, backbone_model_name="swin_base_patch4_window7_224", img_size=224, config=None, pretrained=True, embedding_size=768, margin=0.5, scale=64, lr=0.001, preprocess_lvl=0, re_ranking=True, outdir="results"):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
@@ -75,10 +123,39 @@ class MegadescriptorModel(pl.LightningModule):
             self.distance_matrix = 'euclidean'
             outdir=outdir
 
-        if pretrained==True and img_size != 224:
-            raise ValueError("Image size must be 224 for pretrained MegaDescriptor models.")
-        
-        backbone_model_name = f'hf-hub:BVRA/{backbone_model_name}-{img_size}'
+        #  Swin-L/p4-w12-384
+        # Backbone and loss configuration
+        backbone = timm.create_model('swin_large_patch4_window7_224', num_classes=0, pretrained=True)
+        backbone = timm.create_model('swin_base_patch4_window7_224', num_classes=0, pretrained=True)
+        backbone = timm.create_model('swin_large_patch4_window12_384', num_classes=0, pretrained=True)
+        backbone = timm.create_model('swin_tiny_patch4_window7_224', num_classes=0, pretrained=True)
+        with torch.no_grad():
+            dummy_input = torch.randn(1, 3, 224, 224)
+            embedding_size = backbone(dummy_input).shape[1]
+
+
+        # # Optimize parameters in backbone and in objective using single optimizer.
+        # params = itertools.chain(backbone.parameters(), objective.parameters())
+        # Optimizer and scheduler configuration
+        # params = chain(backbone.parameters(), objective.parameters())
+        # optimizer = SGD(params=params, lr=0.001, momentum=0.9)
+        # min_lr = optimizer.defaults.get("lr") * 1e-3
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100, eta_min=min_lr)
+
+
+        # Setup training
+        # trainer = BasicTrainer(
+        #     dataset=dataset,
+        #     model=backbone,
+        #     objective=objective,
+        #     optimizer=optimizer,
+        #     scheduler=scheduler,
+        #     batch_size=64,
+        #     accumulation_steps=2,
+        #     num_workers=2,
+        #     epochs=100,
+        #     device='cuda',
+        # )
 
         # Download MegaDescriptor-T backbone from HuggingFace Hub
         self.backbone = timm.create_model(backbone_model_name, num_classes=0, pretrained=pretrained)
@@ -106,6 +183,7 @@ class MegadescriptorModel(pl.LightningModule):
         # Embedder (to project features into the desired embedding space)
         self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)
         # self.fc = nn.Linear(self.model.output_size, embedding_size)  # Embedding layer
+        self.loss_fn = ArcFaceLoss(num_classes=self.num_classes, embedding_size=self.embedding_size, margin=self.margin, scale=self.scale)
         self.loss_fn = losses.TripletMarginLoss(margin=margin)
         self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
         self.lr = lr
@@ -186,6 +264,6 @@ class MegadescriptorModel(pl.LightningModule):
             lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
             return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
         else:
-            optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+            optimizer = torch.optim.SGD(self.parameters(), lr=self.lr)
             return optimizer
     

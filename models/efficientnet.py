@@ -58,11 +58,14 @@ class MiewIdNet(nn.Module):
                  pretrained=True,
                  **kwargs):
         """
+        method: TimmBackbone
+        model_name: 'efficientnet_b0'
         """
         super(MiewIdNet, self).__init__()
         print('Building Model Backbone for {} model'.format(model_name))
 
         self.model_name = model_name
+
 
         self.backbone = timm.create_model(model_name, pretrained=pretrained)
         if model_name.startswith('efficientnetv2_rw'):
