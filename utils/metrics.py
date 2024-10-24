@@ -1,4 +1,6 @@
 import numpy as np
+from wildlife_tools.similarity.cosine import CosineSimilarity
+
 
 def evaluate_map(distmat, query_labels, gallery_labels):
     num_queries = query_labels.size(0)
@@ -26,6 +28,26 @@ def compute_average_precision(matches):
     precision_at_k = cumulative_hits / (np.arange(len(matches)) + 1)
     ap = (precision_at_k * matches).sum() / num_relevant
     return ap
+
+
+def compute_distance_matrix(query_embeddings, gallery_embeddings, wildlife=True):
+    if self.distance_matrix == "euclidean":
+        # Compute Euclidean distance between query and gallery embeddings
+        distmat = torch.cdist(query_embeddings, gallery_embeddings)
+    elif self.distance_matrix == "cosine":
+        if wildlife:
+            similarity_function = CosineSimilarity()
+            similarity = similarity_function(query_embeddings, gallery_embeddings)['cosine']
+            distmat = 1 - similarity # Convert similarity to distance if necessary
+            print(f"Distance matrix type should be np for rerankin: {type(distmat)}")
+            return distmat
+        else:
+            query_embeddings = F.normalize(query_embeddings, p=2, dim=1)
+            gallery_embeddings = F.normalize(gallery_embeddings, p=2, dim=1)
+            cosine_similarity = torch.mm(query_embeddings, gallery_embeddings.t())
+            distmat = 1 - cosine_similarity # Convert similarity to distance if necessary
+            print(f"Distance matrix type should be np for reranking: {type(distmat)}")
+            return distmat
 
 
 """

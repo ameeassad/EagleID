@@ -18,6 +18,7 @@ from utils.metrics import evaluate_map, compute_average_precision
 
 from utils.re_ranking import re_ranking
 from data.data_utils import calculate_num_channels
+from utils.metrics import compute_distance_matrix
 
 class TripletSimpleModel(pl.LightningModule):
     def __init__(self, backbone_model_name, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001):
@@ -53,10 +54,9 @@ class TripletModel(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
-        self.re_ranking = re_ranking
         if config:
             backbone_model_name=config['backbone_name']
-            embedding_size=int(config['triplet_loss']['embedding_size'])
+            embedding_size=int(config['embedding_size'])
             margin=config['triplet_loss']['margin']
             mining_type=config['triplet_loss']['mining_type']
             preprocess_lvl=int(config['preprocess_lvl'])
@@ -90,6 +90,8 @@ class TripletModel(pl.LightningModule):
                 )
                 # Reinitialize the weights of the new convolutional layer
                 nn.init.kaiming_normal_(self.backbone.conv1.weight, mode='fan_out', nonlinearity='relu')
+        else:
+            num_channels = 3
 
         # Embedder (to project features into the desired embedding space)
         self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)
@@ -142,31 +144,12 @@ class TripletModel(pl.LightningModule):
         if self.re_ranking:
             distmat = re_ranking(query_embeddings, gallery_embeddings, k1=20, k2=6, lambda_value=0.3)
         else:
-            distmat = self.compute_distance_matrix(query_embeddings, gallery_embeddings)
+            distmat = compute_distance_matrix(self.distance_matrix, query_embeddings, gallery_embeddings)
 
         # Compute mAP
         # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
         mAP = evaluate_map(distmat, query_labels, gallery_labels)
         self.log('val/mAP', mAP)
-
-    def compute_distance_matrix(self, query_embeddings, gallery_embeddings, wildlife=True):
-        if self.distance_matrix == "euclidean":
-            # Compute Euclidean distance between query and gallery embeddings
-            distmat = torch.cdist(query_embeddings, gallery_embeddings)
-        elif self.distance_matrix == "cosine":
-            if wildlife:
-                similarity_function = CosineSimilarity()
-                similarity = similarity_function(query_embeddings, gallery_embeddings)['cosine']
-                distmat = 1 - similarity # Convert similarity to distance if necessary
-                print(f"Distance matrix type should be np for rerankin: {type(distmat)}")
-                return distmat
-            else:
-                query_embeddings = F.normalize(query_embeddings, p=2, dim=1)
-                gallery_embeddings = F.normalize(gallery_embeddings, p=2, dim=1)
-                cosine_similarity = torch.mm(query_embeddings, gallery_embeddings.t())
-                distmat = 1 - cosine_similarity # Convert similarity to distance if necessary
-                print(f"Distance matrix type should be np for reranking: {type(distmat)}")
-                return distmat
 
     def configure_optimizers(self):
         if self.config:

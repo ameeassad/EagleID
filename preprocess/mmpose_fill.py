@@ -6,13 +6,13 @@ Finally, returns the updated dataframe (with the skeleton information).
 """
 
 import os, ast
-from mmpose.apis import MMPoseInferencer
 import cv2
 import pandas as pd
 import numpy as np
 
 
 def fill_keypoints(df, image_dir="", cache_path=None, device='cpu', animal_cat='bird'):
+    from mmpose.apis import MMPoseInferencer
 
     pose2d = f'td-hm_hrnet-w32_8xb32-300e_animalkingdom_P3_{animal_cat}-256x256'
 
@@ -82,10 +82,11 @@ def fill_keypoints(df, image_dir="", cache_path=None, device='cpu', animal_cat='
         img = cv2.imread(img_path)
 
         # Crop the image using the bounding box
-        x, y, w, h = [int(v) for v in bbox]
+        if not (type(bbox)!=list and bbox.isna()):
+            x, y, w, h = [int(v) for v in bbox]
+            img = img[y:y+h, x:x+w]
 
-        cropped_img = img[y:y+h, x:x+w]
-        result_generator = inferencer(cropped_img)
+        result_generator = inferencer(img)
 
         # Perform pose estimation using the bounding box from the annotation
         result = next(result_generator)

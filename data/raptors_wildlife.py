@@ -393,7 +393,7 @@ class RaptorsWildlife(WildlifeDataset):
 #         #     metadata = raptor_dataset.df['species'] == 'goleag'
     
 class WildlifeReidDataModule(pl.LightningDataModule):
-    def __init__(self, metadata, config = None, data_dir="", preprocess_lvl=0, batch_size=8, size=256, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], num_workers=2, cache_path="../dataset/dataframe/cache.csv", animal_cat='bird', splitter ='closed'):
+    def __init__(self, metadata, config = None, data_dir="", preprocess_lvl=0, batch_size=8, size=256, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], num_workers=2, cache_path="../dataset/dataframe/cache.csv", animal_cat='bird', splitter ='closed', force_cache=False):
         super().__init__()
         self.config = config
         self.metadata = metadata
@@ -474,9 +474,9 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         if self.preprocess_lvl > 0: # 1: bounding box cropped image or 2: masked image
             from preprocess.segmenter import add_segmentations
 
-            df_train = add_segmentations(df_train, self.data_dir, cache_path=self.cache_path)
-            df_query = add_segmentations(df_query, self.data_dir, cache_path=self.cache_path)
-            df_gallery = add_segmentations(df_gallery, self.data_dir, cache_path=self.cache_path)
+            df_train = add_segmentations(df_train, self.data_dir, cache_path=self.cache_path, force_cache=force_cache)
+            df_query = add_segmentations(df_query, self.data_dir, cache_path=self.cache_path, force_cache=force_cache)
+            df_gallery = add_segmentations(df_gallery, self.data_dir, cache_path=self.cache_path, force_cache=force_cache)
         
         if self.preprocess_lvl >= 3: # 3: masked + pose (skeleton) image in 1 channel or 4: masked + body part clusters in channels
             from preprocess.mmpose_fill import fill_keypoints, get_skeleton_info, get_keypoints_info

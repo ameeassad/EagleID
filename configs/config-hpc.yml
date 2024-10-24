@@ -1,6 +1,6 @@
 project_name: eagleID
 notes: 
-use_wandb: False
+use_wandb: True
 wandb_entity: winniethepooh
 
 animal_cat: bird
@@ -30,11 +30,15 @@ transforms:
   mean: [0.485, 0.456, 0.406]
   std: [0.229, 0.224, 0.225]
 
+embedding_size: 128
 triplet_loss:
-  embedding_size: 128
   margin: 0.2
   mining_type: semihard
   distance_matrix: euclidean
+megadescriptor: 
+  margin: 
+  scale: 
+
 
 early_stopping:
   monitor: val/loss

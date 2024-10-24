@@ -39,7 +39,10 @@ def query_prediction_results(root, query_metadata, db_metadata, query_start, pre
 
         predicted_img_path = filtered_id_pred['path'].values[0]
         # print("predicted img path:", predicted_img_path)
-        predicted_img_species = filtered_id_pred['species'].values[0]
+        if 'species' in filtered_id_pred.columns:
+            predicted_img_species = filtered_id_pred['species'].values[0]
+        else:
+            predicted_img_species = ''
         # print("predicted img species:", predicted_img_species)
         predicted_img = load_image(os.path.join(root,predicted_img_path))
         
@@ -51,17 +54,22 @@ def query_prediction_results(root, query_metadata, db_metadata, query_start, pre
         print
 
         ground_truth_img_path = filtered_id_truth['path'].values[0] #ERROR
-        truth_img_species = filtered_id_truth['species'].values[0]
+        if 'species' in filtered_id_truth.columns:
+            truth_img_species = filtered_id_truth['species'].values[0]
+        else:
+            truth_img_species = ''
         ground_truth_img = load_image(os.path.join(root,ground_truth_img_path))
         
         # Display query image
         axes[i, 0].imshow(query_img)
         axes[i, 0].set_title(f'Query Image: {query_metadata.iloc[idx]['identity']}')
         axes[i, 0].axis('off')
+
+        predicted_color = 'green' if (predicted_label == ground_truth_label) else 'red'
         
         # Display predicted image
         axes[i, 1].imshow(predicted_img)
-        axes[i, 1].set_title(f'Predicted: {predicted_img_species}, {predicted_label}')
+        axes[i, 1].set_title(f'Predicted: {predicted_img_species}, {predicted_label}', color=predicted_color)
         axes[i, 1].axis('off')
         
         # Display ground truth image
