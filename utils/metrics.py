@@ -30,11 +30,11 @@ def compute_average_precision(matches):
     return ap
 
 
-def compute_distance_matrix(query_embeddings, gallery_embeddings, wildlife=True):
-    if self.distance_matrix == "euclidean":
+def compute_distance_matrix(distance_matrix, query_embeddings, gallery_embeddings, wildlife=True):
+    if distance_matrix == "euclidean":
         # Compute Euclidean distance between query and gallery embeddings
         distmat = torch.cdist(query_embeddings, gallery_embeddings)
-    elif self.distance_matrix == "cosine":
+    elif distance_matrix == "cosine":
         if wildlife:
             similarity_function = CosineSimilarity()
             similarity = similarity_function(query_embeddings, gallery_embeddings)['cosine']
