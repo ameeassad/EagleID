@@ -11,7 +11,35 @@ import pandas as pd
 import numpy as np
 
 
-def fill_keypoints(df, image_dir="", cache_path=None, device='cpu', animal_cat='bird'):
+def fill_keypoints(df, image_dir="", cache_path=None, only_cache=False, device='cpu', animal_cat='bird'):
+
+    if 'keypoints' not in df.columns:
+        df['keypoints'] = None  # Initialize with None or an empty list
+    if 'num_keypoints' not in df.columns:
+        df['num_keypoints'] = 0  # Initialize with zero
+
+    # Load or initialize the cache DataFrame
+    if cache_path and os.path.exists(cache_path):
+        cache_df = pd.read_csv(cache_path)
+        # Ensure 'keypoints' and 'num_keypoints' columns exist in cache_df
+        if 'keypoints' not in cache_df.columns:
+            cache_df['keypoints'] = None
+        if 'num_keypoints' not in cache_df.columns:
+            cache_df['num_keypoints'] = 0
+    else:
+        cache_df = pd.DataFrame(columns=df.columns)
+    
+    if only_cache:
+        # Loop through each row and update with keypoints
+        for idx, row in df.iterrows():
+            if cache_path and 'path' in cache_df.columns:
+                cached_row = cache_df[cache_df['path'] == row['path']]
+                if not cached_row.empty and pd.notnull(cached_row.iloc[0]['keypoints']):
+                    # Use cached data: update only the keypoints and num_keypoints columns
+                    df.at[idx, 'keypoints'] = cached_row.iloc[0]['keypoints']
+                    df.at[idx, 'num_keypoints'] = cached_row.iloc[0]['num_keypoints'] 
+        return df # return without doing any inference with mmpose
+        
     from mmpose.apis import MMPoseInferencer
 
     pose2d = f'td-hm_hrnet-w32_8xb32-300e_animalkingdom_P3_{animal_cat}-256x256'
@@ -40,25 +68,9 @@ def fill_keypoints(df, image_dir="", cache_path=None, device='cpu', animal_cat='
         device=device,
     )
 
-    if 'keypoints' not in df.columns:
-        df['keypoints'] = None  # Initialize with None or an empty list
-    if 'num_keypoints' not in df.columns:
-        df['num_keypoints'] = 0  # Initialize with zero
-
-    # Load or initialize the cache DataFrame
-    if cache_path and os.path.exists(cache_path):
-        cache_df = pd.read_csv(cache_path)
-        # Ensure 'keypoints' and 'num_keypoints' columns exist in cache_df
-        if 'keypoints' not in cache_df.columns:
-            cache_df['keypoints'] = None
-        if 'num_keypoints' not in cache_df.columns:
-            cache_df['num_keypoints'] = 0
-    else:
-        cache_df = pd.DataFrame(columns=df.columns)
-
     # Loop through each row and update with keypoints
     for idx, row in df.iterrows():
-
+        
         if cache_path and 'path' in cache_df.columns:
             cached_row = cache_df[cache_df['path'] == row['path']]
             if not cached_row.empty and pd.notnull(cached_row.iloc[0]['keypoints']):

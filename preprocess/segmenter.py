@@ -54,7 +54,7 @@ def display_annotations(image,polygon=None):
         # Show the plot
         plt.pyplot.show()
 
-def add_segmentations(df, image_dir="", testing=False, cache_path=None, force_cache=False):
+def add_segmentations(df, image_dir="", testing=False, cache_path=None, only_cache=False):
     """
     Uses the YOLOv8 model to make predictions for bbox and segmentations. 
     Bbox format is [x_min, y_min, width, height]
@@ -78,7 +78,7 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None, force_ca
                 # Use cached data
                 updated_rows.append(cached_row.iloc[0].to_dict())
                 continue
-        if cache_path and force_cache:
+        if cache_path and only_cache:
             continue
 
         # else:

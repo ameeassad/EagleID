@@ -393,7 +393,7 @@ class RaptorsWildlife(WildlifeDataset):
 #         #     metadata = raptor_dataset.df['species'] == 'goleag'
     
 class WildlifeReidDataModule(pl.LightningDataModule):
-    def __init__(self, metadata, config = None, data_dir="", preprocess_lvl=0, batch_size=8, size=256, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], num_workers=2, cache_path="../dataset/dataframe/cache.csv", animal_cat='bird', splitter ='closed', force_cache=False):
+    def __init__(self, metadata, config = None, data_dir="", preprocess_lvl=0, batch_size=8, size=256, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], num_workers=2, cache_path="../dataset/dataframe/cache.csv", animal_cat='bird', splitter ='closed', force_cache=False, only_cache=False):
         super().__init__()
         self.config = config
         self.metadata = metadata
@@ -409,6 +409,7 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.cache_path = config['cache_path']
             self.animal_cat = config['animal_cat']
             self.splitter = config['splitter']
+            self.only_cache = config['only_cache']
         else:
             self.data_dir = data_dir
             self.num_workers = num_workers
@@ -421,6 +422,7 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.cache_path = cache_path
             self.animal_cat = animal_cat
             self.splitter = splitter
+            self.only_cache = only_cache
 
         if self.preprocess_lvl == 3:
             resize_and_pad = t.ResizeAndPadBoth(self.size, skeleton=True)
@@ -474,9 +476,9 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         if self.preprocess_lvl > 0: # 1: bounding box cropped image or 2: masked image
             from preprocess.segmenter import add_segmentations
 
-            df_train = add_segmentations(df_train, self.data_dir, cache_path=self.cache_path, force_cache=force_cache)
-            df_query = add_segmentations(df_query, self.data_dir, cache_path=self.cache_path, force_cache=force_cache)
-            df_gallery = add_segmentations(df_gallery, self.data_dir, cache_path=self.cache_path, force_cache=force_cache)
+            df_train = add_segmentations(df_train, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
+            df_query = add_segmentations(df_query, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
+            df_gallery = add_segmentations(df_gallery, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
         
         if self.preprocess_lvl >= 3: # 3: masked + pose (skeleton) image in 1 channel or 4: masked + body part clusters in channels
             from preprocess.mmpose_fill import fill_keypoints, get_skeleton_info, get_keypoints_info
@@ -484,9 +486,9 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.keypoints = get_keypoints_info()
             self.skeleton = get_skeleton_info()
 
-            df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat)
-            df_query = fill_keypoints(df_query, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat)
-            df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat)
+            df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache, animal_cat=self.animal_cat)
+            df_query = fill_keypoints(df_query, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache, animal_cat=self.animal_cat)
+            df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache, animal_cat=self.animal_cat)
 
         if self.preprocess_lvl == 0:
             self.method = 'full'

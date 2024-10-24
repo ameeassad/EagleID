@@ -10,6 +10,8 @@ cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.c
 splitter: closed
 split_ratio: 0.8
 
+only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
+
 model_architecture: TripletModel
 backbone_name: resnet50
 checkpoint: 
