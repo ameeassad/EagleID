@@ -20,7 +20,7 @@ class GradCAMCallback(Callback):
             outdir: Directory to save GradCAM images locally.
             log_every_n_epochs: Interval at which GradCAM images are logged.
         """
-        self.model = model
+        self.model = model.backbone
         self.config = config
         self.outdir = outdir
         self.log_every_n_epochs = log_every_n_epochs

@@ -47,7 +47,7 @@ def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
 
     if config['use_gradcam']:
         gradcam_callback = GradCAMCallback(
-            model=model.backbone, 
+            model=model, 
             config=config, 
             outdir=config['outdir'], 
             log_every_n_epochs=1 

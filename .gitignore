@@ -17,3 +17,4 @@ __pycache__/dataset.cpython-312.pyc
 __pycache__/model.cpython-312.pyc
 dataset/dataframe/
 scripts/
+scripts/run_train.sh
