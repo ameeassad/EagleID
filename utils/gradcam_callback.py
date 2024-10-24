@@ -78,11 +78,13 @@ class GradCAMCallback(Callback):
 
     def get_resnet50_layer4(self, model):
         """
-        Retrieve the layer4 of a ResNet50 model from timm.
+        Retrieve the layer4 of a ResNet50 model.
         """
-        # Check if the model has the layer4 attribute (specific to ResNet-like architectures)
         if hasattr(model, 'layer4'):
             return model.layer4[-1]  # Use the last block of layer4 for GradCAM
+        elif hasattr(model, 'backbone') and hasattr(model.backbone, 'layer4'):
+            # In case the backbone is wrapped inside another model
+            return model.backbone.layer4[-1]
         elif hasattr(model, 'model') and hasattr(model.model, 'layer4'):
             # If wrapped inside a SimpleModel or another object
             return model.model.layer4[-1]
