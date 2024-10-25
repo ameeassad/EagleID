@@ -51,7 +51,7 @@ class GradCAMCallback(Callback):
                 # GradCAM logic (same as before)
                 with torch.enable_grad():
                     x_np = x[0].cpu().numpy()  # Convert from PyTorch tensor to numpy array
-                    unnormalized_x = denormalize(x_np, self.config['transforms']['mean'], self.config['transforms']['std']).permute(1, 2, 0).numpy()
+                    unnormalized_x = denormalize(x_np, self.config['transforms']['mean'], self.config['transforms']['std'])
                     unnormalized_x = np.clip(unnormalized_x, 0, 1)
 
                     # cam = GradCAM(model=self.model, target_layers=[self.model.layer4[-1]])
