@@ -50,19 +50,15 @@ class GradCAMCallback(Callback):
 
                 # GradCAM logic (same as before)
                 with torch.enable_grad():
-                    x_np_permuted = x[0].cpu().permute(1, 2, 0).numpy()  # Convert from PyTorch tensor to numpy array
-                    x_np = x[0].cpu().numpy()
-                    print("x_np shape:", x_np.shape)
-                    print("x_np_permuted shape:", x_np_permuted.shape)
+                    x_np = x[0].cpu().permute(1, 2, 0).numpy()  # Convert from PyTorch tensor to numpy array
                     unnormalized_x = denormalize(x_np, self.config['transforms']['mean'], self.config['transforms']['std'])
                     unnormalized_x = np.clip(unnormalized_x, 0, 1)
 
                     # cam = GradCAM(model=self.model, target_layers=[self.model.layer4[-1]])
                     cam = GradCAM(model=self.model, target_layers=[target_layer])
                     targets = [ClassifierOutputTarget(class_idx) for class_idx in target]
-                    grayscale_cam = cam(input_tensor=x, targets=targets)
-                    grayscale_cam = grayscale_cam[0, :]
-                    print("grayscale_cam shape:", grayscale_cam.shape)
+                    grayscale_cam = cam(input_tensor=x, targets=targets)[0, :]
+                    grayscale_cam = np.repeat(grayscale_cam[:, :, np.newaxis], 3, axis=2) # make it compatible with x - 3 channels
                     visualization = show_cam_on_image(unnormalized_x, grayscale_cam, use_rgb=True)
                     img = Image.fromarray((visualization * 255).astype(np.uint8))
 
