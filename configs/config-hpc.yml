@@ -55,9 +55,9 @@ solver:
   WEIGHT_DECAY: 0.001
   MOMENTUM: 0.9  # only when OPT is sgd
   BASE_LR: 0.0001
-  LR_SCHEDULER: reduce_on_plateau  # step, multistep, reduce_on_plateau
+  LR_SCHEDULER: multistep  # step, multistep, reduce_on_plateau
   LR_DECAY_RATE: 0.1
   LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
-  LR_STEP_MILESTONES: [10, 15]  # only when LR_SCHEDULER is multistep
+  LR_STEP_MILESTONES: [20, 30]  # only when LR_SCHEDULER is multistep
 
 re_ranking: True
