@@ -42,6 +42,7 @@ class GradCAMCallback(Callback):
             # Proceed with GradCAM logic if dataloaders exist
             pl_module.eval()  # Ensure model is in evaluation mode
             for batch_idx, batch in enumerate(trainer.val_dataloaders):
+                print(batch)
                 x, target = batch
 
                 # Move inputs and targets to the device
