@@ -8,7 +8,7 @@ from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 import wandb
 
-from data.data_utils import unnormalize
+from data.transforms import denormalize
 
 
 class GradCAMCallback(Callback):
@@ -20,7 +20,7 @@ class GradCAMCallback(Callback):
             outdir: Directory to save GradCAM images locally.
             log_every_n_epochs: Interval at which GradCAM images are logged.
         """
-        self.model = model.backbone
+        self.model = model
         self.config = config
         self.outdir = outdir
         self.log_every_n_epochs = log_every_n_epochs
@@ -50,7 +50,7 @@ class GradCAMCallback(Callback):
 
                 # GradCAM logic (same as before)
                 with torch.enable_grad():
-                    unnormalized_x = unnormalize(x[0].cpu(), self.config['transforms']['mean'], self.config['transforms']['std']).permute(1, 2, 0).numpy()
+                    unnormalized_x = denormalize(x[0].cpu(), self.config['transforms']['mean'], self.config['transforms']['std']).permute(1, 2, 0).numpy()
                     unnormalized_x = np.clip(unnormalized_x, 0, 1)
 
                     # cam = GradCAM(model=self.model, target_layers=[self.model.layer4[-1]])
@@ -80,6 +80,14 @@ class GradCAMCallback(Callback):
         """
         Retrieve the layer4 of a ResNet50 model.
         """
+        try:
+            backbone = model.backbone
+
+            if hasattr(backbone, 'layer4'):
+                return backbone.layer4[-1]  # Return the last block of layer4 for GradCAM
+        except:
+            print('model has no backbone')
+            
         if hasattr(model, 'layer4'):
             return model.layer4[-1]  # Use the last block of layer4 for GradCAM
         elif hasattr(model, 'backbone') and hasattr(model.backbone, 'layer4'):
@@ -91,3 +99,9 @@ class GradCAMCallback(Callback):
         else:
             print("layer4 not found in the model.")
             return None
+        
+
+
+        backbone = model.backbone
+        if hasattr(backbone, 'layer4'):
+            return backbone.layer4[-1]  # Return the last block of layer4 for GradCAM
