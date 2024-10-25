@@ -36,14 +36,17 @@ def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
         every_n_epochs=checkpoint_interval,
         save_last=True,
     )
-    early_stop_callback = EarlyStopping(
-        monitor=config['early_stopping']['monitor'],  # Monitored metric
-        min_delta=config['early_stopping']['min_delta'],      # Minimum change to qualify as an improvement
-        patience=config['early_stopping']['patience'],         # Number of epochs with no improvement after which training will be stopped
-        verbose=config['early_stopping']['verbose'],
-        mode=config['early_stopping']['mode']           # Mode for the monitored metric ('min' or 'max')
-    )
-    callbacks = [ckpt_callback, lr_callback, early_stop_callback]
+    callbacks = [ckpt_callback, lr_callback]
+
+    if config['early_stopping']['enabled']==True:
+        early_stop_callback = EarlyStopping(
+            monitor=config['early_stopping']['monitor'],  # Monitored metric
+            min_delta=config['early_stopping']['min_delta'],      # Minimum change to qualify as an improvement
+            patience=config['early_stopping']['patience'],         # Number of epochs with no improvement after which training will be stopped
+            verbose=config['early_stopping']['verbose'],
+            mode=config['early_stopping']['mode']           # Mode for the monitored metric ('min' or 'max')
+        )
+        callbacks.append(early_stop_callback)
 
     if config['use_gradcam']:
         gradcam_callback = GradCAMCallback(

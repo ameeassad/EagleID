@@ -22,7 +22,7 @@ img_size: 224
 epochs: 100
 save_interval: 10
 n_gpu: 1
-num_workers: 12
+num_workers: 8
 gpu_ids: 
 seed: 42
 
@@ -43,6 +43,7 @@ megadescriptor:
 
 
 early_stopping:
+  enabled: False
   monitor: val/loss
   min_delta: 0.0005
   patience: 50
