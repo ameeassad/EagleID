@@ -50,9 +50,16 @@ class TripletSimpleModel(pl.LightningModule):
         return optimizer
 
 class TripletModel(pl.LightningModule):
-    def __init__(self, backbone_model_name="resnet50", config=None, pretrained=True, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001, preprocess_lvl=0, re_ranking=True, outdir="results"):
+    def __init__(self, 
+                 backbone_model_name="resnet50", 
+                 config=None, pretrained=True, 
+                 embedding_size=128, margin=0.2, 
+                 mining_type="semihard", 
+                 lr=0.001, 
+                 preprocess_lvl=0, 
+                 re_ranking=True, 
+                 outdir="results"):
         super().__init__()
-        self.save_hyperparameters()
         self.config = config
         if config:
             backbone_model_name=config['backbone_name']
@@ -72,6 +79,7 @@ class TripletModel(pl.LightningModule):
             self.re_ranking=re_ranking
             self.distance_matrix = 'euclidean'
             outdir=outdir
+        self.save_hyperparameters()
             
         # Backbone (ResNet without the final FC layer)
         self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=pretrained, num_classes=0)

@@ -35,9 +35,20 @@ from utils.metrics import compute_distance_matrix
 
 
 class MegadescriptorModel(pl.LightningModule):
-    def __init__(self, backbone_model_name="swin_base_patch4_window7_224", img_size=224, num_classes=1000, config=None, pretrained=True, embedding_size=768, margin=0.5, scale=64, lr=0.001, preprocess_lvl=0, re_ranking=True, outdir="results"):
+    def __init__(self, 
+                 backbone_model_name="swin_base_patch4_window7_224", 
+                 img_size=224, 
+                 num_classes=1000, 
+                 config=None, 
+                 pretrained=True, 
+                 embedding_size=768, 
+                 margin=0.5, 
+                 scale=64, 
+                 lr=0.001, 
+                 preprocess_lvl=0, 
+                 re_ranking=True, 
+                 outdir="results"):
         super().__init__()
-        self.save_hyperparameters()
         self.config = config
 
         if config:
@@ -64,6 +75,7 @@ class MegadescriptorModel(pl.LightningModule):
             self.lr = lr
             self.distance_matrix = 'euclidean'
             outdir=outdir
+        self.save_hyperparameters()
 
         # Backbone model
         if self.backbone not in ['swin_large_patch4_window7_224','swin_base_patch4_window7_224','swin_large_patch4_window12_384','swin_tiny_patch4_window7_224']:
@@ -73,16 +85,17 @@ class MegadescriptorModel(pl.LightningModule):
         # Adjust input channels if necessary based on preprocess level
         if preprocess_lvl >= 3:
             num_channels = calculate_num_channels(preprocess_lvl)
-            if hasattr(self.backbone, 'conv1'):
-                self.backbone.conv1 = nn.Conv2d(
+            if hasattr(self.backbone, 'patch_embed'):
+                self.backbone.patch_embed.proj = nn.Conv2d(
                     in_channels=num_channels,
-                    out_channels=self.backbone.conv1.out_channels,
-                    kernel_size=self.backbone.conv1.kernel_size,
-                    stride=self.backbone.conv1.stride,
-                    padding=self.backbone.conv1.padding,
+                    out_channels=self.backbone.patch_embed.proj.out_channels,
+                    kernel_size=self.backbone.patch_embed.proj.kernel_size,
+                    stride=self.backbone.patch_embed.proj.stride,
+                    padding=self.backbone.patch_embed.proj.padding,
                     bias=False
                 )
-                nn.init.kaiming_normal_(self.backbone.conv1.weight, mode='fan_out', nonlinearity='relu')
+                # Reinitialize weights for the adjusted layer
+                nn.init.kaiming_normal_(self.backbone.patch_embed.proj.weight, mode='fan_out', nonlinearity='relu')
         else:
             num_channels = 3
 

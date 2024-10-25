@@ -127,6 +127,7 @@ def get_trainer(config) -> Trainer:
         'devices': devices,
         'logger': wandb_logger,
         'deterministic': True,
+        'profiler': 'simple',
     }
 
     if strategy is not None:
