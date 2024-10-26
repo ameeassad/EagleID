@@ -67,12 +67,22 @@ class GradCAMCallback(Callback):
 
                     # Log GradCAM image to W&B if enabled
                     if self.config.get('use_wandb', False):
-                        wandb_img = wandb.Image(visualization, caption=f"GradCAM Epoch {trainer.current_epoch + 1} Batch {batch_idx} Image 0")
-                        pl_module.logger.experiment.log({"GradCAM Images": wandb_img})
+                        # wandb_img = wandb.Image(visualization, caption=f"GradCAM Epoch {trainer.current_epoch + 1} Batch {batch_idx} Image 0")
+                        # pl_module.logger.experiment.log({"GradCAM Images": wandb_img})
+                        #debug
+                        #below is for debugging purposes
+                        x_np = np.transpose(x_np, (1, 2, 0))
+                        x_np = (x_np * 255).astype(np.uint8)
+                        x_img = Image.fromarray(x_np)
+                        x_img.save(os.path.join(self.outdir, f'input image{trainer.current_epoch + 1}_batch{batch_idx}_img0.jpg'))
+                        wandb_img = wandb.Image(x_img, caption=f"image input {trainer.current_epoch + 1} Batch {batch_idx} Image 0")
+                        pl_module.logger.experiment.log({"Images": wandb_img})
 
                     # Save locally
                     os.makedirs(self.outdir, exist_ok=True)
                     img.save(os.path.join(self.outdir, f'cam_image_val_epoch{trainer.current_epoch + 1}_batch{batch_idx}_img0.png'))
+
+    
 
                 # Limit the number of batches for GradCAM to avoid excessive logs
                 if batch_idx >= 2:
