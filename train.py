@@ -163,8 +163,8 @@ if __name__ == '__main__':
             'learning_rates': config['param_grid']['learning_rates'],
             }
         param_grid_arcface = {
-            'scales': config['param_grid_arcface']['scales'],
-            'margins': config['param_grid_arcface']['margins'],
+            'scales': config['param_grid']['arcface']['scales'],
+            'margins': config['param_grid']['arcface']['margins'],
             }
         grid = ParameterGrid(param_grid_triplet)
     else:

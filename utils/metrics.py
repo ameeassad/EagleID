@@ -1,5 +1,6 @@
 import numpy as np
 from wildlife_tools.similarity.cosine import CosineSimilarity
+import torch.nn.functional as F
 
 
 def evaluate_map(distmat, query_labels, gallery_labels):

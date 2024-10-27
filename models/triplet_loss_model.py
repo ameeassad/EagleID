@@ -190,7 +190,7 @@ class TripletModel(pl.LightningModule):
         if self.re_ranking:
             distmat = re_ranking(query_embeddings, gallery_embeddings, k1=20, k2=6, lambda_value=0.3)
         else:
-            distmat = compute_distance_matrix(self.distance_matrix, query_embeddings, gallery_embeddings)
+            distmat = compute_distance_matrix(self.distance_matrix, query_embeddings, gallery_embeddings, wildlife=True)
 
         # Compute mAP
         # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
