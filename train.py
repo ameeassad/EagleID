@@ -15,6 +15,7 @@ from models.simple_model import SimpleModel
 from models.resnet_plus_model import ResNetPlusModel
 from models.triplet_loss_model import TripletModel
 from utils.gradcam_callback import GradCAMCallback
+from sklearn.model_selection import ParameterGrid
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Train classifier.')
@@ -23,7 +24,6 @@ def get_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
     return args
-
 
 def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
     lr_callback = LearningRateMonitor(logging_interval='epoch')
@@ -148,6 +148,31 @@ if __name__ == '__main__':
         config = yaml.safe_load(config_file)
 
     seed_everything(config['seed'], workers=True)
+
+    ##
+    if config['param_grid'] == True:
+    
+        param_grid = {
+            'embedding_sizes': [32, 64, 128],
+            'margins': [0.1, 0.5, 1.0],
+            'mining_types': ['soft', 'hard', 'semihard'],
+            'learning_rates': [0.001, 0.01, 0.1],
+            }
+        grid = ParameterGrid(param_grid)
+        results = []
+        for params in grid:
+            model = TripletModel(embedding_size=params['embedding_sizes'],
+                                 margin=params['margins'],
+                                 mining_type=params['mining_types'],
+                                 lr=params['learning_rates']
+                                 )
+            trainer = Trainer(max_epochs=20)
+            trainer.fit(model)
+            results.append((params, trainer.callback_metrics['train_loss']))
+        
+        best_params = sorted(results, key=lambda x: x[1])[0]
+        print(f'Best parameters: {best_params[0]}, Validation Loss: {best_params[1]}')
+    ##
 
     # setup dataset
     data =  get_dataset(config)

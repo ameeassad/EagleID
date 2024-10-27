@@ -76,3 +76,7 @@ solver:
   lr_decay: 0.8
 
 re_ranking: True
+
+param_grid: False
+param_grid:
+  learning_rates: [0.001, 0.01, 0.1]
