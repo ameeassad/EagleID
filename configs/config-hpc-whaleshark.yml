@@ -1,9 +1,9 @@
-project_name: eagleID
+project_name: eagleID-whaleshark
 notes: 
 use_wandb: True
 wandb_entity: winniethepooh
 
-wildlife_dataset: whaleshark
+wildlife_name: whaleshark
 animal_cat: fish
 outdir: results
 dataset: /proj/nobackup/aiforeagles/EDA-whaleshark/

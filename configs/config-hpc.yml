@@ -1,8 +1,9 @@
-project_name: eagleID
+project_name: eagleID-raptors
 notes: 
 use_wandb: True
 wandb_entity: winniethepooh
 
+wildlife_name: raptors
 animal_cat: bird
 outdir: results
 dataset: /proj/nobackup/aiforeagles/raptor_individuals_cropped/
