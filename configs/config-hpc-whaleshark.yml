@@ -79,4 +79,8 @@ re_ranking: True
 
 param_grid: False
 param_grid:
+  embedding_sizes: [128, 256, 512, 768, 2048]
+  margins: [0.2, 0.5, 0.7]
+  mining_types: ['semihard', 'hard']
   learning_rates: [0.001, 0.01, 0.1]
+  re_ranking: [True, False]

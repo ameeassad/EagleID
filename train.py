@@ -153,10 +153,11 @@ if __name__ == '__main__':
     if config['param_grid'] == True:
     
         param_grid = {
-            'embedding_sizes': [32, 64, 128],
-            'margins': [0.1, 0.5, 1.0],
-            'mining_types': ['soft', 'hard', 'semihard'],
-            'learning_rates': [0.001, 0.01, 0.1],
+            'embedding_sizes': config['param_grid']['embedding_sizes'],
+            'margins': config['param_grid']['margins'],
+            'mining_types': config['param_grid']['mining_types'],
+            'learning_rates': config['param_grid']['learning_rates'],
+            're_ranking': config['param_grid']['re_ranking'],
             }
         grid = ParameterGrid(param_grid)
         results = []
@@ -164,7 +165,8 @@ if __name__ == '__main__':
             model = TripletModel(embedding_size=params['embedding_sizes'],
                                  margin=params['margins'],
                                  mining_type=params['mining_types'],
-                                 lr=params['learning_rates']
+                                 lr=params['learning_rates'],
+                                 re_ranking=params['re_ranking'],
                                  )
             trainer = Trainer(max_epochs=20)
             trainer.fit(model)

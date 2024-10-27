@@ -143,7 +143,7 @@ class TripletModel(pl.LightningModule):
             # Perform validation metric calculation using random embeddings
             self.on_validation_epoch_end()
             # Log random baseline mAP
-            self.log("random_val/mAP", self.trainer.logged_metrics['val/mAP'])
+            self.log("random_val/mAP")
         # Switch back to training mode
         self.train()
 
