@@ -78,7 +78,7 @@ solver:
 re_ranking: True
 
 param_grid:
-  use_grid: False
+  use_grid: True
   embedding_sizes: [128, 256, 512, 768, 2048]
   learning_rates: [0.001, 0.01, 0.1]
   triplet:
