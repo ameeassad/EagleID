@@ -252,7 +252,11 @@ class RaptorsWildlife(WildlifeDataset):
                 # Convert polygon to RLE
                 height, width = int(data['height']), int(data['width'])
                 # height, width = img.size[1], img.size[0]
-                print("segmentation", type(segmentation[0][0]), segmentation[0][0])
+                try:
+                    print("segmentation", type(segmentation[0][0]), segmentation[0][0])
+                except:
+                    print("the following segmentation has a different format", segmentation)
+                    print("image: ", img_path)
                 rle = mask_coco.frPyObjects(segmentation, height, width)
                 segmentation = mask_coco.merge(rle)
 
