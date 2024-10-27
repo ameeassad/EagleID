@@ -252,12 +252,7 @@ class RaptorsWildlife(WildlifeDataset):
                 # Convert polygon to RLE
                 height, width = int(data['height']), int(data['width'])
                 # height, width = img.size[1], img.size[0]
-                try:
-                    print("segmentation", type(segmentation[0][0]), segmentation[0][0])
-                    rle = mask_coco.frPyObjects(segmentation, height, width)
-                except:
-                    print("the following segmentation has a different format", segmentation)
-                    print("image: ", img_path)
+                rle = mask_coco.frPyObjects(segmentation, height, width)
                 segmentation = mask_coco.merge(rle)
 
         if self.img_load in ["bbox", "bbox_mask", "bbox_hide", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
@@ -489,6 +484,8 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             df_train = add_segmentations(df_train, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
             df_query = add_segmentations(df_query, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
             df_gallery = add_segmentations(df_gallery, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
+
+            metadata_df = self.clean_segmentation(metadata_df, segmentation_col='segmentation')
         
         if self.preprocess_lvl >= 3: # 3: masked + pose (skeleton) image in 1 channel or 4: masked + body part clusters in channels
             from preprocess.mmpose_fill import fill_keypoints, get_skeleton_info, get_keypoints_info
@@ -577,7 +574,49 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         identity_counts = metadata['identity'].value_counts()
         valid_identities = identity_counts[identity_counts >= min_images].index
         return metadata[metadata['identity'].isin(valid_identities)].reset_index(drop=True)
+
+    def clean_segmentation(self, segmentation_col='segmentation'):
+        """
+        Cleans the segmentation column in the DataFrame to ensure each segmentation 
+        is in the correct format (list where the first element is a float).
+        
+        Args:
+            df (pd.DataFrame): The DataFrame containing metadata.
+            segmentation_col (str): The name of the column containing segmentation data.
+            
+        Returns:
+            pd.DataFrame: A cleaned DataFrame with valid segmentation data.
+        """
+        # Apply the cleaning function to the segmentation column
+
+        df = self.metadata
+        df[segmentation_col] = df[segmentation_col].apply(self.parse_segmentation)
+
+        # Drop rows where segmentation is None (invalid)
+        df_cleaned = df.dropna(subset=[segmentation_col])
+
+        print(f"Removed {len(df) - len(df_cleaned)} rows with invalid segmentation data.")
+
+        return df_cleaned
     
-    def get_img_channels(self):
-        return self.img_channels
+
+    def parse_segmentation(self, segmentation):
+        # Convert from string to list if needed
+        if isinstance(segmentation, str):
+            try:
+                segmentation = json.loads(segmentation)
+            except json.JSONDecodeError:
+                return None  # Return None for invalid JSON format
+
+        # Check if segmentation is a list and the first element is a float or list
+        if isinstance(segmentation, list):
+            # If it's a flat list, check if the first element is a float
+            if all(isinstance(coord, (int, float)) for coord in segmentation):
+                return [segmentation]  # Wrap in a list to make it a list of lists
+            elif isinstance(segmentation[0], list) and isinstance(segmentation[0][0], (int, float)):
+                return segmentation  # Already in the correct format
+
+        # If none of the above conditions are met, return None (invalid format)
+        print(f"Invalid segmentation format: {segmentation}")
+        return None
 
