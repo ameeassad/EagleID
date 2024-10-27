@@ -40,14 +40,15 @@ def compute_distance_matrix(distance_matrix, query_embeddings, gallery_embedding
             similarity = similarity_function(query_embeddings, gallery_embeddings)['cosine']
             distmat = 1 - similarity # Convert similarity to distance if necessary
             print(f"Distance matrix type should be np for rerankin: {type(distmat)}")
-            return distmat
         else:
             query_embeddings = F.normalize(query_embeddings, p=2, dim=1)
             gallery_embeddings = F.normalize(gallery_embeddings, p=2, dim=1)
             cosine_similarity = torch.mm(query_embeddings, gallery_embeddings.t())
             distmat = 1 - cosine_similarity # Convert similarity to distance if necessary
             print(f"Distance matrix type should be np for reranking: {type(distmat)}")
-            return distmat
+    else:
+        raise ValueError(f"Invalid distance matrix type: {distance_matrix}")
+    return distmat
 
 
 """
