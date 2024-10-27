@@ -53,11 +53,10 @@ class GradCAMCallback(Callback):
                     x_np = x[0].cpu().numpy()  # Convert from PyTorch tensor to numpy array
                     unnormalized_x = denormalize(x_np, self.config['transforms']['mean'], self.config['transforms']['std'])
 
-                    # x_debug = unnormalized_x #debug
-
                     # Reformat unnormalized_x back to (224, 224, 3) for visualization
                     unnormalized_x = np.transpose(unnormalized_x, (1, 2, 0))  # Shape is now (224, 224, 3)
-                    unnormalized_x = np.clip(unnormalized_x, 0, 1)
+                    # x_debug = unnormalized_x #debug
+                    # unnormalized_x = np.clip(unnormalized_x, 0, 1)
 
                     # cam = GradCAM(model=self.model, target_layers=[self.model.layer4[-1]])
                     cam = GradCAM(model=self.model, target_layers=[target_layer])
@@ -73,7 +72,6 @@ class GradCAMCallback(Callback):
                         pl_module.logger.experiment.log({"GradCAM Images": wandb_img})
 
                         # #below is for debugging purposes
-                        # x_debug  = np.transpose(x_debug, (1, 2, 0)) 
                         # x_img = Image.fromarray(x_debug)
                         # x_img.save(os.path.join(self.outdir, f'input image{trainer.current_epoch + 1}_batch{batch_idx}_img0.jpg'))
                         # wandb_img = wandb.Image(x_img, caption=f"image input {trainer.current_epoch + 1} Batch {batch_idx} Image 0")

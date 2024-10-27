@@ -593,28 +593,14 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         Returns:
             pd.DataFrame: A cleaned DataFrame with valid segmentation data.
         """
-        # Apply the cleaning function to the segmentation column
-
-        print(f"length of dataframe: {len(df)}")
-        # Keep only rows where segmentation is a list or a string
-        df = df[df[segmentation_col].apply(lambda x: isinstance(x, (list, str)))]
-
-        print(f"new length of dataframe: {len(df)}")
-
-
         df[segmentation_col] = df[segmentation_col].apply(self.parse_segmentation)
-
         # Drop rows where segmentation is None (invalid)
         df_cleaned = df.dropna(subset=[segmentation_col])
-
         print(f"Removed {len(df) - len(df_cleaned)} rows with invalid segmentation data.")
-
         return df_cleaned
     
 
     def parse_segmentation(self, segmentation):
-        print(f"working with segmentation: {segmentation}")
-        print(f"working with type: {type(segmentation)}")
         # Convert from string to list if needed
         if segmentation is None:
             print("No segmentation data found.: None")
