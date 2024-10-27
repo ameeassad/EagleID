@@ -237,8 +237,13 @@ class RaptorsWildlife(WildlifeDataset):
         if self.img_load in ["full_mask", "full_hide", "bbox_mask", "bbox_hide", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
             if not ("segmentation" in data):
                 raise ValueError(f"{self.img_load} selected but no segmentation found.")
+            
             if type(data["segmentation"]) == str:
-                segmentation = eval(data["segmentation"])
+                # segmentation = eval(data["segmentation"])
+                try:
+                    segmentation = json.loads(data["segmentation"])
+                except json.JSONDecodeError:
+                    raise ValueError("Segmentation string could not be decoded. Ensure it is a valid JSON format.")
             else:
                 segmentation = data["segmentation"]
             seg_coco = segmentation
