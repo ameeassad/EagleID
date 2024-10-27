@@ -596,6 +596,15 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         # Apply the cleaning function to the segmentation column
 
         df = self.metadata.copy()
+        print("TYPES OF VALUES IN SEGMENTATION COLUMN:")
+        print(df[segmentation_col].apply(type).value_counts())
+        print(f"length of dataframe: {len(df)}")
+        # Keep only rows where segmentation is a list or a string
+        df = df[df[segmentation_col].apply(lambda x: isinstance(x, (list, str)))]
+
+        print(f"new length of dataframe: {len(df)}")
+
+
         df[segmentation_col] = df[segmentation_col].apply(self.parse_segmentation)
 
         # Drop rows where segmentation is None (invalid)
