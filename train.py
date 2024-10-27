@@ -130,6 +130,7 @@ def get_trainer(config) -> Trainer:
         'logger': wandb_logger,
         'deterministic': True,
         'profiler': 'simple',
+        'num_sanity_val_steps': -1, # -1 to check all validation data, 0 to turn off
     }
 
     if strategy is not None:
