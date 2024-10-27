@@ -1,0 +1,64 @@
+project_name: eagleID
+notes: 
+use_wandb: True
+wandb_entity: winniethepooh
+
+wildlife_dataset: whaleshark
+animal_cat: fish
+outdir: results
+dataset: /proj/nobackup/aiforeagles/EDA-whaleshark/
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_whaleshark.csv
+splitter: closed
+split_ratio: 0.8
+
+only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
+
+model_architecture: TripletModel
+backbone_name: resnet50
+checkpoint: 
+preprocess_lvl: 2 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
+
+batch_size: 32
+img_size: 224
+epochs: 100
+save_interval: 10
+n_gpu: 1
+num_workers: 8
+gpu_ids: 
+seed: 42
+
+use_gradcam: True
+
+transforms:
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+
+embedding_size: 768
+triplet_loss:
+  margin: 0.2
+  mining_type: semihard
+  distance_matrix: euclidean
+megadescriptor: 
+  margin: 
+  scale: 
+
+
+early_stopping:
+  enabled: False
+  monitor: val/loss
+  min_delta: 0.0005
+  patience: 50
+  verbose: true
+  mode: min
+
+solver:
+  OPT: adam  # adam, SGD
+  WEIGHT_DECAY: 0.001
+  MOMENTUM: 0.9  # only when OPT is sgd
+  BASE_LR: 0.0001
+  LR_SCHEDULER: multistep  # step, multistep, reduce_on_plateau
+  LR_DECAY_RATE: 0.1
+  LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
+  LR_STEP_MILESTONES: [20, 30]  # only when LR_SCHEDULER is multistep
+
+re_ranking: True

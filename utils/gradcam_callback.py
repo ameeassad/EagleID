@@ -53,7 +53,7 @@ class GradCAMCallback(Callback):
                     x_np = x[0].cpu().numpy()  # Convert from PyTorch tensor to numpy array
                     unnormalized_x = denormalize(x_np, self.config['transforms']['mean'], self.config['transforms']['std'])
 
-                    x_debug = unnormalized_x #debug
+                    # x_debug = unnormalized_x #debug
 
                     # Reformat unnormalized_x back to (224, 224, 3) for visualization
                     unnormalized_x = np.transpose(unnormalized_x, (1, 2, 0))  # Shape is now (224, 224, 3)
@@ -69,21 +69,19 @@ class GradCAMCallback(Callback):
 
                     # Log GradCAM image to W&B if enabled
                     if self.config.get('use_wandb', False):
-                        # wandb_img = wandb.Image(visualization, caption=f"GradCAM Epoch {trainer.current_epoch + 1} Batch {batch_idx} Image 0")
-                        # pl_module.logger.experiment.log({"GradCAM Images": wandb_img})
-                        #debug
-                        #below is for debugging purposes
-                        x_debug  = np.transpose(x_debug, (1, 2, 0)) 
-                        x_img = Image.fromarray(x_debug)
-                        x_img.save(os.path.join(self.outdir, f'input image{trainer.current_epoch + 1}_batch{batch_idx}_img0.jpg'))
-                        wandb_img = wandb.Image(x_img, caption=f"image input {trainer.current_epoch + 1} Batch {batch_idx} Image 0")
-                        pl_module.logger.experiment.log({"Images": wandb_img})
+                        wandb_img = wandb.Image(visualization, caption=f"GradCAM Epoch {trainer.current_epoch + 1} Batch {batch_idx} Image 0")
+                        pl_module.logger.experiment.log({"GradCAM Images": wandb_img})
+
+                        # #below is for debugging purposes
+                        # x_debug  = np.transpose(x_debug, (1, 2, 0)) 
+                        # x_img = Image.fromarray(x_debug)
+                        # x_img.save(os.path.join(self.outdir, f'input image{trainer.current_epoch + 1}_batch{batch_idx}_img0.jpg'))
+                        # wandb_img = wandb.Image(x_img, caption=f"image input {trainer.current_epoch + 1} Batch {batch_idx} Image 0")
+                        # pl_module.logger.experiment.log({"Images": wandb_img})
 
                     # Save locally
                     os.makedirs(self.outdir, exist_ok=True)
-                    img.save(os.path.join(self.outdir, f'cam_image_val_epoch{trainer.current_epoch + 1}_batch{batch_idx}_img0.png'))
-
-    
+                    img.save(os.path.join(self.outdir, f'cam_image_val_epoch{trainer.current_epoch + 1}_batch{batch_idx}_img0.png'))    
 
                 # Limit the number of batches for GradCAM to avoid excessive logs
                 if batch_idx >= 2:

@@ -10,8 +10,7 @@ from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint, Ea
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import seed_everything
 
-from data.artportalen_goleag import ArtportalenDataModule
-from data.raptors_wildlife import WildlifeReidDataModule, Raptors
+from data.combined_datasets import get_dataset
 from models.simple_model import SimpleModel
 from models.resnet_plus_model import ResNetPlusModel
 from models.triplet_loss_model import TripletModel
@@ -150,8 +149,7 @@ if __name__ == '__main__':
     seed_everything(config['seed'], workers=True)
 
     # setup dataset
-    dataset = Raptors(root=config['dataset'], include_video=False)
-    data = WildlifeReidDataModule(metadata=dataset.df, config = config)
+    data =  get_dataset(config)
 
     # setup model
     if config['checkpoint']:
