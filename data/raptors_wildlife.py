@@ -613,6 +613,8 @@ class WildlifeReidDataModule(pl.LightningDataModule):
     
 
     def parse_segmentation(self, segmentation):
+        print(f"working with segmentation: {segmentation}")
+        print(f"working with type: {type(segmentation)}")
         # Convert from string to list if needed
         if segmentation is None:
             print("No segmentation data found.: None")
