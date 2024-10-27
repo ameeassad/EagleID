@@ -226,4 +226,82 @@ class MegadescriptorModel(pl.LightningModule):
         #     device='cuda',
         # )
 
+class MiewIdNet(nn.Module):
+
+    def __init__(self,
+                 n_classes,
+                 model_name='swinv2_base_window12_192_22k',
+                 use_fc=False,
+                 fc_dim=512,
+                 dropout=0.0,
+                 pretrained=True,
+                 in_channels=3,  # Parameter for the number of input channels
+                 **kwargs):
+        """
+        SwinV2 Model initialization
+        """
+        super(MiewIdNet, self).__init__()
+        print('Building Model Backbone for {} model'.format(model_name))
+
+        self.model_name = model_name
+
+        # Create the backbone using timm
+        self.backbone = timm.create_model(model_name, pretrained=pretrained)
+
+        # Modify the patch embedding layer if the number of input channels is different
+        if in_channels != 3:
+            # Get the original patch embedding layer
+            patch_embed = self.backbone.patch_embed
+
+            # Create a new patch embedding layer with the desired number of input channels
+            new_patch_embed = nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=patch_embed.proj.out_channels,
+                kernel_size=patch_embed.proj.kernel_size,
+                stride=patch_embed.proj.stride,
+                padding=patch_embed.proj.padding,
+                bias=patch_embed.proj.bias is not None
+            )
+
+            # Initialize the weights of the new patch embedding layer
+            nn.init.kaiming_normal_(new_patch_embed.weight, mode='fan_out', nonlinearity='relu')
+
+            # Replace the old patch embedding layer with the new one
+            self.backbone.patch_embed.proj = new_patch_embed
+
+        # Determine the number of input features for the final layer
+        final_in_features = self.backbone.head.in_features
+
+        self.final_in_features = final_in_features
+        
+        # Remove the classification head
+        self.backbone.head = nn.Identity()
+        
+        self.pooling = GeM()
+        self.bn = nn.BatchNorm1d(final_in_features)
+        self.use_fc = use_fc
+        if use_fc:
+            self.dropout = nn.Dropout(p=dropout)
+            self.bn = nn.BatchNorm1d(fc_dim)
+            self.bn.bias.requires_grad_(False)
+            self.fc = nn.Linear(final_in_features, n_classes, bias=False)            
+            self.bn.apply(weights_init_kaiming)
+            self.fc.apply(weights_init_classifier)
+            final_in_features = fc_dim
+
+    def forward(self, x):
+        feature = self.extract_feat(x)
+        return feature
+
+    def extract_feat(self, x):
+        batch_size = x.shape[0]
+        x = self.backbone.forward_features(x)
+
+        x = self.pooling(x).view(batch_size, -1)
+        x = self.bn(x)
+        if self.use_fc:
+            x1 = self.dropout(x)
+            x1 = self.bn(x1)
+            x1 = self.fc(x1)
+        return x
 

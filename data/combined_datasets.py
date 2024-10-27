@@ -56,6 +56,9 @@ def get_dataset(config):
         # don't use bbox
         dataset = datasets.StripeSpotter(config['dataset'])
         data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+    elif config['wildlife_name'] == 'ALL_BIRDS':
+        #TODO combine all bird datasets
+        pass
     else:
         raise ValueError(f"Unknown dataset {config['wildlife_name']}")
     

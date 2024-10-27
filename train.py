@@ -149,60 +149,74 @@ if __name__ == '__main__':
 
     seed_everything(config['seed'], workers=True)
 
-    ##
-    if config['param_grid'] == True:
-    
-        param_grid = {
-            'embedding_sizes': config['param_grid']['embedding_sizes'],
-            'margins': config['param_grid']['margins'],
-            'mining_types': config['param_grid']['mining_types'],
-            'learning_rates': config['param_grid']['learning_rates'],
-            're_ranking': config['param_grid']['re_ranking'],
-            }
-        grid = ParameterGrid(param_grid)
-        results = []
-        for params in grid:
-            model = TripletModel(embedding_size=params['embedding_sizes'],
-                                 margin=params['margins'],
-                                 mining_type=params['mining_types'],
-                                 lr=params['learning_rates'],
-                                 re_ranking=params['re_ranking'],
-                                 )
-            trainer = Trainer(max_epochs=20)
-            trainer.fit(model)
-            results.append((params, trainer.callback_metrics['train_loss']))
-        
-        best_params = sorted(results, key=lambda x: x[1])[0]
-        print(f'Best parameters: {best_params[0]}, Validation Loss: {best_params[1]}')
-    ##
-
     # setup dataset
     data =  get_dataset(config)
 
-    # setup model
-    if config['checkpoint']:
-        print(f"Loading model {config['model_architecture']} from checkpoint")
-        if config['model_architecture']=='TripletModel':
-            # pretrained=True,
-            model = TripletModel(config=config, pretrained=False)
-        else:
-            model = SimpleModel(config=config, pretrained=False)
-
-        checkpoint = torch.load(config['checkpoint'])
-        model.load_state_dict(checkpoint["state_dict"])
+    ##
+    param_grid = config['param_grid']['use_grid']
+    if param_grid == True:
+        config['max_epochs'] = 20
+        param_grid_triplet = {
+            'embedding_sizes': config['param_grid']['embedding_sizes'],
+            'margins': config['param_grid']['triplet']['margins'],
+            'mining_types': config['param_grid']['triplet']['mining_types'],
+            'learning_rates': config['param_grid']['learning_rates'],
+            }
+        param_grid_arcface = {
+            'scales': config['param_grid_arcface']['scales'],
+            'margins': config['param_grid_arcface']['margins'],
+            }
+        grid = ParameterGrid(param_grid_triplet)
     else:
-        print(f"Start training {config['model_architecture']} from pretrained model")
-        if config['model_architecture']=='TripletModel':
-            model = TripletModel(config=config, pretrained=True)
+        grid = range(1)
+
+    results = []
+
+    # setup model
+    for params in grid:
+        if param_grid and config['model_architecture']=='TripletModel':
+            # triplet
+            config['embedding_size'] = params['embedding_sizes']
+            config['triplet_loss']['margin'] = params['margins']
+            config['triplet_loss']['mining_type'] = params['mining_types']
+            config['solver']['BASE_LR'] = params['learning_rates']
+        elif param_grid and config['model_architecture']=='ArcFaceModel':
+            # arcface
+            config['embedding_size'] = params['embedding_sizes']
+            config['arcface']['scale'] = params['scales']
+            config['arcface']['margin'] = params['margins']
+            config['solver']['BASE_LR'] = params['learning_rates']
+
+        if config['checkpoint']:
+            print(f"Loading model {config['model_architecture']} from checkpoint")
+            if config['model_architecture']=='TripletModel':
+                # pretrained=True
+                model = TripletModel(config=config, pretrained=False)
+            else:
+                model = SimpleModel(config=config, pretrained=False)
+
+            checkpoint = torch.load(config['checkpoint'])
+            model.load_state_dict(checkpoint["state_dict"])
         else:
-            model = SimpleModel(config=config, pretrained=True)
+            print(f"Start training {config['model_architecture']} from pretrained model")
+            if config['model_architecture']=='TripletModel':
+                model = TripletModel(config=config, pretrained=True)
+            else:
+                model = SimpleModel(config=config, pretrained=True)
 
-    trainer = get_trainer(config)
+        trainer = get_trainer(config)
 
-    print('Args:')
-    pprint(args.__dict__)
-    print('configuration:')
-    pprint(config)
+        print('Args:')
+        pprint(args.__dict__)
+        print('configuration:')
+        pprint(config)
 
-    
-    trainer.fit(model, data)
+        
+        trainer.fit(model, data)
+        
+        if param_grid:
+            results.append((params, trainer.callback_metrics['train_loss']))
+
+    if param_grid:
+        best_params = sorted(results, key=lambda x: x[1])[0]
+        print(f'Best parameters: {best_params[0]}, Validation Loss: {best_params[1]}')

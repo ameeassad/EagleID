@@ -101,6 +101,10 @@ class TripletModel(pl.LightningModule):
         else:
             num_channels = 3
 
+        # Debug: check if all layers are unfrozen:
+        for name, param in self.backbone.named_parameters():
+            print(f"{name}: requires_grad = {param.requires_grad}")
+
         # Embedder (to project features into the desired embedding space)
         self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)
         # self.fc = nn.Linear(self.model.output_size, embedding_size)  # Embedding layer
@@ -115,15 +119,7 @@ class TripletModel(pl.LightningModule):
         embeddings = nn.functional.normalize(embeddings, p=2, dim=1)  # L2 normalization
         return embeddings
     
-    # def on_train_start(self):
-    #     # Log the initial training loss
-    #     self.log_initial_training_loss()
-    #     # Perform initial validation to log the mAP
-    #     self.log_initial_validation_map()
-    #     # Log random baseline metrics for comparison
-    #     self.log_random_baseline_metrics()
-
-    def on_validation_start(self):
+    def on_validation_start(self): # to run only once can also use: on_train_start
         self.eval()
         self.on_validation_epoch_start()  # Initialize query/gallery embeddings and labels
         with torch.no_grad():
@@ -200,65 +196,6 @@ class TripletModel(pl.LightningModule):
         # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
         mAP = evaluate_map(distmat, query_labels, gallery_labels)
         self.log('val/mAP', mAP)
-
-    # def log_initial_training_loss(self):
-    #     # Switch to evaluation mode
-    #     self.eval()
-    #     with torch.no_grad():
-    #         total_loss = 0.0
-    #         num_batches = 0
-    #         for batch in self.trainer.train_dataloader:
-    #             images, labels = batch
-    #             embeddings = self(images)
-    #             mined_triplets = self.miner(embeddings, labels)
-    #             loss = self.loss_fn(embeddings, labels, mined_triplets)
-    #             total_loss += loss.item()
-    #             num_batches += 1
-    #         # Compute average loss
-    #         avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
-    #         self.log("initial_train_loss", avg_loss)
-    #     # Switch back to training mode
-    #     self.train()
-
-    # def log_initial_validation_map(self):
-    #     # Switch to evaluation mode
-    #     self.eval()
-    #     self.on_validation_epoch_start()  # Initialize query/gallery embeddings and labels
-    #     with torch.no_grad():
-    #         for batch_idx, batch in enumerate(self.trainer.val_dataloaders[0]):
-    #             self.validation_step(batch, batch_idx, dataloader_idx=0)
-    #         for batch_idx, batch in enumerate(self.trainer.val_dataloaders[1]):
-    #             self.validation_step(batch, batch_idx, dataloader_idx=1)
-    #         # Perform validation metric calculation
-    #         self.on_validation_epoch_end()
-    #     # Switch back to training mode
-    #     self.train()
-
-    # def log_random_baseline_metrics(self):
-    #     # Log random baseline for training loss
-    #     self.log_random_baseline_training_loss()
-    #     # Log random baseline for validation mAP
-    #     self.log_random_baseline_validation_map()
-
-    # def log_random_baseline_training_loss(self):
-    #     # Switch to evaluation mode
-    #     self.eval()
-    #     with torch.no_grad():
-    #         total_loss = 0.0
-    #         num_batches = 0
-    #         for batch in self.trainer.train_dataloader:
-    #             images, labels = batch
-    #             # Generate random embeddings with the same shape
-    #             random_embeddings = torch.randn_like(self(images))
-    #             mined_triplets = self.miner(random_embeddings, labels)
-    #             loss = self.loss_fn(random_embeddings, labels, mined_triplets)
-    #             total_loss += loss.item()
-    #             num_batches += 1
-    #         # Compute average loss
-    #         avg_random_loss = total_loss / num_batches if num_batches > 0 else 0.0
-    #         self.log("random_train_loss", avg_random_loss)
-    #     # Switch back to training mode
-    #     self.train()
 
     def log_random_baseline_validation_map(self):
         # Switch to evaluation mode
