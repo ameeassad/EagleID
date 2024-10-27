@@ -619,26 +619,33 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         if segmentation is None:
             print("No segmentation data found.: None")
             return None
-        if not isinstance(segmentation, (list, str)):
-            print("No segmentation data found.: Not a list or string")
-            return None
         if isinstance(segmentation, str):
             try:
                 segmentation = json.loads(segmentation)
+                print("Parsed segmentation from string.")
             except json.JSONDecodeError:
-                return None  # Return None for invalid JSON format
+                print("Segmentation is a string but not valid JSON.")
+                return None
 
-        # Check if segmentation is a list and the first element is a float or list
-        if isinstance(segmentation, list):
-            # If it's a flat list, check if the first element is a float
-            if all(isinstance(coord, (int, float)) for coord in segmentation):
-                print("Flat list segmentation found.")
-                return [segmentation]  # Wrap in a list to make it a list of lists
-            elif isinstance(segmentation[0], list) and isinstance(segmentation[0][0], (int, float)):
-                print("Nested list segmentation found.")
-                return segmentation  # Already in the correct format
-
-        # If none of the above conditions are met, return None (invalid format)
-        print(f"Invalid segmentation format: {segmentation}")
+        # Ensure the segmentation is now a list after possible string conversion
+        if not isinstance(segmentation, list):
+            print("No segmentation data found: Not a list after conversion.")
+            return None
+        
+        # Check for empty lists or lists containing only empty lists
+        if not segmentation or (len(segmentation) == 1 and not segmentation[0]):
+            print("No segmentation data found: Empty list or list containing empty list.")
+            return None
+        
+        # Check if the first element is a list of coordinates
+        if isinstance(segmentation[0], list) and all(isinstance(coord, (int, float)) for coord in segmentation[0]):
+            return segmentation  # Already in the correct format
+        
+        # If it's a flat list of coordinates, wrap it in a list
+        if all(isinstance(coord, (int, float)) for coord in segmentation):
+            return [segmentation]  # Convert to a list of lists
+        
+        # If none of the conditions are met, return None
+        print("Segmentation format is not recognized.")
         return None
 
