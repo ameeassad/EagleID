@@ -152,6 +152,7 @@ class TripletModel(pl.LightningModule):
             random_mAP = evaluate_map(distmat, query_labels, gallery_labels)
             
             # Log the random baseline mAP
+            print(f"Random mAP: {random_mAP}")
             self.log("random_val/mAP", random_mAP)
         # Switch back to training mode
         self.train()
