@@ -239,18 +239,18 @@ class RaptorsWildlife(WildlifeDataset):
                 raise ValueError(f"{self.img_load} selected but no segmentation found.")
             
             if type(data["segmentation"]) == str:
-                # segmentation = eval(data["segmentation"])
-                try:
-                    segmentation = json.loads(data["segmentation"])
-                except json.JSONDecodeError:
-                    raise ValueError("Segmentation string could not be decoded. Ensure it is a valid JSON format.")
+                segmentation = eval(data["segmentation"])
+                # try:
+                #     segmentation = json.loads(data["segmentation"])
+                # except json.JSONDecodeError:
+                #     raise ValueError("Segmentation string could not be decoded. Ensure it is a valid JSON format.")
             else:
                 segmentation = data["segmentation"]
             seg_coco = segmentation
 
             if isinstance(segmentation, list):
                 # Convert polygon to RLE
-                height, width = data['height'], data['width']
+                height, width = int(data['height']), int(data['width'])
                 # height, width = img.size[1], img.size[0]
                 rle = mask_coco.frPyObjects(segmentation, height, width)
                 segmentation = mask_coco.merge(rle)
