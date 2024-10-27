@@ -32,8 +32,6 @@ from pytorch_metric_learning import losses
 from data.data_utils import calculate_num_channels
 from utils.metrics import compute_distance_matrix
 
-
-
 class MegadescriptorModel(pl.LightningModule):
     def __init__(self, 
                  backbone_model_name="swin_base_patch4_window7_224", 
