@@ -595,17 +595,6 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         """
         # Apply the cleaning function to the segmentation column
 
-        if df[segmentation_col] is None:
-            print("No segmentation data found.: None")
-            return None
-        if not isinstance(df[segmentation_col], (list, str)):
-            print("No segmentation data found.: Not a list or string")
-            print(f"type of data in segmentation column: {type(df[segmentation_col].iloc[0])}")
-            print(f"segmentation column: {df[segmentation_col]}")
-            return None
-
-        print("TYPES OF VALUES IN SEGMENTATION COLUMN:")
-        print(df[segmentation_col].apply(type).value_counts())
         print(f"length of dataframe: {len(df)}")
         # Keep only rows where segmentation is a list or a string
         df = df[df[segmentation_col].apply(lambda x: isinstance(x, (list, str)))]
@@ -625,6 +614,12 @@ class WildlifeReidDataModule(pl.LightningDataModule):
 
     def parse_segmentation(self, segmentation):
         # Convert from string to list if needed
+        if segmentation is None:
+            print("No segmentation data found.: None")
+            return None
+        if not isinstance(segmentation, (list, str)):
+            print("No segmentation data found.: Not a list or string")
+            return None
         if isinstance(segmentation, str):
             try:
                 segmentation = json.loads(segmentation)
@@ -635,8 +630,10 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         if isinstance(segmentation, list):
             # If it's a flat list, check if the first element is a float
             if all(isinstance(coord, (int, float)) for coord in segmentation):
+                print("Flat list segmentation found.")
                 return [segmentation]  # Wrap in a list to make it a list of lists
             elif isinstance(segmentation[0], list) and isinstance(segmentation[0][0], (int, float)):
+                print("Nested list segmentation found.")
                 return segmentation  # Already in the correct format
 
         # If none of the above conditions are met, return None (invalid format)
