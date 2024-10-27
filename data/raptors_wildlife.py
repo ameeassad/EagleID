@@ -581,7 +581,7 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         valid_identities = identity_counts[identity_counts >= min_images].index
         return metadata[metadata['identity'].isin(valid_identities)].reset_index(drop=True)
 
-    def clean_segmentation(self, segmentation_col='segmentation'):
+    def clean_segmentation(self, df, segmentation_col='segmentation'):
         """
         Cleans the segmentation column in the DataFrame to ensure each segmentation 
         is in the correct format (list where the first element is a float).
@@ -595,7 +595,13 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         """
         # Apply the cleaning function to the segmentation column
 
-        df = self.metadata.copy()
+        if df[segmentation_col] is None:
+            print("No segmentation data found.: None")
+            return None
+        if not isinstance(df[segmentation_col], (list, str)):
+            print("No segmentation data found.: Not a list or string")
+            return None
+
         print("TYPES OF VALUES IN SEGMENTATION COLUMN:")
         print(df[segmentation_col].apply(type).value_counts())
         print(f"length of dataframe: {len(df)}")
