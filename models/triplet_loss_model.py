@@ -141,13 +141,20 @@ class TripletModel(pl.LightningModule):
                 self.gallery_labels.append(target)
 
             # Perform validation metric calculation using random embeddings
-            self.on_validation_epoch_end()
-            # Log random baseline mAP
-            self.log("random_val/mAP")
+            # Compute the distance matrix using the random embeddings
+            query_embeddings = torch.cat(self.query_embeddings)
+            gallery_embeddings = torch.cat(self.gallery_embeddings)
+            query_labels = torch.cat(self.query_labels)
+            gallery_labels = torch.cat(self.gallery_labels)
+
+            # Use a suitable distance metric for mAP calculation
+            distmat = compute_distance_matrix('euclidean', query_embeddings, gallery_embeddings)
+            random_mAP = evaluate_map(distmat, query_labels, gallery_labels)
+            
+            # Log the random baseline mAP
+            self.log("random_val/mAP", random_mAP)
         # Switch back to training mode
         self.train()
-
-
 
     def training_step(self, batch, batch_idx):
         images, labels = batch
