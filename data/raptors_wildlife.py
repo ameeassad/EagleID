@@ -254,10 +254,10 @@ class RaptorsWildlife(WildlifeDataset):
                 # height, width = img.size[1], img.size[0]
                 try:
                     print("segmentation", type(segmentation[0][0]), segmentation[0][0])
+                    rle = mask_coco.frPyObjects(segmentation, height, width)
                 except:
                     print("the following segmentation has a different format", segmentation)
                     print("image: ", img_path)
-                rle = mask_coco.frPyObjects(segmentation, height, width)
                 segmentation = mask_coco.merge(rle)
 
         if self.img_load in ["bbox", "bbox_mask", "bbox_hide", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
