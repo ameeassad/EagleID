@@ -485,7 +485,9 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             df_query = add_segmentations(df_query, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
             df_gallery = add_segmentations(df_gallery, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
 
-            metadata_df = self.clean_segmentation(metadata_df, segmentation_col='segmentation')
+            df_train = self.clean_segmentation(df_train)
+            df_query = self.clean_segmentation(df_query)
+            df_gallery = self.clean_segmentation(df_gallery)
         
         if self.preprocess_lvl >= 3: # 3: masked + pose (skeleton) image in 1 channel or 4: masked + body part clusters in channels
             from preprocess.mmpose_fill import fill_keypoints, get_skeleton_info, get_keypoints_info
