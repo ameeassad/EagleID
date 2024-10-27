@@ -591,7 +591,7 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         """
         # Apply the cleaning function to the segmentation column
 
-        df = self.metadata
+        df = self.metadata.copy()
         df[segmentation_col] = df[segmentation_col].apply(self.parse_segmentation)
 
         # Drop rows where segmentation is None (invalid)
