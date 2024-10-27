@@ -600,6 +600,8 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             return None
         if not isinstance(df[segmentation_col], (list, str)):
             print("No segmentation data found.: Not a list or string")
+            print(f"type of segmentation column: {type(df[segmentation_col])}")
+            print(f"segmentation column: {df[segmentation_col]}")
             return None
 
         print("TYPES OF VALUES IN SEGMENTATION COLUMN:")
