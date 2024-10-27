@@ -56,7 +56,8 @@ class GradCAMCallback(Callback):
                     # Reformat unnormalized_x back to (224, 224, 3) for visualization
                     unnormalized_x = np.transpose(unnormalized_x, (1, 2, 0))  # Shape is now (224, 224, 3)
                     # x_debug = unnormalized_x #debug
-                    # unnormalized_x = np.clip(unnormalized_x, 0, 1)
+                    unnormalized_x = (unnormalized_x-np.min(unnormalized_x))/(np.max(unnormalized_x)-np.min(unnormalized_x))
+                    unnormalized_x = np.clip(unnormalized_x, 0, 1)
 
                     # cam = GradCAM(model=self.model, target_layers=[self.model.layer4[-1]])
                     cam = GradCAM(model=self.model, target_layers=[target_layer])
