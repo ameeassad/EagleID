@@ -17,6 +17,8 @@ from models.resnet_plus_model import ResNetPlusModel
 from models.triplet_loss_model import TripletModel
 from utils.gradcam_callback import GradCAMCallback
 
+global config_yml
+
 sweep_config = {
   "method": "grid",   # Random search
   'name': 'first_sweep',
@@ -115,13 +117,14 @@ def get_gpu_settings(
     return "gpu", devices, strategy
 
 
-def get_trainer(config) -> Trainer:
+def get_trainer(config, model) -> Trainer:
     callbacks = get_basic_callbacks(checkpoint_interval=int(config['save_interval']))
     accelerator, devices, strategy = get_gpu_settings(config['gpu_ids'], config['n_gpu'])
 
     if config['use_wandb']:
-        wandb.init()    # required to have access to `wandb.config`
-        wandb_logger = WandbLogger(project=config['project_name'], log_model=True)
+        wandb.init(project=config['project_name'])
+        wandb_logger = WandbLogger()
+        # wandb_logger = WandbLogger(project=config['project_name'], log_model=True)
         wandb_logger.watch(model, log='all', log_freq=20)
         # add multiple hyperparameters
         wandb_logger.experiment.config.update({"model_architecture": config['model_architecture'], 
@@ -161,10 +164,7 @@ def get_trainer(config) -> Trainer:
     trainer = Trainer(**trainer_args)
     return trainer
 
-def sweep_iteration():
-    # setup data
-    data =  get_dataset(config)
-
+def get_model(config):
     # setup model - note how we refer to sweep parameters with wandb.config
     if config['checkpoint']:
         print(f"Loading model {config['model_architecture']} from checkpoint")
@@ -183,8 +183,16 @@ def sweep_iteration():
         else:
             model = SimpleModel(config=config, pretrained=True)
 
+
+def sweep_iteration():
+    wandb.init(project="sweep", config =config_yml)
+    config=wandb.config
+
+    data =  get_dataset(config)
+    model = get_model(config)
+
     # setup Trainer
-    trainer = get_trainer(config)
+    trainer = get_trainer(config, model)
 
     # train
     trainer.fit(model, data)
@@ -195,18 +203,19 @@ if __name__ == '__main__':
 
     config_file_path = yaml.safe_load(args.config)
     with open(config_file_path, 'r') as config_file:
-        config = yaml.safe_load(config_file)
+        config_yml = yaml.safe_load(config_file)
 
-    seed_everything(config['seed'], workers=True)
+    seed_everything(config_yml['seed'], workers=True)
 
     # setup dataset
-    data =  get_dataset(config)
+    # data =  get_dataset(config_yml)
 
     # override epochs
-    config['epochs'] = 10
+    config_yml['epochs'] = 10
 
     sweep_id = wandb.sweep(sweep_config, project="sweep-test")
 
     # agent that will iterate over the sweep parameters with specified search method
     wandb.agent(sweep_id, function=sweep_iteration, count=5)
+
         

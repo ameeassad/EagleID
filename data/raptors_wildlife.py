@@ -485,9 +485,9 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             df_query = add_segmentations(df_query, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
             df_gallery = add_segmentations(df_gallery, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
 
-            print(f"df_train: {len(df_train)}, columns: {df_train.columns} and values: {df_train.iloc[0]}")
-            print(f"df_query: {len(df_query)}, columns: {df_query.columns} and values: {df_query.iloc[0]}")
-            print(f"df_gallery: {len(df_gallery)}, columns: {df_gallery.columns} and values: {df_gallery.iloc[0]}")
+            # print(f"df_train: {len(df_train)}, columns: {df_train.columns} and values: {df_train.iloc[0]}")
+            # print(f"df_query: {len(df_query)}, columns: {df_query.columns} and values: {df_query.iloc[0]}")
+            # print(f"df_gallery: {len(df_gallery)}, columns: {df_gallery.columns} and values: {df_gallery.iloc[0]}")
 
             df_train = self.clean_segmentation(df_train)
             df_query = self.clean_segmentation(df_query)
@@ -593,8 +593,6 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         Returns:
             pd.DataFrame: A cleaned DataFrame with valid segmentation data.
         """
-        print("CLEANING THE FOLLOWING DF")
-        print(df.head())
         df[segmentation_col] = df[segmentation_col].apply(self.parse_segmentation)
         # Drop rows where segmentation is None (invalid)
         df_cleaned = df.dropna(subset=[segmentation_col])
