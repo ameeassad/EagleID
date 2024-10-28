@@ -74,6 +74,7 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None, only_cac
         # Check if the row exists in the cache and has 'segmentation' data
         if cache_path and 'path' in cache_df.columns:
             cached_row = cache_df[cache_df['path'] == row['path']]
+            print(cached_row)
             if not cached_row.empty:
                 
                 if isinstance(cached_row.iloc[0]['segmentation'], (list, tuple, np.ndarray)) and pd.notnull(cached_row.iloc[0]['segmentation']).all():
@@ -142,7 +143,7 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None, only_cac
 
                 break # only process the first result
             
-    if cache_path:
+    if cache_path and not only_cache:
         cache_df.to_csv(cache_path, index=False)
 
     updated_df = pd.DataFrame(updated_rows)
