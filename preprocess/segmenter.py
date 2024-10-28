@@ -60,6 +60,11 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None, only_cac
     Bbox format is [x_min, y_min, width, height]
     Segmentations format is a flattened list of x , y values
     """
+    print(df.head())
+    print(image_dir)
+    print(cache_path)
+    print(only_cache)
+          
 
     # Load or initialize the cache DataFrame
     if cache_path and os.path.exists(cache_path):
@@ -75,13 +80,10 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None, only_cac
         if cache_path and 'path' in cache_df.columns:
             cached_row = cache_df[cache_df['path'] == row['path']]
             print(cached_row)
-            if not cached_row.empty:
-                
-                if isinstance(cached_row.iloc[0]['segmentation'], (list, tuple, np.ndarray)) and pd.notnull(cached_row.iloc[0]['segmentation']).all():
-            # if not cached_row.empty and pd.notnull(cached_row.iloc[0]['segmentation']):
+            if not cached_row.empty and pd.notnull(cached_row.iloc[0]['segmentation']):
                 # Use cached data
-                    updated_rows.append(cached_row.iloc[0].to_dict())
-                    continue
+                updated_rows.append(cached_row.iloc[0].to_dict())
+                continue
         if cache_path and only_cache:
             continue
 
