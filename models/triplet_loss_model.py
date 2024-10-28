@@ -79,7 +79,7 @@ class TripletModel(pl.LightningModule):
             self.re_ranking=re_ranking
             self.distance_matrix = 'euclidean'
             outdir=outdir
-        self.save_hyperparameters()
+        # self.save_hyperparameters()
             
         # Backbone (ResNet without the final FC layer)
         self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=pretrained, num_classes=0)
