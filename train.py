@@ -100,7 +100,7 @@ def get_trainer(config) -> Trainer:
 
     if config['use_wandb']:
         wandb_logger = WandbLogger(project=config['project_name'], log_model=True)
-        wandb_logger.watch(model, log='all', log_freq=100)
+        wandb_logger.watch(model, log='all', log_freq=20)
         # add multiple hyperparameters
         wandb_logger.experiment.config.update({"model_architecture": config['model_architecture'], 
                                                 "checkpoint": config['checkpoint'],
@@ -155,7 +155,7 @@ if __name__ == '__main__':
     ##
     param_grid = config['param_grid']['use_grid']
     if param_grid == True:
-        config['max_epochs'] = 20
+        config['epochs'] = 20
         param_grid_triplet = {
             'embedding_sizes': config['param_grid']['embedding_sizes'],
             'margins': config['param_grid']['triplet']['margins'],

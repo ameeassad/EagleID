@@ -119,7 +119,7 @@ class TripletModel(pl.LightningModule):
         embeddings = nn.functional.normalize(embeddings, p=2, dim=1)  # L2 normalization
         return embeddings
     
-    def on_validation_start(self): # to run only once can also use: on_train_start
+    def on_train_start(self): # to run only once: on_train_start / for every val: on_validation_start
         self.eval()
         self.on_validation_epoch_start()  # Initialize query/gallery embeddings and labels
         with torch.no_grad():

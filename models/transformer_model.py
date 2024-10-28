@@ -3,36 +3,26 @@ import itertools
 from torch.optim import SGD
 from wildlife_tools.train import ArcFaceLoss, BasicTrainer
 
-
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from pytorch_metric_learning import losses
 
-from utils.triplet_loss_utils import TripletLoss
 from utils.optimizer import get_optimizer, get_lr_scheduler_config
 from utils.weights_initializer import weights_init_kaiming, weights_init_classifier
 
-import torch
-import torch.nn.functional as F
 import pytorch_lightning as pl
 from pytorch_metric_learning import losses, miners
-from torch import nn
 
 from wildlife_tools.similarity.cosine import CosineSimilarity
 from utils.metrics import evaluate_map, compute_average_precision
 
 from utils.re_ranking import re_ranking
 
-import pytorch_lightning as pl
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import timm
-from pytorch_metric_learning import losses
-
 from data.data_utils import calculate_num_channels
 from utils.metrics import compute_distance_matrix
 
-class MegadescriptorModel(pl.LightningModule):
+class TransformerModel(pl.LightningModule):
     def __init__(self, 
                  backbone_model_name="swin_base_patch4_window7_224", 
                  img_size=224, 

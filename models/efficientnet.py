@@ -6,36 +6,20 @@ from torch import optim
 
 from .heads import ArcMarginProduct, ElasticArcFace, ArcFaceSubCenterDynamic
 
-import timm
-import itertools
 from torch.optim import SGD
 from wildlife_tools.train import ArcFaceLoss, BasicTrainer
-
-
-import torch
-import torch.nn as nn
 
 from utils.triplet_loss_utils import TripletLoss
 from utils.optimizer import get_optimizer, get_lr_scheduler_config
 from utils.weights_initializer import weights_init_kaiming, weights_init_classifier
 
-import torch
-import torch.nn.functional as F
 import pytorch_lightning as pl
 from pytorch_metric_learning import losses, miners
-from torch import nn
 
 from wildlife_tools.similarity.cosine import CosineSimilarity
 from utils.metrics import evaluate_map, compute_average_precision
 
 from utils.re_ranking import re_ranking
-
-import pytorch_lightning as pl
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import timm
-from pytorch_metric_learning import losses
 
 from data.data_utils import calculate_num_channels
 from utils.metrics import compute_distance_matrix
@@ -80,31 +64,48 @@ class GeM(nn.Module):
                 '(' + 'p=' + '{:.4f}'.format(self.p.data.tolist()[0]) + \
                 ', ' + 'eps=' + str(self.eps) + ')'
     
-class MiewIdNet(nn.Module):
-
+class EfficientNet(pl.LighntingModule):
+    # inspiration from MiewIdNet
     def __init__(self,
-                 n_classes,
-                 model_name='efficientnet_b0',
-                 use_fc=False,
-                 fc_dim=512,
-                 dropout=0.0,
-                 pretrained=True,
-                 in_channels=3,  # Added parameter for number of input channels
-                 **kwargs):
-        """
-        method: TimmBackbone
-        model_name: 'efficientnet_b0'
-        """
-        super(MiewIdNet, self).__init__()
-        print('Building Model Backbone for {} model'.format(model_name))
+                n_classes,
+                backbone_model_name='efficientnet_b0',
+                config = None, pretrained=True,
+                margin=0.3,
+                scale=50,
+                dropout=0.0,
+                lr=0.001, 
+                preprocess_lvl=0, 
+                re_ranking=True, 
+                outdir="results",
+                **kwargs):
+        super().__init__()
+        self.config = config
+        if config:
+            backbone_model_name=config['backbone_name']
+            preprocess_lvl=int(config['preprocess_lvl'])
+            self.re_ranking=config['re_ranking']
+            self.distance_matrix = config['triplet_loss']['distance_matrix']
+            outdir=config['outdir']
+        else:
+            backbone_model_name=backbone_model_name
+            preprocess_lvl=preprocess_lvl
+            self.re_ranking=re_ranking
+            self.distance_matrix = 'euclidean'
+            outdir=outdir
+        self.save_hyperparameters()
+        
 
-        self.model_name = model_name
+        if self.backbone not in ['efficientnet_b0','efficientnet_b3','efficientnetv2_rw']:
+            raise ValueError(f"Backbone model {self.backbone} not supported.")
+        self.backbone = timm.create_model(backbone_model_name, num_classes=0, pretrained=pretrained)
+        self.model_name = backbone_model_name
 
         # Create the backbone using timm
-        self.backbone = timm.create_model(model_name, pretrained=pretrained)
+        self.backbone = timm.create_model(backbone_model_name, pretrained=pretrained)
 
         # Modify the first convolutional layer to support more input channels
-        if in_channels != 3:
+        if preprocess_lvl >= 3:
+            in_channels = calculate_num_channels(preprocess_lvl)
             # Get the original first conv layer
             original_conv = self.backbone.conv_head if hasattr(self.backbone, 'conv_head') else self.backbone.conv1
 
@@ -128,28 +129,22 @@ class MiewIdNet(nn.Module):
                 self.backbone.conv1 = new_conv
 
         # Determine the number of input features for the final layer
-        if model_name.startswith('efficientnetv2_rw'):
-            final_in_features = self.backbone.classifier.in_features
-        elif model_name.startswith('swinv2'):
-            final_in_features = self.backbone.norm.normalized_shape[0]
-
-        self.final_in_features = final_in_features
+        self.final_in_features = self.backbone.classifier.in_features
         
         # Remove the classifier and global pool layer, replace with identity
         self.backbone.classifier = nn.Identity()
         self.backbone.global_pool = nn.Identity()
         
         self.pooling = GeM()
-        self.bn = nn.BatchNorm1d(final_in_features)
-        self.use_fc = use_fc
-        if use_fc:
-            self.dropout = nn.Dropout(p=dropout)
-            self.bn = nn.BatchNorm1d(fc_dim)
-            self.bn.bias.requires_grad_(False)
-            self.fc = nn.Linear(final_in_features, n_classes, bias=False)            
-            self.bn.apply(weights_init_kaiming)
-            self.fc.apply(weights_init_classifier)
-            final_in_features = fc_dim
+        self.bn = nn.BatchNorm1d(self.final_in_features)
+        # initialize parameters
+        nn.init.constant_(self.bn.weight, 1)
+        nn.init.constant_(self.bn.bias, 0)
+
+        self.loss_fn = losses.ArcFaceLoss(num_classes=n_classes, embedding_size=self.final_in_features, margin=margin, scale=scale)
+        self.lr = lr
+
+        self._init_params()
 
     def forward(self, x):
         feature = self.extract_feat(x)
@@ -158,113 +153,32 @@ class MiewIdNet(nn.Module):
     def extract_feat(self, x):
         batch_size = x.shape[0]
         x = self.backbone.forward_features(x)
-        if self.model_name.startswith('swinv2'):
-            x = x.permute(0, 3, 1, 2)
-
         x = self.pooling(x).view(batch_size, -1)
         x = self.bn(x)
-        if self.use_fc:
-            x1 = self.dropout(x)
-            x1 = self.bn(x1)
-            x1 = self.fc(x1)
-        return x
-
-            
-class MiewIdNet(nn.Module):
-
-    def __init__(self,
-                 n_classes,
-                 model_name='efficientnet_b0',
-                 use_fc=False,
-                 fc_dim=512,
-                 dropout=0.0,
-                 pretrained=True,
-                 **kwargs):
-        """
-        method: TimmBackbone
-        model_name: 'efficientnet_b0'
-        efficientnet_b3
-        """
-        super(MiewIdNet, self).__init__()
-        print('Building Model Backbone for {} model'.format(model_name))
-
-        self.model_name = model_name
-
-
-        self.backbone = timm.create_model(model_name, pretrained=pretrained)
-        if model_name.startswith('efficientnetv2_rw'):
-            final_in_features = self.backbone.classifier.in_features
-        if model_name.startswith('swinv2'):
-            final_in_features = self.backbone.norm.normalized_shape[0]
-
-        self.final_in_features = final_in_features
-        
-        self.backbone.classifier = nn.Identity()
-        self.backbone.global_pool = nn.Identity()
-        
-        self.pooling =  GeM()
-        self.bn = nn.BatchNorm1d(final_in_features)
-        self.use_fc = use_fc
-        if use_fc:
-            self.dropout = nn.Dropout(p=dropout)
-            self.bn = nn.BatchNorm1d(fc_dim)
-            self.bn.bias.requires_grad_(False)
-            self.fc = nn.Linear(final_in_features, n_classes, bias = False)            
-            self.bn.apply(weights_init_kaiming)
-            self.fc.apply(weights_init_classifier)
-            final_in_features = fc_dim
-
-    def _init_params(self):
-        nn.init.xavier_normal_(self.fc.weight)
-        nn.init.constant_(self.fc.bias, 0)
-        nn.init.constant_(self.bn.weight, 1)
-        nn.init.constant_(self.bn.bias, 0)
-
-    def forward(self, x, label=None):
-        feature = self.extract_feat(x)
-        
-        return feature
-
-    def extract_feat(self, x):
-        batch_size = x.shape[0]
-        x = self.backbone.forward_features(x)
-        if self.model_name.startswith('swinv2'):
-            x = x.permute(0, 3, 1, 2)
-
-        x = self.pooling(x).view(batch_size, -1)
-        x = self.bn(x)
-        if self.use_fc:
-            x1 = self.dropout(x)
-            x1 = self.bn(x1)
-            x1 = self.fc(x1)
-    
         return x
     
+    def training_step(self, batch, batch_idx):
+        images, labels = batch
+        embeddings = self.extract_feat(images)
+        loss = self.loss_fn(embeddings, labels)
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+        return loss
 
-class EfficientNet(pl.LighntingModule):
+    def validation_step(self, batch, batch_idx):
+        images, labels = batch
+        features = self.extract_feat(images)
+        logits = self.fc(features)
+        loss = F.cross_entropy(logits, labels)
+        acc = (logits.argmax(dim=1) == labels).float().mean()
+        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        return loss
 
-
-
-
-
-
-
-     #Load EfficientNet model from timm
-    model = timm.create_model('efficientnet_b0', pretrained=True, num_classes=0)
-    #efficientnetv2_rw_m
-
-# Define your custom input channels (e.g., 4 channels)
-num_input_channels = 4
-
-# Modify the conv_stem layer to have custom input channels
-model.conv_stem = nn.Conv2d(
-    in_channels=num_input_channels,
-    out_channels=model.conv_stem.out_channels,
-    kernel_size=model.conv_stem.kernel_size,
-    stride=model.conv_stem.stride,
-    padding=model.conv_stem.padding,
-    bias=False
-)
-
-# Reinitialize the weights for conv_stem after modifying it
-nn.init.kaiming_normal_(model.conv_stem.weight, mode='fan_out', nonlinearity='relu')
+    def configure_optimizers(self):
+        if self.config:
+            optimizer = get_optimizer(self.config, self.parameters())
+            lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
+            return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
+        else:
+            optimizer = torch.optim.SGD(self.parameters(), lr=self.lr)
+            return optimizer
