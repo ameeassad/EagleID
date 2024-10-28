@@ -593,6 +593,8 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         Returns:
             pd.DataFrame: A cleaned DataFrame with valid segmentation data.
         """
+        print("CLEANING THE FOLLOWING DF")
+        print(df.head())
         df[segmentation_col] = df[segmentation_col].apply(self.parse_segmentation)
         # Drop rows where segmentation is None (invalid)
         df_cleaned = df.dropna(subset=[segmentation_col])
