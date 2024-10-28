@@ -102,8 +102,8 @@ class TripletModel(pl.LightningModule):
             num_channels = 3
 
         # Debug: check if all layers are unfrozen:
-        for name, param in self.backbone.named_parameters():
-            print(f"{name}: requires_grad = {param.requires_grad}")
+        # for name, param in self.backbone.named_parameters():
+        #     print(f"{name}: requires_grad = {param.requires_grad}")
 
         # Embedder (to project features into the desired embedding space)
         self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)

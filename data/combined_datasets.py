@@ -4,7 +4,13 @@ from data.raptors_wildlife import Raptors, WildlifeReidDataModule
 import os
 import sys
 
-def get_dataset(config):
+def get_dataset(config, hardcode=None):
+    if hardcode is not None:
+        config['wildlife_name'] = hardcode['species']
+        config['dataset']= hardcode['dataset']
+    if os.path.exists(config['dataset']) is False:
+            os.makedirs(config['dataset'])
+
     if config['wildlife_name'] == 'raptors':
         dataset = Raptors(root=config['dataset'], include_video=False)
         data = WildlifeReidDataModule(metadata=dataset.df, config = config)
@@ -12,9 +18,7 @@ def get_dataset(config):
         dataset = datasets.WhaleSharkID(config['dataset'])
         data = WildlifeReidDataModule(metadata=dataset.df, config=config, only_cache=True)
     elif config['wildlife_name'] == 'ATRW':
-        if os.path.exists(config['dataset']) is False:
-            os.makedirs(config['dataset'])
-            datasets.ATRW.get_data(config['dataset'])
+        datasets.ATRW.get_data(config['dataset'])
         dataset = datasets.ATRW(config['dataset'])
         data = WildlifeReidDataModule(metadata=dataset.df, config=config)
     elif config['wildlife_name'] == 'BirdIndividualID':
