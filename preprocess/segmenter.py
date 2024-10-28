@@ -87,7 +87,7 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None, only_cac
         image = Image.open(image_path)
         og_width, og_height = image.size
 
-        if 'bbox' in row:
+        if 'bbox' in row and (isinstance(row['bbox'], (list, tuple, np.ndarray)) and pd.notnull(row['bbox']).all() or pd.notnull(row['bbox'])):
             bbox_exists = True
             print("running segmentation on pre-existing bbox")
             bbox = row['bbox']
