@@ -74,7 +74,7 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None, only_cac
         # Check if the row exists in the cache and has 'segmentation' data
         if cache_path and 'path' in cache_df.columns:
             cached_row = cache_df[cache_df['path'] == row['path']]
-            print("the row is: ", cached_row.iloc[0]['segmentation'])
+            print("the row is: ", cached_row)
             if not cached_row.empty: print("cached row not empty")
             if isinstance(cached_row.iloc[0]['segmentation'], (list, tuple, np.ndarray)): print("cached row has segmentation list tuple or ndarray")
             if pd.notnull(cached_row.iloc[0]['segmentation']).all(): print("cached row has not null segmentation")
