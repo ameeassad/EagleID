@@ -43,10 +43,6 @@ arcface_loss:
   margin: 0.328
   scale: 49.326
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
-megadescriptor: 
-  margin: 
-  scale: 
-
 
 early_stopping:
   enabled: False

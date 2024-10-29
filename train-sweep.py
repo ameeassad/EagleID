@@ -19,31 +19,12 @@ from utils.gradcam_callback import GradCAMCallback
 
 global config_yml
 
-sweep_config = {
-  "method": "grid",   # Random search
-  'name': 'first_sweep',
-  "metric": {           # We want to maximize val_acc
-      "name": "val/mAP",
-      "goal": "minimize"
-  },
-  "parameters": {
-        "margin": {
-            "values": [0.2, 0.5, 0.7]
-        },
-        "mining_types":{
-            "values": ['semihard', 'hard']
-        },
-        "embedding_size": {
-            "values": [128, 768, 2048]
-        },
-        "lr": {"values": [0.0001, 0.001, 0.005]}
-    }
-}
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Train classifier.')
     parser.add_argument(
         '--config', type=str, required=True, default="./config.yaml", help='Path to config yaml file'
+        '--sweep_config', type=str, required=True, default="./sweep_config.yaml", help='Path to sweep config yaml file'
     )
     args = parser.parse_args()
     return args
@@ -126,23 +107,6 @@ def get_trainer(config, model) -> Trainer:
         wandb_logger = WandbLogger()
         # wandb_logger = WandbLogger(project=config['project_name'], log_model=True)
         wandb_logger.watch(model, log='all', log_freq=20)
-        # add multiple hyperparameters
-        # wandb_logger.experiment.config.update({"model_architecture": config['model_architecture'], 
-        #                                         "checkpoint": config['checkpoint'],
-        #                                         "preprocess_lvl": config['preprocess_lvl'],
-        #                                         "batch_size": config['batch_size'],
-        #                                         "img_size": config['img_size'], 
-        #                                         "seed": config['seed'],
-        #                                         "transforms": str(config['transforms']['mean']) + " / " + str(config['transforms']['std']),
-        #                                         "optimizer": config['solver']['OPT'],
-        #                                         "weight_decay": config['solver']['WEIGHT_DECAY'],
-        #                                         "momentum": config['solver']['MOMENTUM'],
-        #                                         "base_lr": config['solver']['BASE_LR'],
-        #                                         "lr_scheduler": config['solver']['LR_SCHEDULER'],
-        #                                         "lr_decay_rate": config['solver']['LR_DECAY_RATE'],
-        #                                         "lr_step_size": config['solver']['LR_STEP_SIZE'],
-        #                                         "lr_step_milestones": config['solver']['LR_STEP_MILESTONES']
-        #                                         }, allow_val_change=True)
     else:
         wandb_logger = None
 
@@ -208,13 +172,14 @@ if __name__ == '__main__':
     with open(config_file_path, 'r') as config_file:
         config_yml = yaml.safe_load(config_file)
 
+    sweep_params_path = yaml.safe_load(args.sweep_config)
+    with open(sweep_params_path, 'r') as sweep_file:
+        sweep_config = yaml.safe_load(sweep_file)
+
     seed_everything(config_yml['seed'], workers=True)
 
-    # setup dataset
-    # data =  get_dataset(config_yml)
-
     # override epochs
-    config_yml['epochs'] = 10
+    config_yml['epochs'] = 50
 
     sweep_id = wandb.sweep(sweep_config, project="sweep-test")
 
