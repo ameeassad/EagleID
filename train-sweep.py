@@ -189,7 +189,7 @@ def get_model(config):
 def sweep_iteration():
     wandb.init(project="sweep", config =config_yml)
     config=wandb.config
-    # print(config)
+    print(config)
 
     data =  get_dataset(config)
     model = get_model(config)
