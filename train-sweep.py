@@ -24,7 +24,7 @@ def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Train classifier.')
     parser.add_argument(
         '--config', type=str, required=True, default="./config.yaml", help='Path to config yaml file'
-        '--sweep_config', type=str, required=True, default="./sweep_config.yaml", help='Path to sweep config yaml file'
+        '--sweep-config', type=str, required=True, default="./sweep_config.yaml", help='Path to sweep config yaml file'
     )
     args = parser.parse_args()
     return args
