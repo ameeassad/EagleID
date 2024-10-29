@@ -126,13 +126,13 @@ class TripletModel(pl.LightningModule):
             for batch_idx, batch in enumerate(self.trainer.val_dataloaders[0]):
                 x, target = batch
                 # Generate random embeddings for the query set
-                random_embeddings = torch.randn(x.size(0), self.hparams.embedding_size, device=x.device)
+                random_embeddings = torch.randn(x.size(0), self.embedding_size, device=x.device)
                 self.query_embeddings.append(random_embeddings)
                 self.query_labels.append(target)
             for batch_idx, batch in enumerate(self.trainer.val_dataloaders[1]):
                 x, target = batch
                 # Generate random embeddings for the gallery set
-                random_embeddings = torch.randn(x.size(0), self.hparams.embedding_size, device=x.device)
+                random_embeddings = torch.randn(x.size(0), self.embedding_size, device=x.device)
                 self.gallery_embeddings.append(random_embeddings)
                 self.gallery_labels.append(target)
 
@@ -196,31 +196,6 @@ class TripletModel(pl.LightningModule):
         # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
         mAP = evaluate_map(distmat, query_labels, gallery_labels)
         self.log('val/mAP', mAP)
-
-    def log_random_baseline_validation_map(self):
-        # Switch to evaluation mode
-        self.eval()
-        self.on_validation_epoch_start()  # Initialize query/gallery embeddings and labels
-        with torch.no_grad():
-            for batch_idx, batch in enumerate(self.trainer.val_dataloaders[0]):
-                x, target = batch
-                # Generate random embeddings for the query set
-                random_embeddings = torch.randn(x.size(0), self.hparams.embedding_size, device=x.device)
-                self.query_embeddings.append(random_embeddings)
-                self.query_labels.append(target)
-            for batch_idx, batch in enumerate(self.trainer.val_dataloaders[1]):
-                x, target = batch
-                # Generate random embeddings for the gallery set
-                random_embeddings = torch.randn(x.size(0), self.hparams.embedding_size, device=x.device)
-                self.gallery_embeddings.append(random_embeddings)
-                self.gallery_labels.append(target)
-
-            # Perform validation metric calculation using random embeddings
-            self.on_validation_epoch_end()
-            # Log random baseline mAP
-            self.log("random_val/mAP", self.trainer.logged_metrics['val/mAP'])
-        # Switch back to training mode
-        self.train()
 
     def configure_optimizers(self):
         if self.config:
