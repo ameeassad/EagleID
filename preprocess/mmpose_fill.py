@@ -76,6 +76,7 @@ def fill_keypoints(df, image_dir="", cache_path=None, only_cache=False, device='
             if (
                 not cached_row.empty
                 and cached_row.iloc[0]['keypoints'] is not None
+                and isinstance(cached_row.iloc[0]['keypoints'], (list, np.ndarray))  # Ensure it's list-like
                 and all(pd.notnull(value) for value in cached_row.iloc[0]['keypoints'])
                 and len(cached_row.iloc[0]['keypoints']) == 23
                 ):
