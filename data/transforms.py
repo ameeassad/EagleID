@@ -1,5 +1,6 @@
 import random
 import math
+import ast
 import numpy as np
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -482,6 +483,12 @@ class RGBTransforms:
         return rgb_img
 
 def denormalize(x, mean, std):
+    if isinstance(x, str):
+        try:
+            x = ast.literal_eval(x)
+        except (ValueError, SyntaxError):
+            raise ValueError(f"Invalid format for mean or std: {x}")
+
     #  x is np array
     x = x[:3, :, :]
 
