@@ -49,6 +49,8 @@ def get_args() -> argparse.Namespace:
     return args
 
 def get_basic_callbacks(config, model) -> list:
+    print(f"type of config: {type(config)}")
+    print(f"type of model: {type(model)}")
     lr_callback = LearningRateMonitor(logging_interval='epoch')
     ckpt_callback = ModelCheckpoint(
         dirpath='checkpoints',
@@ -118,6 +120,8 @@ def get_gpu_settings(
 
 
 def get_trainer(config, model) -> Trainer:
+    print(f"type of config: {type(config)}")
+    print(f"type of model: {type(model)}")
     callbacks = get_basic_callbacks(config, model)
     accelerator, devices, strategy = get_gpu_settings(config['gpu_ids'], config['n_gpu'])
 
@@ -165,7 +169,6 @@ def get_trainer(config, model) -> Trainer:
     return trainer
 
 def get_model(config):
-    print("getting model with config: ", config)
     # setup model - note how we refer to sweep parameters with wandb.config
     if config['checkpoint']:
         print(f"Loading model {config['model_architecture']} from checkpoint")
