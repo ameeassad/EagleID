@@ -3,7 +3,7 @@ from wildlife_tools.similarity.cosine import CosineSimilarity
 import torch.nn.functional as F
 
 
-def evaluate_map(distmat, query_labels, gallery_labels):
+def evaluate_map(distmat, query_labels, gallery_labels, top_k=None):
     num_queries = query_labels.size(0)
     aps = []
     for i in range(num_queries):
@@ -14,6 +14,9 @@ def evaluate_map(distmat, query_labels, gallery_labels):
         indices = np.argsort(q_dist)
         # Compare gallery labels with query label
         matches = (gallery_labels[indices] == q_label).cpu().numpy()
+        # Limit matches to top_k
+        if top_k is not None:
+            matches = matches[:top_k]
         # Compute Average Precision
         ap = compute_average_precision(matches)
         aps.append(ap)

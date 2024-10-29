@@ -194,7 +194,7 @@ class TripletModel(pl.LightningModule):
 
         # Compute mAP
         # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
-        mAP = evaluate_map(distmat, query_labels, gallery_labels)
+        mAP = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
         self.log('val/mAP', mAP)
 
     def configure_optimizers(self):
