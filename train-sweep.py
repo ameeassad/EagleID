@@ -48,14 +48,14 @@ def get_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
-def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
+def get_basic_callbacks(config) -> list:
     lr_callback = LearningRateMonitor(logging_interval='epoch')
     ckpt_callback = ModelCheckpoint(
         dirpath='checkpoints',
         filename='epoch{epoch:03d}',
         auto_insert_metric_name=False,
         save_top_k=1,
-        every_n_epochs=checkpoint_interval,
+        every_n_epochs=int(config['save_interval']),
         save_last=True,
     )
     callbacks = [ckpt_callback, lr_callback]
@@ -118,7 +118,7 @@ def get_gpu_settings(
 
 
 def get_trainer(config, model) -> Trainer:
-    callbacks = get_basic_callbacks(checkpoint_interval=int(config['save_interval']))
+    callbacks = get_basic_callbacks(config)
     accelerator, devices, strategy = get_gpu_settings(config['gpu_ids'], config['n_gpu'])
 
     if config['use_wandb']:

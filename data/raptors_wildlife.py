@@ -499,9 +499,9 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.keypoints = get_keypoints_info()
             self.skeleton = get_skeleton_info()
 
-            df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache, animal_cat=self.animal_cat)
-            df_query = fill_keypoints(df_query, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache, animal_cat=self.animal_cat)
-            df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache, animal_cat=self.animal_cat)
+            df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=False)
+            df_query = fill_keypoints(df_query, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=False)
+            df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=False)
 
         if self.preprocess_lvl == 0:
             self.method = 'full'

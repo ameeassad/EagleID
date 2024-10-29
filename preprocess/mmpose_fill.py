@@ -75,8 +75,9 @@ def fill_keypoints(df, image_dir="", cache_path=None, only_cache=False, device='
             cached_row = cache_df[cache_df['path'] == row['path']]
             if (
                 not cached_row.empty
-                and pd.notnull(cached_row.iloc[0]['keypoints'])
-                and all(value != 0 for value in cached_row.iloc[0]['keypoints'])
+                and cached_row.iloc[0]['keypoints'] is not None
+                and all(pd.notnull(value) for value in cached_row.iloc[0]['keypoints'])
+                and len(cached_row.iloc[0]['keypoints']) == 23
                 ):
                 # Use cached data: update only the keypoints and num_keypoints columns
                 df.at[idx, 'keypoints'] = cached_row.iloc[0]['keypoints']
@@ -84,8 +85,8 @@ def fill_keypoints(df, image_dir="", cache_path=None, only_cache=False, device='
                 continue
 
         # else:
-
-        image_id = int(row['image_id'])
+        image_id = row['image_id']
+        # image_id = int(row['image_id'])
         bbox = row['bbox']  # [x1, y1, width, height]
         if type(bbox) == str:
             bbox = ast.literal_eval(bbox)
