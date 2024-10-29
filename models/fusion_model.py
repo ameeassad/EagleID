@@ -20,36 +20,7 @@ from utils.re_ranking import re_ranking
 from data.data_utils import calculate_num_channels
 from utils.metrics import compute_distance_matrix
 
-class TripletSimpleModel(pl.LightningModule):
-    def __init__(self, backbone_model_name, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001):
-        super().__init__()
-        # Backbone (ResNet without the final FC layer)
-        self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=True, num_classes=0)
-        # Embedder (to project features into the desired embedding space)
-        self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)
-        # self.fc = nn.Linear(self.model.output_size, embedding_size)  # Embedding layer
-        self.loss_fn = losses.TripletMarginLoss(margin=margin)
-        self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
-        self.lr = lr
-
-    def forward(self, x):
-        features = self.backbone(x)  # Extract features using the backbone
-        embeddings = self.embedder(features)  # Project features into the embedding space
-        return embeddings  # Project features to embedding space
-
-    def training_step(self, batch, batch_idx):
-        images, labels = batch
-        embeddings = self(images)
-        mined_triplets = self.miner(embeddings, labels)
-        loss = self.loss_fn(embeddings, labels, mined_triplets)
-        self.log("train_loss", loss)
-        return loss
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        return optimizer
-
-class TripletModel(pl.LightningModule):
+class FusionModel(pl.LightningModule):
     def __init__(self, 
                  backbone_model_name="resnet50", 
                  config=None, pretrained=True, 
@@ -82,42 +53,93 @@ class TripletModel(pl.LightningModule):
             self.distance_matrix = 'euclidean'
             outdir=outdir
             
-        # Backbone (ResNet without the final FC layer)
-        self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=pretrained, num_classes=0)
-
+        self.backbone_rgb = timm.create_model(model_name=backbone_model_name, pretrained=pretrained, num_classes=0, global_pool='')
         if preprocess_lvl >= 3:
-            num_channels = calculate_num_channels(preprocess_lvl)
+            num_kp_channels = calculate_num_channels(preprocess_lvl) - 3
+            self.backbone_kp = timm.create_model(
+                backbone_model_name, pretrained=False, num_classes=0, in_chans=num_kp_channels, global_pool=''
+            )
+        # Backbone network (ResNet-50 up to layer3)
+        # self.backbone = timm.create_model(
+        #     backbone_model_name, pretrained=pretrained, features_only=True,
+        #     out_indices=(0, 1, 2, 3)  # Extract layers up to layer3
+        # )
+        
+        # self.feature_dim = self.backbone.feature_info[-1]['num_chs']
 
-            if hasattr(self.backbone, 'conv1'):
-                self.backbone.conv1 = nn.Conv2d(
-                    in_channels=num_channels,
-                    out_channels=self.backbone.conv1.out_channels,
-                    kernel_size=self.backbone.conv1.kernel_size,
-                    stride=self.backbone.conv1.stride,
-                    padding=self.backbone.conv1.padding,
-                    bias=False
-                )
-                # Reinitialize the weights of the new convolutional layer
-                nn.init.kaiming_normal_(self.backbone.conv1.weight, mode='fan_out', nonlinearity='relu')
-        else:
-            num_channels = 3
+        # Transformation layers for each part
+        # self.part_transforms = nn.ModuleList([
+        #     nn.Sequential(
+        #         nn.Linear(self.feature_dim, self.embedding_size),
+        #         nn.BatchNorm1d(self.embedding_size),
+        #         nn.ReLU(inplace=True)
+        #     ) for _ in range(self.num_parts)
+        # ])
 
-        # Debug: check if all layers are unfrozen:
-        # for name, param in self.backbone.named_parameters():
-        #     print(f"{name}: requires_grad = {param.requires_grad}")
+        # if preprocess_lvl >= 3:
+        #     # Backbone for keypoint channels (Define a small CNN or use parts of the main backbone)
+        #     num_kp_channels = calculate_num_channels(preprocess_lvl) - 3
+        #     self.backbone_kp = timm.create_model(
+        #         backbone_model_name, pretrained=False, num_classes=0, in_chans=num_kp_channels, global_pool=''
+        #     )
+            # self.keypoint_branch = nn.Sequential(
+            #     nn.Conv2d(in_channels=num_kp_channels, out_channels=64, kernel_size=7, stride=2, padding=3, bias=False),
+            #     nn.BatchNorm2d(64),
+            #     nn.ReLU(inplace=True),
+            #     self.backbone_img.maxpool,
+            #     self.backbone_img.layer1,
+            #     self.backbone_img.layer2,
+            # )
 
-        # Embedder (to project features into the desired embedding space)
-        self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)
-        # self.fc = nn.Linear(self.model.output_size, embedding_size)  # Embedding layer
+        # Global pooling
+        self.global_pool = nn.AdaptiveAvgPool2d(1)
+
+        # Embedding layer
+        total_feature_dim = self.backbone_rgb.feature_info[-1]['num_chs'] + self.backbone_kp.feature_info[-1]['num_chs']
+        self.embedding = nn.Linear(total_feature_dim, embedding_size)
+
+
+        # # Final transformation for concatenated part features
+        # self.final_transform = nn.Sequential(
+        #     nn.Linear(self.embedding_size * self.num_parts, self.embedding_size),
+        #     nn.BatchNorm1d(self.embedding_size),
+        #     nn.ReLU(inplace=True)
+        # )
+        # OR # Fusion layer
+        # Assuming both backbones output the same feature map size and number of channels
+        # self.fusion_layer = nn.Sequential(
+        #     nn.Conv2d(
+        #         in_channels=self.backbone_img.feature_info[-1]['num_chs'] * 2,
+        #         out_channels=self.backbone_img.feature_info[-1]['num_chs'],
+        #         kernel_size=1,
+        #         bias=False
+        #     ),
+        #     nn.BatchNorm2d(self.backbone_img.feature_info[-1]['num_chs']),
+        #     nn.ReLU(inplace=True)
+        # )
         self.loss_fn = losses.TripletMarginLoss(margin=margin)
         self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
         self.lr = lr
 
-    # Can experiment with different embedders or need to adjust the embedding layer frequently.
     def forward(self, x):
-        features = self.backbone(x) # Extract features using the backbone
-        embeddings = self.embedder(features) # Project features into the embedding space
-        embeddings = nn.functional.normalize(embeddings, p=2, dim=1)  # L2 normalization
+        # Process RGB image
+        x_rgb = x[:, :3, :, :] 
+        x_kp = x[:, 3:, :, :]
+        features_rgb = self.backbone_rgb(x_rgb)[-1]  # Shape: (B, C_rgb, H, W)
+
+        # Process keypoint channels
+        features_kp = self.backbone_kp(x_kp)[-1]  # Shape: (B, C_kp, H, W)
+
+        # Concatenate along channel dimension
+        combined_features = torch.cat((features_rgb, features_kp), dim=1)  # Shape: (B, C_rgb + C_kp, H, W)
+
+        # Global pooling
+        pooled_features = self.global_pool(combined_features)  # Shape: (B, C_rgb + C_kp, 1, 1)
+        pooled_features = pooled_features.view(pooled_features.size(0), -1)  # Shape: (B, C_rgb + C_kp)
+
+        # Embedding
+        embeddings = self.embedding(pooled_features)
+        embeddings = nn.functional.normalize(embeddings, p=2, dim=1) # L2 normalization
         return embeddings
     
     def on_train_start(self): # to run only once: on_train_start / for every val: on_validation_start

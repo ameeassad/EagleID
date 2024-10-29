@@ -1,5 +1,5 @@
 name: sweeping-triplet
-method: grid
+method: bayes
 metric:
   name: val/mAP
   goal: maximize

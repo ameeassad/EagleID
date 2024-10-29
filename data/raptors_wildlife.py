@@ -619,6 +619,7 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             return None
         if isinstance(segmentation, str):
             try:
+                segmentation = segmentation.replace("'", "\"")
                 segmentation = json.loads(segmentation)
                 # print("Parsed segmentation from string.")
             except json.JSONDecodeError:
