@@ -7,13 +7,13 @@ parameters:
   batch_size:
     values: [32, 64, 128]
   embedding_size:
-    values: [128, 256, 512, 768, 2048]
+    values: [256, 512, 768, 2048]
   triplet_loss:
     parameters:
       margin:
-        values: [0.2, 0.5, 0.7]
+        values: [0.5]
       mining_type:
-        values: ['semihard', 'hard'] 
+        values: ['semihard'] 
   solver:
     parameters:
       BASE_LR:

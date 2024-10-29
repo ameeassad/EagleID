@@ -186,6 +186,6 @@ if __name__ == '__main__':
     sweep_id = wandb.sweep(sweep_config, project="sweep-test")
 
     # agent that will iterate over the sweep parameters with specified search method
-    wandb.agent(sweep_id, function=sweep_iteration, count=5)
+    wandb.agent(sweep_id, function=sweep_iteration)
 
         
