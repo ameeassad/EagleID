@@ -19,8 +19,10 @@ def evaluate_map(distmat, query_labels, gallery_labels, top_k=None):
             matches = matches[:top_k]
         # Compute Average Precision
         ap = compute_average_precision(matches)
+        print(f"Query {i} - Label: {q_label}, AP: {ap}, Matches: {matches}")
         aps.append(ap)
     mAP = np.mean(aps)
+    print(f"Calculated mAP: {mAP}")
     return mAP
 
 def compute_average_precision(matches):

@@ -474,24 +474,22 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         print(f"Train set size: {len(df_train)}")
         print(f"Test set size: {len(df_test)}")
 
-        # df_test = self.filter_identities(df_test)
-        df_query, df_gallery = self.split_query_database(df_test)
 
         # preprocessing
         if self.preprocess_lvl > 0: # 1: bounding box cropped image or 2: masked image
             from preprocess.segmenter import add_segmentations
 
             df_train = add_segmentations(df_train, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
-            df_query = add_segmentations(df_query, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
-            df_gallery = add_segmentations(df_gallery, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
+            df_test = add_segmentations(df_test, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
+            # df_gallery = add_segmentations(df_gallery, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
 
             # print(f"df_train: {len(df_train)}, columns: {df_train.columns} and values: {df_train.iloc[0]}")
             # print(f"df_query: {len(df_query)}, columns: {df_query.columns} and values: {df_query.iloc[0]}")
             # print(f"df_gallery: {len(df_gallery)}, columns: {df_gallery.columns} and values: {df_gallery.iloc[0]}")
 
             df_train = self.clean_segmentation(df_train)
-            df_query = self.clean_segmentation(df_query)
-            df_gallery = self.clean_segmentation(df_gallery)
+            df_test = self.clean_segmentation(df_test)
+            # df_gallery = self.clean_segmentation(df_gallery)
         
         if self.preprocess_lvl >= 3: # 3: masked + pose (skeleton) image in 1 channel or 4: masked + body part clusters in channels
             from preprocess.mmpose_fill import fill_keypoints, get_skeleton_info, get_keypoints_info
@@ -500,8 +498,23 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.skeleton = get_skeleton_info()
 
             df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=False)
-            df_query = fill_keypoints(df_query, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=False)
-            df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=False)
+            df_test = fill_keypoints(df_test, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=False)
+            # df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=False)
+
+        print(f"length of training dataset: {len(df_train)}")
+        print(f"number of individuals in training set: {len(df_train['identity'].unique())}")
+        print(f"mean images per individual in training set: {df_train['identity'].value_counts().mean()}")
+        print(f"min images per individual in training set: {df_train['identity'].value_counts().min()}")
+        print(f"max images per individual in training set: {df_train['identity'].value_counts().max()}")
+
+        print(f"length of test dataset: {len(df_test)}")
+        print(f"number of individuals in training set: {len(df_test['identity'].unique())}")
+        print(f"mean images per individual in training set: {df_test['identity'].value_counts().mean()}")
+        print(f"min images per individual in training set: {df_test['identity'].value_counts().min()}")
+        print(f"max images per individual in training set: {df_test['identity'].value_counts().max()}")
+
+        # df_test = self.filter_identities(df_test)
+        df_query, df_gallery = self.split_query_database(df_test)
 
         if self.preprocess_lvl == 0:
             self.method = 'full'
@@ -516,7 +529,6 @@ class WildlifeReidDataModule(pl.LightningDataModule):
         elif self.preprocess_lvl == 5:
             self.method = "bbox_mask_heatmaps"
 
-        print(f"length of training dataset: {len(df_train)}")
         self.train_dataset = RaptorsWildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, img_load=self.method)
         print(f"length of query dataset: {len(df_query)}")
         if not (len(df_query) == 0 or len(df_gallery) == 0):
