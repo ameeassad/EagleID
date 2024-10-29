@@ -63,7 +63,7 @@ class TripletModel(pl.LightningModule):
         self.config = config
         if config:
             backbone_model_name=config['backbone_name']
-            embedding_size=int(config['embedding_size'])
+            self.embedding_size=int(config['embedding_size'])
             margin=config['triplet_loss']['margin']
             mining_type=config['triplet_loss']['mining_type']
             preprocess_lvl=int(config['preprocess_lvl'])
@@ -72,7 +72,7 @@ class TripletModel(pl.LightningModule):
             outdir=config['outdir']
         else:
             backbone_model_name=backbone_model_name
-            embedding_size=embedding_size
+            self.embedding_size=embedding_size
             margin=margin
             mining_type=mining_type
             preprocess_lvl=preprocess_lvl
