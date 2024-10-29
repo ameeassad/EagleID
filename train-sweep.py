@@ -142,7 +142,7 @@ def get_trainer(config, model) -> Trainer:
                                                 "lr_decay_rate": config['solver']['LR_DECAY_RATE'],
                                                 "lr_step_size": config['solver']['LR_STEP_SIZE'],
                                                 "lr_step_milestones": config['solver']['LR_STEP_MILESTONES']
-                                                })
+                                                }, allow_val_change=True)
     else:
         wandb_logger = None
 
