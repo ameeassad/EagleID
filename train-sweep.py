@@ -165,6 +165,7 @@ def get_trainer(config, model) -> Trainer:
     return trainer
 
 def get_model(config):
+    print("getting model with config: ", config)
     # setup model - note how we refer to sweep parameters with wandb.config
     if config['checkpoint']:
         print(f"Loading model {config['model_architecture']} from checkpoint")
@@ -187,7 +188,7 @@ def get_model(config):
 def sweep_iteration():
     wandb.init(project="sweep", config =config_yml)
     config=wandb.config
-    print(config)
+    # print(config)
 
     data =  get_dataset(config)
     model = get_model(config)
