@@ -127,22 +127,22 @@ def get_trainer(config, model) -> Trainer:
         # wandb_logger = WandbLogger(project=config['project_name'], log_model=True)
         wandb_logger.watch(model, log='all', log_freq=20)
         # add multiple hyperparameters
-        wandb_logger.experiment.config.update({"model_architecture": config['model_architecture'], 
-                                                "checkpoint": config['checkpoint'],
-                                                "preprocess_lvl": config['preprocess_lvl'],
-                                                "batch_size": config['batch_size'],
-                                                "img_size": config['img_size'], 
-                                                "seed": config['seed'],
-                                                "transforms": str(config['transforms']['mean']) + " / " + str(config['transforms']['std']),
-                                                "optimizer": config['solver']['OPT'],
-                                                "weight_decay": config['solver']['WEIGHT_DECAY'],
-                                                "momentum": config['solver']['MOMENTUM'],
-                                                "base_lr": config['solver']['BASE_LR'],
-                                                "lr_scheduler": config['solver']['LR_SCHEDULER'],
-                                                "lr_decay_rate": config['solver']['LR_DECAY_RATE'],
-                                                "lr_step_size": config['solver']['LR_STEP_SIZE'],
-                                                "lr_step_milestones": config['solver']['LR_STEP_MILESTONES']
-                                                }, allow_val_change=True)
+        # wandb_logger.experiment.config.update({"model_architecture": config['model_architecture'], 
+        #                                         "checkpoint": config['checkpoint'],
+        #                                         "preprocess_lvl": config['preprocess_lvl'],
+        #                                         "batch_size": config['batch_size'],
+        #                                         "img_size": config['img_size'], 
+        #                                         "seed": config['seed'],
+        #                                         "transforms": str(config['transforms']['mean']) + " / " + str(config['transforms']['std']),
+        #                                         "optimizer": config['solver']['OPT'],
+        #                                         "weight_decay": config['solver']['WEIGHT_DECAY'],
+        #                                         "momentum": config['solver']['MOMENTUM'],
+        #                                         "base_lr": config['solver']['BASE_LR'],
+        #                                         "lr_scheduler": config['solver']['LR_SCHEDULER'],
+        #                                         "lr_decay_rate": config['solver']['LR_DECAY_RATE'],
+        #                                         "lr_step_size": config['solver']['LR_STEP_SIZE'],
+        #                                         "lr_step_milestones": config['solver']['LR_STEP_MILESTONES']
+        #                                         }, allow_val_change=True)
     else:
         wandb_logger = None
 
