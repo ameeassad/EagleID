@@ -40,11 +40,11 @@ class TransformerModel(pl.LightningModule):
         self.config = config
 
         if config:
-            backbone_model_name=config['backbone_name']
-            embedding_size=int(config['embedding_size'])
-            self.num_classes = config['num_classes']
-            self.margin=config['megadescriptor']['margin']
-            self.scale=config['megadescriptor']['scale']
+            self.backbone_model_name=config['backbone_name']
+            self.embedding_size=int(config['embedding_size'])
+            self.num_classes = config['arcface_loss']['n_classes']
+            self.margin=config['arcface_loss']['margin']
+            self.scale=config['arcface_loss']['scale']
             preprocess_lvl=int(config['preprocess_lvl'])
             img_size=config['img_size']
             self.re_ranking=config['re_ranking']
@@ -52,8 +52,8 @@ class TransformerModel(pl.LightningModule):
             self.distance_matrix = config['triplet_loss']['distance_matrix']
             outdir=config['outdir']
         else:
-            backbone_model_name=backbone_model_name
-            embedding_size=embedding_size
+            self.backbone_model_name=backbone_model_name
+            self.embedding_size=embedding_size
             self.num_classes = num_classes
             self.margin=margin
             self.scale=scale
@@ -66,9 +66,9 @@ class TransformerModel(pl.LightningModule):
         self.save_hyperparameters()
 
         # Backbone model
-        if self.backbone not in ['swin_large_patch4_window7_224','swin_base_patch4_window7_224','swin_large_patch4_window12_384','swin_tiny_patch4_window7_224']:
-            raise ValueError(f"Backbone model {self.backbone} not supported.")
-        self.backbone = timm.create_model(backbone_model_name, num_classes=0, pretrained=pretrained)
+        if self.backbone_model_name not in ['swin_large_patch4_window7_224','swin_base_patch4_window7_224','swin_large_patch4_window12_384','swin_tiny_patch4_window7_224']:
+            raise ValueError(f"Backbone model {self.backbone_model_name} not supported.")
+        self.backbone = timm.create_model(self.backbone_model_name, num_classes=0, pretrained=pretrained)
         
         # Adjust input channels if necessary based on preprocess level
         if preprocess_lvl >= 3:
@@ -93,14 +93,24 @@ class TransformerModel(pl.LightningModule):
             pretrained_embedding_size = self.backbone(dummy_input).shape[1]
             print(f"Pretrained embedding size: {pretrained_embedding_size}")
             print(f"Input embedding size: {embedding_size}")
-        self.embedding_size = embedding_size
-        self.embedder = nn.Linear(self.backbone.num_features, embedding_size)
+
+        # Global pooling
+        self.global_pool = nn.AdaptiveAvgPool2d(1)
+
+        # Get the feature dimension from the backbone
+        feature_dim = self.backbone.num_features
+
+        self.embedder = nn.Linear(feature_dim, embedding_size)
         
         # ArcFace Loss: Initializes the margin-based loss function
         self.loss_fn = losses.ArcFaceLoss(num_classes=self.num_classes, embedding_size=self.embedding_size, margin=self.margin, scale=self.scale)
 
+
     def forward(self, x):
-        features = self.backbone(x)  # Get features from the backbone
+        features = self.backbone.forward_features(x)  # Get features from the backbone
+        features = self.global_pool(features)  # Apply global average pooling
+        features = features.view(features.size(0), -1)  # Flatten to [batch_size, feature_dim]
+        print(f"Shape of features from backbone: {features.shape}")
         embeddings = self.embedder(features)  # Project to embedding space
         embeddings = F.normalize(embeddings, p=2, dim=1)  # Normalize the embeddings
         return embeddings
@@ -121,7 +131,7 @@ class TransformerModel(pl.LightningModule):
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         x, target = batch
         embeddings = self(x)
-        self.log('val/loss', self.loss_fn(embeddings, target))
+        # self.log('val/loss', self.loss_fn(embeddings, target))
         if dataloader_idx == 0:
             # Query data
             self.query_embeddings.append(embeddings)
@@ -130,6 +140,7 @@ class TransformerModel(pl.LightningModule):
             # Gallery data
             self.gallery_embeddings.append(embeddings)
             self.gallery_labels.append(target)
+
 
     def on_validation_epoch_end(self):
         # Concatenate all embeddings and labels
@@ -216,82 +227,82 @@ class MegadescriptorModel(pl.LightningModule):
         #     device='cuda',
         # )
 
-class MiewIdNet(nn.Module):
+# class MiewIdNet(nn.Module):
 
-    def __init__(self,
-                 n_classes,
-                 model_name='swinv2_base_window12_192_22k',
-                 use_fc=False,
-                 fc_dim=512,
-                 dropout=0.0,
-                 pretrained=True,
-                 in_channels=3,  # Parameter for the number of input channels
-                 **kwargs):
-        """
-        SwinV2 Model initialization
-        """
-        super(MiewIdNet, self).__init__()
-        print('Building Model Backbone for {} model'.format(model_name))
+#     def __init__(self,
+#                  n_classes,
+#                  model_name='swinv2_base_window12_192_22k',
+#                  use_fc=False,
+#                  fc_dim=512,
+#                  dropout=0.0,
+#                  pretrained=True,
+#                  in_channels=3,  # Parameter for the number of input channels
+#                  **kwargs):
+#         """
+#         SwinV2 Model initialization
+#         """
+#         super(MiewIdNet, self).__init__()
+#         print('Building Model Backbone for {} model'.format(model_name))
 
-        self.model_name = model_name
+#         self.model_name = model_name
 
-        # Create the backbone using timm
-        self.backbone = timm.create_model(model_name, pretrained=pretrained)
+#         # Create the backbone using timm
+#         self.backbone = timm.create_model(model_name, pretrained=pretrained)
 
-        # Modify the patch embedding layer if the number of input channels is different
-        if in_channels != 3:
-            # Get the original patch embedding layer
-            patch_embed = self.backbone.patch_embed
+#         # Modify the patch embedding layer if the number of input channels is different
+#         if in_channels != 3:
+#             # Get the original patch embedding layer
+#             patch_embed = self.backbone.patch_embed
 
-            # Create a new patch embedding layer with the desired number of input channels
-            new_patch_embed = nn.Conv2d(
-                in_channels=in_channels,
-                out_channels=patch_embed.proj.out_channels,
-                kernel_size=patch_embed.proj.kernel_size,
-                stride=patch_embed.proj.stride,
-                padding=patch_embed.proj.padding,
-                bias=patch_embed.proj.bias is not None
-            )
+#             # Create a new patch embedding layer with the desired number of input channels
+#             new_patch_embed = nn.Conv2d(
+#                 in_channels=in_channels,
+#                 out_channels=patch_embed.proj.out_channels,
+#                 kernel_size=patch_embed.proj.kernel_size,
+#                 stride=patch_embed.proj.stride,
+#                 padding=patch_embed.proj.padding,
+#                 bias=patch_embed.proj.bias is not None
+#             )
 
-            # Initialize the weights of the new patch embedding layer
-            nn.init.kaiming_normal_(new_patch_embed.weight, mode='fan_out', nonlinearity='relu')
+#             # Initialize the weights of the new patch embedding layer
+#             nn.init.kaiming_normal_(new_patch_embed.weight, mode='fan_out', nonlinearity='relu')
 
-            # Replace the old patch embedding layer with the new one
-            self.backbone.patch_embed.proj = new_patch_embed
+#             # Replace the old patch embedding layer with the new one
+#             self.backbone.patch_embed.proj = new_patch_embed
 
-        # Determine the number of input features for the final layer
-        final_in_features = self.backbone.head.in_features
+#         # Determine the number of input features for the final layer
+#         final_in_features = self.backbone.head.in_features
 
-        self.final_in_features = final_in_features
+#         self.final_in_features = final_in_features
         
-        # Remove the classification head
-        self.backbone.head = nn.Identity()
+#         # Remove the classification head
+#         self.backbone.head = nn.Identity()
         
-        self.pooling = GeM()
-        self.bn = nn.BatchNorm1d(final_in_features)
-        self.use_fc = use_fc
-        if use_fc:
-            self.dropout = nn.Dropout(p=dropout)
-            self.bn = nn.BatchNorm1d(fc_dim)
-            self.bn.bias.requires_grad_(False)
-            self.fc = nn.Linear(final_in_features, n_classes, bias=False)            
-            self.bn.apply(weights_init_kaiming)
-            self.fc.apply(weights_init_classifier)
-            final_in_features = fc_dim
+#         self.pooling = GeM()
+#         self.bn = nn.BatchNorm1d(final_in_features)
+#         self.use_fc = use_fc
+#         if use_fc:
+#             self.dropout = nn.Dropout(p=dropout)
+#             self.bn = nn.BatchNorm1d(fc_dim)
+#             self.bn.bias.requires_grad_(False)
+#             self.fc = nn.Linear(final_in_features, n_classes, bias=False)            
+#             self.bn.apply(weights_init_kaiming)
+#             self.fc.apply(weights_init_classifier)
+#             final_in_features = fc_dim
 
-    def forward(self, x):
-        feature = self.extract_feat(x)
-        return feature
+#     def forward(self, x):
+#         feature = self.extract_feat(x)
+#         return feature
 
-    def extract_feat(self, x):
-        batch_size = x.shape[0]
-        x = self.backbone.forward_features(x)
+#     def extract_feat(self, x):
+#         batch_size = x.shape[0]
+#         x = self.backbone.forward_features(x)
 
-        x = self.pooling(x).view(batch_size, -1)
-        x = self.bn(x)
-        if self.use_fc:
-            x1 = self.dropout(x)
-            x1 = self.bn(x1)
-            x1 = self.fc(x1)
-        return x
+#         x = self.pooling(x).view(batch_size, -1)
+#         x = self.bn(x)
+#         if self.use_fc:
+#             x1 = self.dropout(x)
+#             x1 = self.bn(x1)
+#             x1 = self.fc(x1)
+#         return x
 

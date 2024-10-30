@@ -1,5 +1,5 @@
 name: sweeping-triplet
-method: grid
+method: bayes
 metric:
   name: train/loss
   goal: minimize
@@ -21,9 +21,13 @@ parameters:
   arcface_loss:
     parameters:
       margin:
-        values: [0.25, 0.5]
+        distribution: normal
+        mu: 0.32
+        sigma: 0.05
       scale:
-        values: [32,64]
+        distribution: normal
+        mu: 50
+        sigma: 5
   solver:
     parameters:
       BASE_LR:
