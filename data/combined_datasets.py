@@ -3,6 +3,7 @@ from data.raptors_wildlife import Raptors, WildlifeReidDataModule
 
 import os
 import sys
+import wandb
 
 def get_dataset(config, hardcode=None):
     if hardcode is not None:
@@ -12,39 +13,61 @@ def get_dataset(config, hardcode=None):
     #         os.makedirs(config['dataset'])
 
     if config['wildlife_name'] == 'raptors':
-        config['animal_cat'] = 'bird'
-        config['dataset']= '/proj/nobackup/aiforeagles/raptor_individuals_cropped/'
-        config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv'
+        if config['use_wandb'] == True:
+            wandb.config.update({"animal_cat": "bird", 
+                                "dataset": '/proj/nobackup/aiforeagles/raptor_individuals_cropped/',
+                                "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv'
+                                }, allow_val_change=True)
+        else:
+            config['animal_cat'] = 'bird'
+            config['dataset']= '/proj/nobackup/aiforeagles/raptor_individuals_cropped/'
+            config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv'
 
         dataset = Raptors(root=config['dataset'], include_video=False)
         data = WildlifeReidDataModule(metadata=dataset.df, config = config)
     
     elif config['wildlife_name'] == 'whaleshark':
-        config['animal_cat'] = 'fish'
-        config['dataset']= '/proj/nobackup/aiforeagles/EDA-whaleshark/'
-        config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_whaleshark.csv'
+        if config['use_wandb'] == True:
+            wandb.config.update({"animal_cat": "fish", 
+                                "dataset": '/proj/nobackup/aiforeagles/EDA-whaleshark/',
+                                "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_whaleshark.csv'
+                                }, allow_val_change=True)
+        else:
+            config['animal_cat'] = 'fish'
+            config['dataset']= '/proj/nobackup/aiforeagles/EDA-whaleshark/'
+            config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_whaleshark.csv'
 
         dataset = datasets.WhaleSharkID(config['dataset'])
         data = WildlifeReidDataModule(metadata=dataset.df, config=config, only_cache=True)
     
     elif config['wildlife_name'] == 'ATRW':
         # datasets.ATRW.get_data(config['dataset'])
-        config['animal_cat'] = 'mammal'
-        config['dataset']= '/proj/nobackup/aiforeagles/ATRW/'
-        config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv'
+        if config['use_wandb'] == True:
+            wandb.config.update({"animal_cat": "mammal", 
+                                "dataset": '/proj/nobackup/aiforeagles/ATRW/',
+                                "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv'
+                                }, allow_val_change=True)
+        else:
+            config['animal_cat'] = 'mammal'
+            config['dataset']= '/proj/nobackup/aiforeagles/ATRW/'
+            config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv'
 
         dataset = datasets.ATRW(config['dataset'])
         data = WildlifeReidDataModule(metadata=dataset.df, config=config)
     
     elif config['wildlife_name'] == 'BirdIndividualID':
+        if config['use_wandb'] == True:
+            wandb.config.update({"animal_cat": "bird", 
+                                "dataset": '/proj/nobackup/aiforeagles/BirdIndividualID/',
+                                "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_BirdIndividualID.csv'
+                                }, allow_val_change=True)
+        else:
+            config['animal_cat'] = 'bird'
+            config['dataset']= '/proj/nobackup/aiforeagles/BirdIndividualID/'
+            config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_BirdIndividualID.csv'
         dataset = datasets.BirdIndividualID(config['dataset'])
         data = WildlifeReidDataModule(metadata=dataset.df, config=config)
         
-        config['animal_cat'] = 'bird'
-        config['dataset']= '/proj/nobackup/aiforeagles/BirdIndividualID/'
-        config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv'
-        
-    
     elif config['wildlife_name'] == 'GiraffeZebraID':
         # try to get zebras only because giraffes is really close up
         dataset = datasets.GiraffeZebraID(config['dataset'])
