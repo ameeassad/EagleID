@@ -1,4 +1,4 @@
-name: sweeping-triplet
+name: sweeping-bayes
 method: bayes
 metric:
   name: train/loss
