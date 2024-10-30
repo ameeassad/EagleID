@@ -42,7 +42,7 @@ class TripletSimpleModel(pl.LightningModule):
         embeddings = self(images)
         mined_triplets = self.miner(embeddings, labels)
         loss = self.loss_fn(embeddings, labels, mined_triplets)
-        self.log("train_loss", loss)
+        self.log("train/loss", loss)
         return loss
 
     def configure_optimizers(self):
@@ -146,11 +146,13 @@ class TripletModel(pl.LightningModule):
 
             # Use a suitable distance metric for mAP calculation
             distmat = compute_distance_matrix('euclidean', query_embeddings, gallery_embeddings)
-            random_mAP = evaluate_map(distmat, query_labels, gallery_labels)
+            random_mAP1 = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
+            random_mAP5 = evaluate_map(distmat, query_labels, gallery_labels, top_k=5)
             
             # Log the random baseline mAP
-            print(f"Random mAP: {random_mAP}")
-            self.log("random_val/mAP", random_mAP)
+            print(f"Random mAP: {random_mAP1}")
+            self.log("random_val/mAP1", random_mAP1)
+            self.log("random_val/mAP5", random_mAP5)
         # Switch back to training mode
         self.train()
 
@@ -159,7 +161,7 @@ class TripletModel(pl.LightningModule):
         embeddings = self(images)
         mined_triplets = self.miner(embeddings, labels)
         loss = self.loss_fn(embeddings, labels, mined_triplets)
-        self.log("train_loss", loss,  on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log("train/loss", loss,  on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def on_validation_epoch_start(self):
@@ -195,8 +197,10 @@ class TripletModel(pl.LightningModule):
 
         # Compute mAP
         # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
-        mAP = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
-        self.log('val/mAP', mAP)
+        mAP1 = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
+        mAP5 = evaluate_map(distmat, query_labels, gallery_labels, top_k=5)
+        self.log('val/mAP1', mAP1)
+        self.log('val/mAP5', mAP5)
 
     def configure_optimizers(self):
         if self.config:

@@ -1,13 +1,17 @@
 name: sweeping-triplet
 method: bayes
 metric:
-  name: val/mAP
-  goal: maximize
+  name: train/loss
+  goal: minimize
 parameters:
+  model_architecture:
+    values: ['TripletModel', 'EfficientNet', 'FusionModel']
+  wildlife_name:
+    values: ['whaleshark', 'raptors']
   batch_size:
-    values: [32, 64, 128]
+    values: [64, 128]
   embedding_size:
-    values: [256, 512, 768, 2048]
+    values: [768]
   triplet_loss:
     parameters:
       margin:

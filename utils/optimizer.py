@@ -38,7 +38,7 @@ def get_lr_scheduler_config(config, optimizer: torch.optim.Optimizer) -> dict:
         )
         lr_scheduler_config = {
             'scheduler': scheduler,
-            'monitor': 'val/loss',
+            'monitor': 'train/loss',
             'interval': 'epoch',
             'frequency': 1,
         }

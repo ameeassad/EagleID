@@ -12,6 +12,9 @@ from pytorch_lightning import seed_everything
 
 from data.combined_datasets import get_dataset
 from models.simple_model import SimpleModel
+from models.fusion_model import FusionModel
+from models.transformer_model import TransformerModel
+from models.efficientnet import EfficientNet
 from models.resnet_plus_model import ResNetPlusModel
 from models.triplet_loss_model import TripletModel
 from utils.gradcam_callback import GradCAMCallback
@@ -151,6 +154,18 @@ if __name__ == '__main__':
 
     # setup dataset
     data =  get_dataset(config)
+    model_classes = {
+        'TripletModel': TripletModel,
+        'SimpleModel': SimpleModel,
+        'FusionModel': FusionModel,
+        'TransformerModel': TransformerModel,
+        'EfficientNet': EfficientNet,
+    }
+    model_name = config['model_architecture']
+    model_class = model_classes.get(model_name)
+
+    if model_class is None:
+        raise ValueError(f"Unknown model architecture: {model_name}")
 
     ##
     param_grid = config['param_grid']['use_grid']
@@ -187,22 +202,14 @@ if __name__ == '__main__':
             config['arcface']['margin'] = params['margins']
             config['solver']['BASE_LR'] = params['learning_rates']
 
-        if config['checkpoint']:
-            print(f"Loading model {config['model_architecture']} from checkpoint")
-            if config['model_architecture']=='TripletModel':
-                # pretrained=True
-                model = TripletModel(config=config, pretrained=False)
-            else:
-                model = SimpleModel(config=config, pretrained=False)
-
+        if config['checkpoint']:  # pretrained=True because will load from checkpoint
+            print(f"Loading model {model_name} from checkpoint")
+            model = model_class(config=config, pretrained=False)
             checkpoint = torch.load(config['checkpoint'])
             model.load_state_dict(checkpoint["state_dict"])
         else:
-            print(f"Start training {config['model_architecture']} from pretrained model")
-            if config['model_architecture']=='TripletModel':
-                model = TripletModel(config=config, pretrained=True)
-            else:
-                model = SimpleModel(config=config, pretrained=True)
+            print(f"Start training {model_name} from pretrained model")
+            model = model_class(config=config, pretrained=True)
 
         trainer = get_trainer(config)
 
@@ -215,7 +222,7 @@ if __name__ == '__main__':
         trainer.fit(model, data)
         
         if param_grid:
-            results.append((params, trainer.callback_metrics['train_loss']))
+            results.append((params, trainer.callback_metrics['train/loss']))
 
     if param_grid:
         best_params = sorted(results, key=lambda x: x[1])[0]

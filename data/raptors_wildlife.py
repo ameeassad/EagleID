@@ -497,21 +497,32 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             self.keypoints = get_keypoints_info()
             self.skeleton = get_skeleton_info()
 
-            df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=False)
-            df_test = fill_keypoints(df_test, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=False)
+            df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
+            df_test = fill_keypoints(df_test, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
             # df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=False)
 
-        print(f"length of training dataset: {len(df_train)}")
-        print(f"number of individuals in training set: {len(df_train['identity'].unique())}")
-        print(f"mean images per individual in training set: {df_train['identity'].value_counts().mean()}")
-        print(f"min images per individual in training set: {df_train['identity'].value_counts().min()}")
-        print(f"max images per individual in training set: {df_train['identity'].value_counts().max()}")
+        config['arcface_loss']['n_classes'] = len(df_train['identity'].unique())
 
-        print(f"length of test dataset: {len(df_test)}")
-        print(f"number of individuals in training set: {len(df_test['identity'].unique())}")
-        print(f"mean images per individual in training set: {df_test['identity'].value_counts().mean()}")
-        print(f"min images per individual in training set: {df_test['identity'].value_counts().min()}")
-        print(f"max images per individual in training set: {df_test['identity'].value_counts().max()}")
+        # Remove only one image per individual
+        train_counts = df_train['identity'].value_counts()
+        train_valid_identities = train_counts[df_train['identity'].value_counts() > 1].index
+        # Filter the dataframe
+        df_train = df_train[df_train['identity'].isin(train_valid_identities)].reset_index(drop=True)
+
+
+        print("Training Set")
+        print(f"Length: {len(df_train)}")
+        print(f"Number of individuals: {len(df_train['identity'].unique())}")
+        print(f"Mean images/individual: {df_train['identity'].value_counts().mean()}")
+        print(f"Min images/individual: {df_train['identity'].value_counts().min()}")
+        print(f"Max images/individual: {df_train['identity'].value_counts().max()}")
+
+        print("Test Set")
+        print(f"Length: {len(df_test)}")
+        print(f"Number of individuals: {len(df_test['identity'].unique())}")
+        print(f"Mean images per individual: {df_test['identity'].value_counts().mean()}")
+        print(f"Min images per individual: {df_test['identity'].value_counts().min()}")
+        print(f"Max images per individual: {df_test['identity'].value_counts().max()}")
 
         # df_test = self.filter_identities(df_test)
         df_query, df_gallery = self.split_query_database(df_test)

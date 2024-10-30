@@ -1,7 +1,7 @@
 import timm
 import itertools
 from torch.optim import SGD
-from wildlife_tools.train import ArcFaceLoss, BasicTrainer
+# from wildlife_tools.train import ArcFaceLoss, BasicTrainer
 
 import torch
 import torch.nn as nn
@@ -109,7 +109,7 @@ class TransformerModel(pl.LightningModule):
         images, labels = batch
         embeddings = self(images)  # Extract embeddings
         loss = self.loss_fn(embeddings, labels)  # Compute ArcFace loss
-        self.log("train_loss", loss)  # Log the loss for monitoring
+        self.log("train/loss", loss)  # Log the loss for monitoring
         return loss
 
     def on_validation_epoch_start(self):
@@ -121,7 +121,7 @@ class TransformerModel(pl.LightningModule):
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         x, target = batch
         embeddings = self(x)
-        self.log('val_loss', self.loss_fn(embeddings, target))
+        self.log('val/loss', self.loss_fn(embeddings, target))
         if dataloader_idx == 0:
             # Query data
             self.query_embeddings.append(embeddings)

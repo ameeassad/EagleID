@@ -19,10 +19,10 @@ def evaluate_map(distmat, query_labels, gallery_labels, top_k=None):
             matches = matches[:top_k]
         # Compute Average Precision
         ap = compute_average_precision(matches)
-        print(f"Query {i} - Label: {q_label}, AP: {ap}, Matches: {matches}")
+        # print(f"Query {i} - Label: {q_label}, AP: {ap}, Matches: {matches}")
         aps.append(ap)
     mAP = np.mean(aps)
-    print(f"Calculated mAP: {mAP}")
+    # print(f"Calculated mAP: {mAP}")
     return mAP
 
 def compute_average_precision(matches):
@@ -34,6 +34,22 @@ def compute_average_precision(matches):
     precision_at_k = cumulative_hits / (np.arange(len(matches)) + 1)
     ap = (precision_at_k * matches).sum() / num_relevant
     return ap
+
+
+def evaluate_recall_at_k(distmat, query_labels, gallery_labels, k):
+    num_queries = query_labels.size(0)
+    correct = 0
+    for i in range(num_queries):
+        q_label = query_labels[i].item()
+        q_dist = distmat[i]
+        # Get the indices of the sorted distances
+        indices = torch.argsort(q_dist)
+        # Retrieve the labels of the top K closest gallery images
+        top_k_labels = gallery_labels[indices[:k]]
+        if q_label in top_k_labels:
+            correct += 1
+    recall_at_k = correct / num_queries
+    return recall_at_k
 
 
 def compute_distance_matrix(distance_matrix, query_embeddings, gallery_embeddings, wildlife=True):

@@ -37,7 +37,7 @@ class FusionModel(pl.LightningModule):
             self.embedding_size=int(config['embedding_size'])
             margin=config['triplet_loss']['margin']
             mining_type=config['triplet_loss']['mining_type']
-            preprocess_lvl=int(config['preprocess_lvl'])
+            self.preprocess_lvl=int(config['preprocess_lvl'])
             self.re_ranking=config['re_ranking']
             self.distance_matrix = config['triplet_loss']['distance_matrix']
             outdir=config['outdir']
@@ -48,17 +48,15 @@ class FusionModel(pl.LightningModule):
             self.embedding_size=embedding_size
             margin=margin
             mining_type=mining_type
-            preprocess_lvl=preprocess_lvl
+            self.preprocess_lvl=preprocess_lvl
             self.re_ranking=re_ranking
             self.distance_matrix = 'euclidean'
             outdir=outdir
             
-        self.backbone_rgb = timm.create_model(model_name=backbone_model_name, pretrained=pretrained, num_classes=0, global_pool='')
-        if preprocess_lvl >= 3:
-            num_kp_channels = calculate_num_channels(preprocess_lvl) - 3
-            self.backbone_kp = timm.create_model(
-                backbone_model_name, pretrained=False, num_classes=0, in_chans=num_kp_channels, global_pool=''
-            )
+        self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=pretrained, num_classes=0, global_pool='', features_only=True)
+        if self.preprocess_lvl >= 3:
+            num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
+            self.backbone_kp = timm.create_model(backbone_model_name, pretrained=False, num_classes=0, in_chans=num_kp_channels, global_pool='', features_only=True)
         # Backbone network (ResNet-50 up to layer3)
         # self.backbone = timm.create_model(
         #     backbone_model_name, pretrained=pretrained, features_only=True,
@@ -95,7 +93,10 @@ class FusionModel(pl.LightningModule):
         self.global_pool = nn.AdaptiveAvgPool2d(1)
 
         # Embedding layer
-        total_feature_dim = self.backbone_rgb.feature_info[-1]['num_chs'] + self.backbone_kp.feature_info[-1]['num_chs']
+        if self.preprocess_lvl >= 3:
+            total_feature_dim = self.backbone.feature_info[-1]['num_chs'] + self.backbone_kp.feature_info[-1]['num_chs']
+        else:
+            total_feature_dim = self.backbone.feature_info[-1]['num_chs']
         self.embedding = nn.Linear(total_feature_dim, embedding_size)
 
 
@@ -124,17 +125,16 @@ class FusionModel(pl.LightningModule):
     def forward(self, x):
         # Process RGB image
         x_rgb = x[:, :3, :, :] 
-        x_kp = x[:, 3:, :, :]
-        features_rgb = self.backbone_rgb(x_rgb)[-1]  # Shape: (B, C_rgb, H, W)
+        features = self.backbone(x_rgb)[-1]  # Shape: (B, C_rgb, H, W)
+        if self.preprocess_lvl >= 3:
+            x_kp = x[:, 3:, :, :]
+            features_kp = self.backbone_kp(x_kp)[-1]  # Shape: (B, C_kp, H, W)
 
-        # Process keypoint channels
-        features_kp = self.backbone_kp(x_kp)[-1]  # Shape: (B, C_kp, H, W)
-
-        # Concatenate along channel dimension
-        combined_features = torch.cat((features_rgb, features_kp), dim=1)  # Shape: (B, C_rgb + C_kp, H, W)
+            # Concatenate along channel dimension
+            features = torch.cat((features, features_kp), dim=1)  # Shape: (B, C_rgb + C_kp, H, W)
 
         # Global pooling
-        pooled_features = self.global_pool(combined_features)  # Shape: (B, C_rgb + C_kp, 1, 1)
+        pooled_features = self.global_pool(features)  # Shape: (B, C_rgb + C_kp, 1, 1)
         pooled_features = pooled_features.view(pooled_features.size(0), -1)  # Shape: (B, C_rgb + C_kp)
 
         # Embedding
@@ -181,7 +181,7 @@ class FusionModel(pl.LightningModule):
         embeddings = self(images)
         mined_triplets = self.miner(embeddings, labels)
         loss = self.loss_fn(embeddings, labels, mined_triplets)
-        self.log("train_loss", loss,  on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log("train/loss", loss,  on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def on_validation_epoch_start(self):
