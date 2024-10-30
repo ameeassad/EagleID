@@ -8,8 +8,8 @@ def get_dataset(config, hardcode=None):
     if hardcode is not None:
         config['wildlife_name'] = hardcode['species']
         config['dataset']= hardcode['dataset']
-    if os.path.exists(config['dataset']) is False:
-            os.makedirs(config['dataset'])
+    # if os.path.exists(config['dataset']) is False:
+    #         os.makedirs(config['dataset'])
 
     if config['wildlife_name'] == 'raptors':
         config['animal_cat'] = 'bird'
