@@ -1,7 +1,7 @@
 name: sweeping-triplet
 method: grid
 metric:
-  name: train/loss
+  name: train/loss_epoch
   goal: minimize
 parameters:
   model_architecture:

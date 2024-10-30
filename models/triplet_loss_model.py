@@ -20,35 +20,6 @@ from utils.re_ranking import re_ranking
 from data.data_utils import calculate_num_channels
 from utils.metrics import compute_distance_matrix
 
-class TripletSimpleModel(pl.LightningModule):
-    def __init__(self, backbone_model_name, embedding_size=128, margin=0.2, mining_type="semihard", lr=0.001):
-        super().__init__()
-        # Backbone (ResNet without the final FC layer)
-        self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=True, num_classes=0)
-        # Embedder (to project features into the desired embedding space)
-        self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)
-        # self.fc = nn.Linear(self.model.output_size, embedding_size)  # Embedding layer
-        self.loss_fn = losses.TripletMarginLoss(margin=margin)
-        self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
-        self.lr = lr
-
-    def forward(self, x):
-        features = self.backbone(x)  # Extract features using the backbone
-        embeddings = self.embedder(features)  # Project features into the embedding space
-        return embeddings  # Project features to embedding space
-
-    def training_step(self, batch, batch_idx):
-        images, labels = batch
-        embeddings = self(images)
-        mined_triplets = self.miner(embeddings, labels)
-        loss = self.loss_fn(embeddings, labels, mined_triplets)
-        self.log("train/loss", loss)
-        return loss
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        return optimizer
-
 class TripletModel(pl.LightningModule):
     def __init__(self, 
                  backbone_model_name="resnet50", 

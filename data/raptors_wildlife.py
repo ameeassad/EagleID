@@ -501,7 +501,8 @@ class WildlifeReidDataModule(pl.LightningDataModule):
             df_test = fill_keypoints(df_test, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
             # df_gallery = fill_keypoints(df_gallery, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=False)
 
-        config['arcface_loss']['n_classes'] = len(df_train['identity'].unique())
+        if config:
+            config['arcface_loss']['n_classes'] = len(df_train['identity'].unique())
 
         # Remove only one image per individual
         train_counts = df_train['identity'].value_counts()
