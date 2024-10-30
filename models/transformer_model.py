@@ -40,7 +40,7 @@ class TransformerModel(pl.LightningModule):
         self.config = config
 
         if config:
-            self.backbone_model_name=config['backbone_name']
+            self.backbone_model_name=config['backbone_name'] if config['backbone_name'] else 'swin_base_patch4_window7_224'
             self.embedding_size=int(config['embedding_size'])
             self.num_classes = config['arcface_loss']['n_classes']
             self.margin=config['arcface_loss']['margin']

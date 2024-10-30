@@ -55,7 +55,7 @@ class EfficientNet(pl.LightningModule):
         super().__init__()
         self.config = config
         if config:
-            self.backbone_model_name=config['backbone_name'] if len(config['backbone_name'])>0 else 'efficientnet_b0'
+            self.backbone_model_name=config['backbone_name'] if config['backbone_name'] else 'efficientnet_b0'
             self.n_classes=config['arcface_loss']['n_classes']
             self.preprocess_lvl=int(config['preprocess_lvl'])
             self.re_ranking=config['re_ranking']

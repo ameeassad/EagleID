@@ -33,7 +33,7 @@ class FusionModel(pl.LightningModule):
         super().__init__()
         self.config = config
         if config:
-            backbone_model_name=config['backbone_name'] if len(config['backbone_name']) > 0 else 'resnet50'
+            backbone_model_name=config['backbone_name'] if config['backbone_name'] else 'resnet50'
             self.embedding_size=int(config['embedding_size'])
             margin=config['triplet_loss']['margin']
             mining_type=config['triplet_loss']['mining_type']
