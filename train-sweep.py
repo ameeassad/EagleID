@@ -13,11 +13,21 @@ from pytorch_lightning import seed_everything
 
 from data.combined_datasets import get_dataset
 from models.simple_model import SimpleModel
+from models.efficientnet import EfficientNet
+from models.fusion_model import FusionModel
+from models.transformer_model import TransformerModel
 from models.resnet_plus_model import ResNetPlusModel
 from models.triplet_loss_model import TripletModel
 from utils.gradcam_callback import GradCAMCallback
 
 global config_yml
+MODEL_CLASSES = {
+        'TripletModel': TripletModel,
+        'SimpleModel': SimpleModel,
+        'FusionModel': FusionModel,
+        'TransformerModel': TransformerModel,
+        'EfficientNet': EfficientNet,
+    }
 
 
 def get_args() -> argparse.Namespace:
@@ -131,23 +141,21 @@ def get_trainer(config, model) -> Trainer:
     return trainer
 
 def get_model(config):
-    # setup model - note how we refer to sweep parameters with wandb.config
-    if config['checkpoint']:
-        print(f"Loading model {config['model_architecture']} from checkpoint")
-        if config['model_architecture']=='TripletModel':
-            # pretrained=True
-            model = TripletModel(config=config, pretrained=False)
-        else:
-            model = SimpleModel(config=config, pretrained=False)
+    # setup dataset
+    model_name = config['model_architecture']
+    model_class = MODEL_CLASSES.get(model_name)
+    if model_class is None:
+        raise ValueError(f"Unknown model architecture: {model_name}")
 
+    # setup model - note how we refer to sweep parameters with wandb.config
+    if config['checkpoint']:  # pretrained=True because will load from checkpoint
+        print(f"Loading model {model_name} from checkpoint")
+        model = model_class(config=config, pretrained=False)
         checkpoint = torch.load(config['checkpoint'])
         model.load_state_dict(checkpoint["state_dict"])
     else:
-        print(f"Start training {config['model_architecture']} from pretrained model")
-        if config['model_architecture']=='TripletModel':
-            model = TripletModel(config=config, pretrained=True)
-        else:
-            model = SimpleModel(config=config, pretrained=True)
+        print(f"Start training {model_name} from pretrained model")
+        model = model_class(config=config, pretrained=True)
 
     return model
 
