@@ -12,22 +12,39 @@ def get_dataset(config, hardcode=None):
             os.makedirs(config['dataset'])
 
     if config['wildlife_name'] == 'raptors':
+        config['animal_cat'] = 'bird'
+        config['dataset']= '/proj/nobackup/aiforeagles/raptor_individuals_cropped/'
+        config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv'
+
         dataset = Raptors(root=config['dataset'], include_video=False)
         data = WildlifeReidDataModule(metadata=dataset.df, config = config)
-        config['animal_cat'] = 'bird'
+    
     elif config['wildlife_name'] == 'whaleshark':
+        config['animal_cat'] = 'fish'
+        config['dataset']= '/proj/nobackup/aiforeagles/EDA-whaleshark/'
+        config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_whaleshark.csv'
+
         dataset = datasets.WhaleSharkID(config['dataset'])
         data = WildlifeReidDataModule(metadata=dataset.df, config=config, only_cache=True)
-        config['animal_cat'] = 'fish'
+    
     elif config['wildlife_name'] == 'ATRW':
         # datasets.ATRW.get_data(config['dataset'])
+        config['animal_cat'] = 'mammal'
+        config['dataset']= '/proj/nobackup/aiforeagles/ATRW/'
+        config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv'
+
         dataset = datasets.ATRW(config['dataset'])
         data = WildlifeReidDataModule(metadata=dataset.df, config=config)
-        config['animal_cat'] = 'mammal'
+    
     elif config['wildlife_name'] == 'BirdIndividualID':
         dataset = datasets.BirdIndividualID(config['dataset'])
         data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+        
         config['animal_cat'] = 'bird'
+        config['dataset']= '/proj/nobackup/aiforeagles/BirdIndividualID/'
+        config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv'
+        
+    
     elif config['wildlife_name'] == 'GiraffeZebraID':
         # try to get zebras only because giraffes is really close up
         dataset = datasets.GiraffeZebraID(config['dataset'])

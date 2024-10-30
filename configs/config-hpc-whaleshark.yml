@@ -13,8 +13,8 @@ split_ratio: 0.8
 
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
 
-model_architecture: TripletModel
-backbone_name: resnet50
+model_architecture: # TripletModel, FusionModel, EfficientNet, TransformerModel
+backbone_name: # efficientnet_b0, resnet50, swin_tiny_patch4_window7_224
 checkpoint: 
 preprocess_lvl: 2 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
 

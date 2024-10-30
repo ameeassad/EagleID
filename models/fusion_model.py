@@ -33,7 +33,7 @@ class FusionModel(pl.LightningModule):
         super().__init__()
         self.config = config
         if config:
-            backbone_model_name=config['backbone_name']
+            backbone_model_name=config['backbone_name'] if len(config['backbone_name']) > 0 else 'resnet50'
             self.embedding_size=int(config['embedding_size'])
             margin=config['triplet_loss']['margin']
             mining_type=config['triplet_loss']['mining_type']
@@ -217,8 +217,10 @@ class FusionModel(pl.LightningModule):
 
         # Compute mAP
         # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
-        mAP = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
-        self.log('val/mAP', mAP)
+        mAP1 = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
+        mAP5 = evaluate_map(distmat, query_labels, gallery_labels, top_k=5)
+        self.log('val/mAP1', mAP1)
+        self.log('val/mAP5', mAP5)
 
     def configure_optimizers(self):
         if self.config:
