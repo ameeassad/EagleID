@@ -1,12 +1,12 @@
 import numpy as np
-from wildlife_tools.similarity.cosine import CosineSimilarity
+# from wildlife_tools.similarity.cosine import CosineSimilarity
+from wildlife_tools.similarity.base import Similarity
 import torch.nn.functional as F
 from utils.triplet_loss_utils import KnnClassifier
 
 
 def wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels):
     similarity_function = CosineSimilarity()
-    similarity = similarity.cpu().numpy()
     similarity = similarity_function(query_embeddings, gallery_embeddings)["cosine"]
 
     # Convert gallery_labels to numpy if necessary
@@ -91,6 +91,28 @@ def compute_distance_matrix(distance_matrix, query_embeddings, gallery_embedding
     else:
         raise ValueError(f"Invalid distance matrix type: {distance_matrix}")
     return distmat
+
+class CosineSimilarity(Similarity):
+    """
+    Calculates cosine similarity, equivalent to `sklearn.metrics.pairwise.cosine_similarity`.
+
+    Returns:
+        dict: dictionary with `cosine` key. Value is 2D array with cosine similarity.
+    """
+
+    def __call__(self, query, database):
+        return {"cosine": self.cosine_similarity(query, database)}
+
+    def cosine_similarity(self, a, b):
+        # Ensure `a` and `b` are tensors and move to the same device if they are not already
+        a = torch.tensor(a).to(device=b.device if isinstance(b, torch.Tensor) else 'cpu')
+        b = torch.tensor(b).to(device=a.device)
+
+        # Calculate cosine similarity
+        similarity = torch.matmul(F.normalize(a), F.normalize(b).T)
+
+        # Move similarity to CPU if needed before converting to NumPy
+        return similarity.cpu().numpy() if similarity.is_cuda else similarity.numpy()
 
 
 """
