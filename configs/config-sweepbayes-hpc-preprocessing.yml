@@ -5,7 +5,7 @@ metric:
   goal: minimize
 parameters:
   model_architecture:
-    values: ['TripletModel']
+    values: ['FusionModel']
   wildlife_name:
     values: ['whaleshark', 'raptors']
   preprocess_lvl:

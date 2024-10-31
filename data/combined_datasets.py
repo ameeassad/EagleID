@@ -108,7 +108,7 @@ def get_dataset(config, hardcode=None):
     elif config['wildlife_name'] == 'SeaTurtleID2022':
         # don't use bbox (it is only face)
         dataset = datasets.SeaTurtleID2022(config['dataset'])
-        data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+        data = WildlifeDataModule(metadata=dataset.df, config=config)
         config['animal_cat'] = 'reptile'
     elif config['wildlife_name'] == 'StripeSpotter': 
         # don't use bbox
