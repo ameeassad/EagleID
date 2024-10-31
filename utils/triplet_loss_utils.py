@@ -25,7 +25,62 @@ def get_all_embeddings(extractor, dataloader):
     # all_labels = torch.cat(all_labels)
     return all_embeddings #, all_labels
 
+def get_all_embeddings_val(extractor, dataloader, query):
+    all_embeddings = []
+    all_labels = []
+    
+    for batch in dataloader:
+        inputs, labels, is_query = batch
+        embeddings = extractor.get_embeddings(inputs)
+        
+        # Filter based on is_query if `query` is True
+        if query:
+            mask = is_query.bool()
+            embeddings = embeddings[mask]
+            labels = labels[mask]
+        
+        # Handle scalar labels by converting to tensors
+        labels = [torch.tensor(label) if isinstance(label, int) else label for label in labels]
+        labels = torch.stack(labels)  # Stack to ensure consistency
 
+        all_embeddings.append(embeddings)
+        all_labels.append(labels)
+    
+    all_embeddings = torch.cat(all_embeddings)
+    all_labels = torch.cat(all_labels) if all_labels else torch.empty(0)
+    return all_embeddings, all_labels
+
+class InferenceSetup():
+    # For the dataloader that has returns x, target, is_query
+    # To separate the query and gallery datasets
+    def __init__(self):
+        self.query_embeddings = []
+        self.query_labels = []
+        self.gallery_embeddings = []
+        self.gallery_labels = []
+
+    def append_to_query(self, embedding, label):
+        # Ensure target[i] is a 1D tensor for consistency
+        label = label if label.dim() > 0 else label.unsqueeze(0)
+        self.query_embeddings.append(embedding)
+        self.query_labels.append(label)
+    
+    def append_to_gallery(self, embedding, label):
+        # Ensure target[i] is a 1D tensor for consistency
+        label = label if label.dim() > 0 else label.unsqueeze(0)
+        self.gallery_embeddings.append(embedding)
+        self.gallery_labels.append(label)
+
+    def concat_query(self):
+        self.query_embeddings = torch.cat(self.query_embeddings)
+        self.query_labels = torch.cat(self.query_labels)
+        return self.query_embeddings, self.query_labels
+
+    def concat_gallery(self):
+        self.gallery_embeddings = torch.cat(self.gallery_embeddings)
+        self.gallery_labels = torch.cat(self.gallery_labels)
+        return self.gallery_embeddings, self.gallery_labels
+    
 class KnnClassifier:
     """
     Predict query label as k labels of nearest matches in database. If there is tie at given k,

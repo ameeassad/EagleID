@@ -15,7 +15,7 @@ import pytorch_lightning as pl
 from pytorch_metric_learning import losses, miners
 
 from wildlife_tools.similarity.cosine import CosineSimilarity
-from utils.metrics import evaluate_map, compute_average_precision
+from utils.metrics import evaluate_map, compute_average_precision, evaluate_recall_at_k, wildlife_accuracy
 
 from utils.re_ranking import re_ranking
 
@@ -70,50 +70,50 @@ class TransformerModel(pl.LightningModule):
             raise ValueError(f"Backbone model {self.backbone_model_name} not supported.")
         self.backbone = timm.create_model(self.backbone_model_name, num_classes=0, pretrained=pretrained)
         
+        # # Debug: check if all layers are unfrozen:
+        # for name, param in self.backbone.named_parameters():
+        #     print(f"{name}: requires_grad = {param.requires_grad}")
+        
         # Adjust input channels if necessary based on preprocess level
-        if preprocess_lvl >= 3:
-            num_channels = calculate_num_channels(preprocess_lvl)
-            if hasattr(self.backbone, 'patch_embed'):
-                self.backbone.patch_embed.proj = nn.Conv2d(
-                    in_channels=num_channels,
-                    out_channels=self.backbone.patch_embed.proj.out_channels,
-                    kernel_size=self.backbone.patch_embed.proj.kernel_size,
-                    stride=self.backbone.patch_embed.proj.stride,
-                    padding=self.backbone.patch_embed.proj.padding,
-                    bias=False
-                )
-                # Reinitialize weights for the adjusted layer
-                nn.init.kaiming_normal_(self.backbone.patch_embed.proj.weight, mode='fan_out', nonlinearity='relu')
-        else:
-            num_channels = 3
+        # if preprocess_lvl >= 3:
+        #     num_channels = calculate_num_channels(preprocess_lvl)
+        #     if hasattr(self.backbone, 'patch_embed'):
+        #         self.backbone.patch_embed.proj = nn.Conv2d(
+        #             in_channels=num_channels,
+        #             out_channels=self.backbone.patch_embed.proj.out_channels,
+        #             kernel_size=self.backbone.patch_embed.proj.kernel_size,
+        #             stride=self.backbone.patch_embed.proj.stride,
+        #             padding=self.backbone.patch_embed.proj.padding,
+        #             bias=False
+        #         )
+        #         # Reinitialize weights for the adjusted layer
+        #         nn.init.kaiming_normal_(self.backbone.patch_embed.proj.weight, mode='fan_out', nonlinearity='relu')
+        # else:
+        #     num_channels = 3
+        if self.preprocess_lvl >= 3:
+            num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
+            self.backbone_kp = timm.create_model(backbone_model_name, pretrained=False, num_classes=0, in_chans=num_kp_channels, global_pool='', features_only=True)
 
         # Embedder: Linear layer to project backbone output to embedding size
-        with torch.no_grad():
-            dummy_input = torch.randn(1, num_channels, 224, 224)
-            pretrained_embedding_size = self.backbone(dummy_input).shape[1]
-            print(f"Pretrained embedding size: {pretrained_embedding_size}")
-            print(f"Input embedding size: {embedding_size}")
+        # with torch.no_grad():
+        #     dummy_input = torch.randn(1, num_channels, 224, 224)
+        #     pretrained_embedding_size = self.backbone(dummy_input).shape[1]
+        #     print(f"Pretrained embedding size: {pretrained_embedding_size}")
+        #     print(f"Input embedding size: {embedding_size}")
 
-        # Global pooling
-        self.global_pool = nn.AdaptiveAvgPool2d(1)
 
-        # Get the feature dimension from the backbone
-        feature_dim = self.backbone.num_features
 
-        self.embedder = nn.Linear(feature_dim, embedding_size)
-        
+
         # ArcFace Loss: Initializes the margin-based loss function
         self.loss_fn = losses.ArcFaceLoss(num_classes=self.num_classes, embedding_size=self.embedding_size, margin=self.margin, scale=self.scale)
 
 
     def forward(self, x):
         features = self.backbone.forward_features(x)  # Get features from the backbone
-        features = self.global_pool(features)  # Apply global average pooling
         features = features.view(features.size(0), -1)  # Flatten to [batch_size, feature_dim]
         print(f"Shape of features from backbone: {features.shape}")
-        embeddings = self.embedder(features)  # Project to embedding space
-        embeddings = F.normalize(embeddings, p=2, dim=1)  # Normalize the embeddings
-        return embeddings
+        features = F.normalize(features, p=2, dim=1)  # Normalize the embeddings
+        return features
 
     def training_step(self, batch, batch_idx):
         images, labels = batch
@@ -161,6 +161,12 @@ class TransformerModel(pl.LightningModule):
         mAP5 = evaluate_map(distmat, query_labels, gallery_labels, top_k=5)
         self.log('val/mAP1', mAP1)
         self.log('val/mAP5', mAP5)
+
+        recall_at_k = evaluate_recall_at_k(distmat, query_labels, gallery_labels, k=5)
+        self.log(f'val/Recall@5', recall_at_k)
+
+        accuracy = wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels)
+        self.log(f'val/accuracy', accuracy)
 
     def configure_optimizers(self):
         if self.config:

@@ -1,108 +1,99 @@
-"""
-Modified class from wildlife-tools to support preprocessing levels. 
-"""
-
 import json
 import os
-import pickle
+import math
+import ast
+import pandas as pd
+import numpy as np
+
+from wildlife_datasets import datasets, splits
+import pytorch_lightning as pl
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
 from typing import Callable
 
 import cv2
-import numpy as np
-import pandas as pd
 import pycocotools.mask as mask_coco
 from PIL import Image
 
 from wildlife_tools.tools import realize
+from wildlife_tools.data.dataset import WildlifeDataset
 
-import pandas as pd
-from typing import Callable
+import data. transforms as t
+from data.transforms import RGBTransforms, ResizeAndPadRGB, ValTransforms, SynchTransforms, resize_and_pad, rotate_image
+from data.data_utils import SplitQueryDatabase
+from data.raptors_wildlife import RaptorsWildlife
 
-import pycocotools.mask as mask_coco
-import numpy as np
-import json
-import math
-
-import cv2
-import os
-
-import ast
 from preprocess.preprocess_utils import create_mask, create_skeleton_channel, create_multichannel_heatmaps
 from preprocess.component_gen import component_generation_module
 from preprocess.mmpose_fill import get_keypoints_info, get_skeleton_info
 
 
-class WildlifeDataset:
+class Wildlife(WildlifeDataset):
     """
-    PyTorch-style dataset for a wildlife datasets
-
-    Args:
-        metadata: A pandas dataframe containing image metadata.
-        root: Root directory if paths in metadata are relative. If None, paths in metadata are used.
-        split: A function that splits metadata, e.g., instance of data.Split.
-        transform: A function that takes in an image and returns its transformed version.
-        img_load: Method to load images.
-            Options: 'full', 'full_mask', 'full_hide', 'bbox', 'bbox_mask', 'bbox_hide',
-                      and 'crop_black'.
-        col_path: Column name in the metadata containing image file paths.
-        col_label: Column name in the metadata containing class labels.
-        load_label: If False, \_\_getitem\_\_ returns only image instead of (image, label) tuple.
-
-    Attributes:
-        labels np.array : An integers array of ordinal encoding of labels.
-        labels_string np.array: A strings array of original labels.
-        labels_map dict: A mapping between labels and their ordinal encoding.
-        num_classes int: Return the number of unique classes in the dataset.
+    Custom Dataset for Raptors, inheriting from WildlifeDataset.
+    Can be used to also call on Raptors class without already having the dataframe ready.
     """
 
     def __init__(
         self,
-        metadata: pd.DataFrame,
+        metadata: pd.DataFrame | None = None,
         root: str | None = None,
         split: Callable | None = None,
-        transform: Callable | None = None,
+        transform: callable = None,
         img_load: str = "full",
         col_path: str = "path",
-        col_label: str = "identity",
+        col_label: str = "identity", 
         load_label: bool = True,
-    ):
-        self.split = split
-        if self.split:
-            metadata = self.split(metadata)
+        chosen_split: str = "gallery", 
+        col_label_idx: str = None,
+    ):    
+        super().__init__(
+            metadata=metadata,
+            root=root,
+            split = split,
+            transform=transform,
+            img_load=img_load,
+            col_path=col_path,
+            col_label=col_label,
+            load_label=load_label
+        )
+        metadata = metadata.reset_index(drop=True)
+        if col_label_idx != "identity_idx":
+            self.labels, self.labels_map = pd.factorize(
+                metadata[col_label].values
+            )
+        else:
+            self.labels = metadata[col_label_idx].values
+        # self.split = split
+        # if self.split:
+        #     self.metadata = self.split(metadata)
+        #     self.metadata['query'] = self.metadata['query'].astype(bool)
+        #     if chosen_split == "gallery":
+        #         self.metadata = self.get_gallery_df()
+        #         print(f"Number of gallery images: {len(self.metadata)}")
+        #     else:
+        #         self.metadata = self.get_query_df()
+        #         print(f"Number of query images: {len(self.metadata)}")
+            
+        # self.metadata = self.metadata.reset_index(drop=True)
 
         self.metadata = metadata.reset_index(drop=True)
+
         self.root = root
         self.transform = transform
         self.img_load = img_load
         self.col_path = col_path
         self.col_label = col_label
         self.load_label = load_label
-        self.labels, self.labels_map = pd.factorize(
-            self.metadata[self.col_label].values
-        )
-
-    @property
-    def labels_string(self):
-        return self.metadata[self.col_label].astype(str).values
-
-    @property
-    def num_classes(self):
-        return len(self.labels_map)
-
-    def __len__(self):
-        return len(self.metadata)
-
-    def get_image(self, path):
-        try:
-            img = cv2.imread(path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(img)
-        except: 
-            print(f"Error loading image: {path}")
-            img = np.full((224, 224, 3), (0, 0, 0), dtype=np.uint8)
-            img = Image.fromarray(img)
-        return img
         
+    def get_image(self, path):
+        """
+        Custom image loader, customized based on preprocessing level for raptor images.
+        """
+        img = cv2.imread(path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = Image.fromarray(img)
+        return img
 
     def __getitem__(self, idx):
         data = self.metadata.iloc[idx]
@@ -117,8 +108,13 @@ class WildlifeDataset:
         if self.img_load in ["full_mask", "full_hide", "bbox_mask", "bbox_hide", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
             if not ("segmentation" in data):
                 raise ValueError(f"{self.img_load} selected but no segmentation found.")
+            
             if type(data["segmentation"]) == str:
                 segmentation = eval(data["segmentation"])
+                # try:
+                #     segmentation = json.loads(data["segmentation"])
+                # except json.JSONDecodeError:
+                #     raise ValueError("Segmentation string could not be decoded. Ensure it is a valid JSON format.")
             else:
                 segmentation = data["segmentation"]
             seg_coco = segmentation
@@ -132,8 +128,8 @@ class WildlifeDataset:
 
             if isinstance(segmentation, list):
                 # Convert polygon to RLE
-                if type(segmentation[0]) == int:
-                    segmentation = [segmentation]
+                height, width = int(data['height']), int(data['width'])
+                # height, width = img.size[1], img.size[0]
                 rle = mask_coco.frPyObjects(segmentation, height, width)
                 segmentation = mask_coco.merge(rle)
 
@@ -245,85 +241,282 @@ class WildlifeDataset:
                 img = self.transform[0](img)
                 img = self.transform[1](img)
 
+        # if self.split:
+        #     return img, self.labels[idx], bool(data['query'])
         if self.load_label:
             return img, self.labels[idx]
         else:
             return img
-        
+
     def get_df(self) -> pd.DataFrame:
         return self.metadata
-        
-    @classmethod
-    def from_config(cls, config):
-        config["split"] = realize(config.get("split"))
-        config["transform"] = realize(config.get("transform"))
-        config["metadata"] = pd.read_csv(config["metadata"], index_col=False)
-        return cls(**config)
-
-
-class FeatureDataset:
-    def __init__(
-        self,
-        features,
-        metadata,
-        col_label="identity",
-        load_label=True,
-    ):
-
-        if len(features) != len(metadata):
-            raise ValueError("Features and metadata (lables) have different length ! ")
-
-        self.load_label = load_label
-        self.features = features
-        self.metadata = metadata.reset_index(drop=True)
-        self.col_label = col_label
-        self.labels, self.labels_map = pd.factorize(
-            self.metadata[self.col_label].values
-        )
-
-    @property
-    def labels_string(self):
-        return self.metadata[self.col_label].astype(str).values
-
-    def __getitem__(self, idx):
-        if self.load_label:
-            return self.features[idx], self.labels[idx]
+    
+    def get_query_df(self) -> pd.DataFrame:
+        if 'query' in self.metadata.columns:
+            # return self.metadata[self.metadata['query'] == True]
+            return self.metadata[self.metadata['query']]
         else:
-            return self.features[idx]
+            print("No query column found.")
+            return self.metadata
+    
+    def get_gallery_df(self) -> pd.DataFrame:
+        if 'query' in self.metadata.columns:
+            return self.metadata[~self.metadata['query']]
+        else:
+            print("No query column found.")
+            return self.metadata
+    
+    def get_query_labels(self) -> np.ndarray:
+        # return self.labels[self.metadata['query']]
+        df = self.get_query_df()
+        return df[self.col_label].values
+    
+    def get_gallery_labels(self) -> np.ndarray:
+        # return self.labels[~self.metadata['query']]
+        df = self.get_gallery_df()
+        return df[self.col_label].values
+    
 
-    def __len__(self):
-        return len(self.metadata)
+class WildlifeDataModule(pl.LightningDataModule):
+    def __init__(self, metadata, config = None, data_dir="", preprocess_lvl=0, batch_size=8, size=256, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], num_workers=2, cache_path="../dataset/dataframe/cache.csv", animal_cat='bird', splitter ='closed', only_cache=False):
+        super().__init__()
+        self.config = config
+        self.metadata = metadata
+        if config:
+            self.data_dir = config['dataset']
+            self.preprocess_lvl = int(config["preprocess_lvl"])
+            self.batch_size = int(config['batch_size'])
+            self.size = int(config['img_size'])
+            self.mean = (config['transforms']['mean'], config['transforms']['mean'], config['transforms']['mean']) if isinstance(config['transforms']['mean'], float) else tuple(config['transforms']['mean'])
+            self.std = (config['transforms']['std'], config['transforms']['std'], config['transforms']['std']) if isinstance(config['transforms']['std'], float) else tuple(config['transforms']['std'])
+            self.split_ratio = config['split_ratio'] # percent of individuals used for training
+            self.num_workers = config['num_workers']
+            self.cache_path = config['cache_path']
+            self.animal_cat = config['animal_cat']
+            self.splitter = config['splitter']
+            self.only_cache = config['only_cache']
+        else:
+            self.data_dir = data_dir
+            self.num_workers = num_workers
+            self.preprocess_lvl = preprocess_lvl
+            self.batch_size = batch_size
+            self.size = size
+            self.mean = (mean, mean, mean) if isinstance(mean, float) else tuple(mean)
+            self.std = (std, std, std) if isinstance(std, float) else tuple(std)
+            self.split_ratio = 0.8
+            self.cache_path = cache_path
+            self.animal_cat = animal_cat
+            self.splitter = splitter
+            self.only_cache = only_cache
 
-    @property
-    def num_classes(self):
-        return len(self.labels_map)
+        if self.preprocess_lvl == 3:
+            resize_and_pad = t.ResizeAndPadBoth(self.size, skeleton=True)
+            sync_transform = t.SynchTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
+            sync_val_transform = t.SynchTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
+            self.train_transforms =  [resize_and_pad, sync_transform]
+            self.val_transforms = [resize_and_pad, sync_val_transform]  # everything except for color / gaussian transforms aka no someOf transforms
+        elif self.preprocess_lvl == 4:
+            resize_and_pad = t.ResizeAndPadRGB(self.size)
+            sync_transform = t.ComponentGenerationTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
+            sync_val_transform = t.ComponentGenerationTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
+            self.train_transforms =  [resize_and_pad, sync_transform]
+            self.val_transforms = [resize_and_pad, sync_val_transform]  # everything except for color / gaussian transforms
+        elif self.preprocess_lvl == 5:
+            resize_and_pad = t.ResizeAndPadBoth(self.size, skeleton=False)
+            sync_transform = t.SynchMultiChannelTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
+            sync_val_transform = t.SynchMultiChannelTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
+            self.train_transforms =  [resize_and_pad, sync_transform]
+            self.val_transforms = [resize_and_pad, sync_val_transform]
+        else:
+            resize_and_pad = t.ResizeAndPadRGB(self.size)
+            rgb_transform = t.RGBTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
+            rgb_val_tranform = t.RGBTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
+            self.train_transforms =  [resize_and_pad, rgb_transform]
+            self.val_transforms = [resize_and_pad, rgb_val_tranform]
 
-    def save(self, path):
-        data = {
-            "features": self.features,
-            "metadata": self.metadata,
-            "col_label": self.col_label,
-            "load_label": self.load_label,
-        }
-        dirname = os.path.dirname(path)
-        if dirname and not os.path.exists(dirname):
-            os.makedirs(dirname)
-        with open(path, "wb") as file:
-            pickle.dump(data, file, protocol=pickle.HIGHEST_PROTOCOL)
+        # Need to fix splits
+        #  will i also offer open set split? aka some individuals in the query might not be present in the gallery. 
+        # This implies that a query can return "unknown" results if the individual is not part of the gallery.
+        if 'date' in self.metadata.columns and self.metadata['date'].isna().any():
+            self.metadata.loc[pd.isna(self.metadata['date']), 'date'] = "unknown" 
+        
+        if self.splitter == 'closed':
+            splitter = splits.ClosedSetSplit(self.split_ratio) # All individuals are both in the training and testing set.
+        elif self.splitter == 'open':
+            splitter = splits.OpenSetSplit(self.split_ratio, 0.1) # Some individuals are in the testing but not in the training set
+        for idx_train, idx_test in splitter.split(metadata):
+            splits.analyze_split(self.metadata, idx_train, idx_test)
 
-    @classmethod
-    def from_file(cls, path, **config):
-        with open(path, "rb") as file:
-            data = pickle.load(file)
-        return cls(**data, **config)
+        df_train, df_test = self.metadata.loc[idx_train], metadata.loc[idx_test]
+        df_train.reset_index(drop=True, inplace=True)
+        df_test.reset_index(drop=True, inplace=True)
 
-    @classmethod
-    def from_config(cls, config):
-        path = config.pop("path")
-        return cls.load(path, **config)
+        print(f"Train set size before pre-processing: {len(df_train)}")
+        print(f"Test set size before pre-processing: {len(df_test)}")
+
+        # preprocessing
+        if self.preprocess_lvl > 0: # 1: bounding box cropped image or 2: masked image
+            from preprocess.segmenter import add_segmentations
+
+            df_train = add_segmentations(df_train, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
+            df_test = add_segmentations(df_test, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
+
+            # print(f"df_train: {len(df_train)}, columns: {df_train.columns} and values: {df_train.iloc[0]}")
+            # print(f"df_query: {len(df_query)}, columns: {df_query.columns} and values: {df_query.iloc[0]}")
+            # print(f"df_gallery: {len(df_gallery)}, columns: {df_gallery.columns} and values: {df_gallery.iloc[0]}")
+
+            df_train = self.clean_segmentation(df_train)
+            df_test = self.clean_segmentation(df_test)
+            # df_gallery = self.clean_segmentation(df_gallery)
+        
+        if self.preprocess_lvl >= 3: # 3: masked + pose (skeleton) image in 1 channel or 4: masked + body part clusters in channels
+            from preprocess.mmpose_fill import fill_keypoints, get_skeleton_info, get_keypoints_info
+
+            self.keypoints = get_keypoints_info()
+            self.skeleton = get_skeleton_info()
+
+            df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
+            df_test = fill_keypoints(df_test, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
+
+            # remove 'float' keypoints
+            df_train = df_train[df_train['keypoints'].apply(lambda x: not isinstance(x, float))]
+            df_test = df_test[df_test['keypoints'].apply(lambda x: not isinstance(x, float))]
 
 
-class FeatureDatabase(FeatureDataset):
-    """Alias for FeatureDataset"""
+        if config:
+            config['arcface_loss']['n_classes'] = len(df_train['identity'].unique())
 
-    pass
+        # Remove only one image per individual
+        train_counts = df_train['identity'].value_counts()
+        train_valid_identities = train_counts[df_train['identity'].value_counts() > 1].index
+        # Filter the dataframe
+        df_train = df_train[df_train['identity'].isin(train_valid_identities)].reset_index(drop=True)
+
+        print("Training Set")
+        print(f"Length: {len(df_train)}")
+        print(f"Number of individuals: {len(df_train['identity'].unique())}")
+        print(f"Mean images/individual: {df_train['identity'].value_counts().mean()}")
+        print(f"Min images/individual: {df_train['identity'].value_counts().min()}")
+        print(f"Max images/individual: {df_train['identity'].value_counts().max()}")
+
+        print("Test Set")
+        print(f"Length: {len(df_test)}")
+        print(f"Number of individuals: {len(df_test['identity'].unique())}")
+        print(f"Mean images per individual: {df_test['identity'].value_counts().mean()}")
+        print(f"Min images per individual: {df_test['identity'].value_counts().min()}")
+        print(f"Max images per individual: {df_test['identity'].value_counts().max()}")
+
+
+
+        df_test_labels, df_test_labels_map = pd.factorize(df_test['identity'].values)
+        df_test['identity_idx'] = df_test_labels
+
+
+        self.val_split = SplitQueryDatabase()
+        df_test = self.val_split(df_test)
+        df_test['query'] = df_test['query'].astype(bool)
+        df_query = df_test[df_test['query']]
+        df_gallery = df_test[~df_test['query']]
+
+
+        if self.preprocess_lvl == 0:
+            self.method = 'full'
+        elif self.preprocess_lvl == 1:
+            self.method = 'bbox'
+        elif self.preprocess_lvl == 2: 
+            self.method = "bbox_mask"
+        elif self.preprocess_lvl == 3: 
+            self.method = "bbox_mask_skeleton"
+        elif self.preprocess_lvl == 4:
+            self.method = "bbox_mask_components"
+        elif self.preprocess_lvl == 5:
+            self.method = "bbox_mask_heatmaps"
+
+        self.train_dataset = Wildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, img_load=self.method)
+        # self.test_dataset = Wildlife(metadata=df_test, root=self.data_dir, split = self.val_split, transform=self.val_transforms, img_load=self.method)
+        # self.val_query_dataset = Wildlife(metadata=df_test, root=self.data_dir, split=self.val_split, transform=self.val_transforms, img_load=self.method, chosen_split="query")
+        # self.val_gallery_dataset = Wildlife(metadata=df_test, root=self.data_dir, split=self.val_split, transform=self.val_transforms, img_load=self.method, chosen_split="gallery")
+
+        self.val_query_dataset = Wildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', col_label_idx ='identity_idx', img_load=self.method)
+        self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity',  col_label_idx ='identity_idx', img_load=self.method)
+
+    def train_dataloader(self):
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+    
+    def val_dataloader(self):
+        query_loader = DataLoader(self.val_query_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+        gallery_loader = DataLoader(self.val_gallery_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+        return [query_loader, gallery_loader]
+    
+    # def val_dataloader(self):
+    #     return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+    
+    def filter_identities(self, metadata, min_images=2):
+        """
+        Filters out identities with fewer than a minimum number of images.
+
+        Args:
+            metadata (pd.DataFrame): Dataframe containing image metadata.
+            min_images (int): Minimum number of images required per identity.
+
+        Returns:
+            filtered_metadata (pd.DataFrame): Metadata filtered to only include identities with the required number of images.
+        """
+        identity_counts = metadata['identity'].value_counts()
+        valid_identities = identity_counts[identity_counts >= min_images].index
+        return metadata[metadata['identity'].isin(valid_identities)].reset_index(drop=True)
+
+    def clean_segmentation(self, df, segmentation_col='segmentation'):
+        """
+        Cleans the segmentation column in the DataFrame to ensure each segmentation 
+        is in the correct format (list where the first element is a float).
+        
+        Args:
+            df (pd.DataFrame): The DataFrame containing metadata.
+            segmentation_col (str): The name of the column containing segmentation data.
+            
+        Returns:
+            pd.DataFrame: A cleaned DataFrame with valid segmentation data.
+        """
+        df[segmentation_col] = df[segmentation_col].apply(self.parse_segmentation)
+        # Drop rows where segmentation is None (invalid)
+        df_cleaned = df.dropna(subset=[segmentation_col])
+        print(f"Removed {len(df) - len(df_cleaned)} rows with invalid segmentation data.")
+        return df_cleaned
+    
+    def parse_segmentation(self, segmentation):
+        # Convert from string to list if needed
+        if segmentation is None:
+            print("No segmentation data found.: None")
+            return None
+        if isinstance(segmentation, str):
+            try:
+                segmentation = segmentation.replace("'", "\"")
+                segmentation = json.loads(segmentation)
+                # print("Parsed segmentation from string.")
+            except json.JSONDecodeError:
+                print("Segmentation is a string but not valid JSON.")
+                return None
+
+        # Ensure the segmentation is now a list after possible string conversion
+        if not isinstance(segmentation, list):
+            print("No segmentation data found: Not a list after conversion.")
+            return None
+        
+        # Check for empty lists or lists containing only empty lists
+        if not segmentation or (len(segmentation) == 1 and not segmentation[0]):
+            print("No segmentation data found: Empty list or list containing empty list.")
+            return None
+        
+        # Check if the first element is a list of coordinates
+        if isinstance(segmentation[0], list) and all(isinstance(coord, (int, float)) for coord in segmentation[0]):
+            return segmentation  # Already in the correct format
+        
+        # If it's a flat list of coordinates, wrap it in a list
+        if all(isinstance(coord, (int, float)) for coord in segmentation):
+            return [segmentation]  # Convert to a list of lists
+        
+        # If none of the conditions are met, return None
+        print("Segmentation format is not recognized.")
+        return None
+

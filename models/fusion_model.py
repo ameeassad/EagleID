@@ -18,7 +18,7 @@ from utils.metrics import evaluate_map, compute_average_precision
 
 from utils.re_ranking import re_ranking
 from data.data_utils import calculate_num_channels
-from utils.metrics import compute_distance_matrix
+from utils.metrics import compute_distance_matrix, evaluate_recall_at_k, wildlife_accuracy
 
 class FusionModel(pl.LightningModule):
     def __init__(self, 
@@ -221,6 +221,12 @@ class FusionModel(pl.LightningModule):
         mAP5 = evaluate_map(distmat, query_labels, gallery_labels, top_k=5)
         self.log('val/mAP1', mAP1)
         self.log('val/mAP5', mAP5)
+
+        recall_at_k = evaluate_recall_at_k(distmat, query_labels, gallery_labels, k=5)
+        self.log(f'val/Recall@5', recall_at_k)
+
+        accuracy = wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels)
+        self.log(f'val/accuracy', accuracy)
 
     def configure_optimizers(self):
         if self.config:

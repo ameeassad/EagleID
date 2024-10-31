@@ -1,6 +1,7 @@
 import torch
 from preprocess.mmpose_fill import get_keypoints_info
 import pandas as pd
+from wildlife_tools.data.split import Split
 
 def unnormalize(x, mean, std):
     """
@@ -90,3 +91,29 @@ def create_df_from_coco(coco_obj):
     df = pd.DataFrame(annotations_data)
 
     return df
+
+class SplitQueryDatabase(Split):
+    """
+    Splits metadata into query and database sets by adding a 'query' column.
+    Each identity is present in both query and database sets without data leakage.
+    The 'query' column is set to 1 if the image is part of the query set; otherwise, 0.
+    """
+
+    def __call__(self, metadata):
+        # Initialize 'query' column to 0 (default: part of database)
+        metadata = metadata.copy()
+        metadata['query'] = 0
+
+        identities = metadata['identity'].unique()
+
+        for identity in identities:
+            identity_indices = metadata[metadata['identity'] == identity].index.tolist()
+            if len(identity_indices) > 1:
+                # Set the first image as query (value 1)
+                metadata.at[identity_indices[0], 'query'] = 1
+                # Remaining images stay as database (value 0)
+            else:
+                # If only one image, it remains in the database
+                continue
+
+        return metadata

@@ -23,7 +23,6 @@ from utils.gradcam_callback import GradCAMCallback
 global config_yml
 MODEL_CLASSES = {
         'TripletModel': TripletModel,
-        'SimpleModel': SimpleModel,
         'FusionModel': FusionModel,
         'TransformerModel': TransformerModel,
         'EfficientNet': EfficientNet,

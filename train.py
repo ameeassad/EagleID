@@ -154,9 +154,15 @@ if __name__ == '__main__':
 
     # setup dataset
     data =  get_dataset(config)
+    # Comment: local training
+    # from wildlife_datasets import datasets
+    # from data.wildlife_dataset import WildlifeDataModule
+    # dataset = datasets.WhaleSharkID(config['dataset'])
+    # data = WildlifeDataModule(metadata=dataset.df, config=config, only_cache=True)
+    
+    
     model_classes = {
         'TripletModel': TripletModel,
-        'SimpleModel': SimpleModel,
         'FusionModel': FusionModel,
         'TransformerModel': TransformerModel,
         'EfficientNet': EfficientNet,

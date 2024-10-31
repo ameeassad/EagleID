@@ -1,7 +1,23 @@
 import numpy as np
 from wildlife_tools.similarity.cosine import CosineSimilarity
 import torch.nn.functional as F
+from utils.triplet_loss_utils import KnnClassifier
 
+
+def wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels):
+    similarity_function = CosineSimilarity()
+    similarity = similarity_function(query_embeddings, gallery_embeddings)["cosine"]
+
+    # Convert gallery_labels to numpy if necessary
+    gallery_labels = gallery_labels.cpu().numpy() if isinstance(gallery_labels, torch.Tensor) else gallery_labels
+
+    # Nearest neighbor classifier using KNN with k=1
+    classifier = KnnClassifier(k=1)
+    preds = classifier(similarity)
+    preds = [gallery_labels[i] for i in preds] #convert indices to labels
+
+    accuracy = (preds == query_labels.cpu().numpy()).mean()
+    return accuracy
 
 def evaluate_map(distmat, query_labels, gallery_labels, top_k=None):
     num_queries = query_labels.size(0)
@@ -37,6 +53,9 @@ def compute_average_precision(matches):
 
 
 def evaluate_recall_at_k(distmat, query_labels, gallery_labels, k):
+    if isinstance(distmat, np.ndarray):
+        distmat = torch.tensor(distmat)
+
     num_queries = query_labels.size(0)
     correct = 0
     for i in range(num_queries):

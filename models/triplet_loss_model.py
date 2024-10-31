@@ -14,11 +14,10 @@ from pytorch_metric_learning import losses, miners
 from torch import nn
 
 from wildlife_tools.similarity.cosine import CosineSimilarity
-from utils.metrics import evaluate_map, compute_average_precision
 
 from utils.re_ranking import re_ranking
 from data.data_utils import calculate_num_channels
-from utils.metrics import compute_distance_matrix
+from utils.metrics import compute_distance_matrix, evaluate_map, evaluate_recall_at_k, wildlife_accuracy
 
 class TripletModel(pl.LightningModule):
     def __init__(self, 
@@ -173,6 +172,12 @@ class TripletModel(pl.LightningModule):
         self.log('val/mAP1', mAP1)
         self.log('val/mAP5', mAP5)
 
+        recall_at_k = evaluate_recall_at_k(distmat, query_labels, gallery_labels, k=5)
+        self.log(f'val/Recall@5', recall_at_k)
+
+        accuracy = wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels)
+        self.log(f'val/accuracy', accuracy)
+
     def configure_optimizers(self):
         if self.config:
             optimizer = get_optimizer(self.config, self.parameters())
@@ -278,3 +283,195 @@ class TripletModel(pl.LightningModule):
 #         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
     
 
+# class TripletModelBADDATALOADER(pl.LightningModule):
+#     def __init__(self, 
+#                  backbone_model_name="resnet50", 
+#                  config=None, pretrained=True, 
+#                  embedding_size=128, margin=0.2, 
+#                  mining_type="semihard", 
+#                  lr=0.001, 
+#                  preprocess_lvl=0, 
+#                  re_ranking=True, 
+#                  outdir="results"):
+#         super().__init__()
+#         self.config = config
+#         if config:
+#             backbone_model_name=config['backbone_name'] if config['backbone_name'] else 'efficientnet_b0'
+#             self.embedding_size=int(config['embedding_size'])
+#             margin=config['triplet_loss']['margin']
+#             mining_type=config['triplet_loss']['mining_type']
+#             preprocess_lvl=int(config['preprocess_lvl'])
+#             self.re_ranking=config['re_ranking']
+#             self.distance_matrix = config['triplet_loss']['distance_matrix']
+#             outdir=config['outdir']
+#             if not config['use_wandb']:
+#                 self.save_hyperparameters()
+#         else:
+#             backbone_model_name=backbone_model_name
+#             self.embedding_size=embedding_size
+#             margin=margin
+#             mining_type=mining_type
+#             preprocess_lvl=preprocess_lvl
+#             self.re_ranking=re_ranking
+#             self.distance_matrix = 'euclidean'
+#             outdir=outdir
+            
+#         # Backbone (ResNet without the final FC layer)
+#         self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=pretrained, num_classes=0)
+
+#         if preprocess_lvl >= 3:
+#             num_channels = calculate_num_channels(preprocess_lvl)
+
+#             if hasattr(self.backbone, 'conv1'):
+#                 self.backbone.conv1 = nn.Conv2d(
+#                     in_channels=num_channels,
+#                     out_channels=self.backbone.conv1.out_channels,
+#                     kernel_size=self.backbone.conv1.kernel_size,
+#                     stride=self.backbone.conv1.stride,
+#                     padding=self.backbone.conv1.padding,
+#                     bias=False
+#                 )
+#                 # Reinitialize the weights of the new convolutional layer
+#                 nn.init.kaiming_normal_(self.backbone.conv1.weight, mode='fan_out', nonlinearity='relu')
+#         else:
+#             num_channels = 3
+
+#         # Debug: check if all layers are unfrozen:
+#         # for name, param in self.backbone.named_parameters():
+#         #     print(f"{name}: requires_grad = {param.requires_grad}")
+
+#         # Embedder (to project features into the desired embedding space)
+#         self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)
+#         # self.fc = nn.Linear(self.model.output_size, embedding_size)  # Embedding layer
+#         self.loss_fn = losses.TripletMarginLoss(margin=margin)
+#         self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
+#         self.lr = lr
+
+#     # Can experiment with different embedders or need to adjust the embedding layer frequently.
+#     def forward(self, x):
+#         features = self.backbone(x) # Extract features using the backbone
+#         embeddings = self.embedder(features) # Project features into the embedding space
+#         embeddings = nn.functional.normalize(embeddings, p=2, dim=1)  # L2 normalization
+#         return embeddings
+    
+#     # def on_train_start(self): # to run only once: on_train_start / for every val: on_validation_start
+#     #     self.eval()
+#     #     self.on_validation_epoch_start()  # Initialize query/gallery embeddings and labels
+#     #     with torch.no_grad():
+#     #         for batch in self.trainer.val_dataloaders:
+#     #             x, target, is_query = batch
+#     #             # Generate random embeddings for the query set
+#     #             random_embeddings = torch.randn(x.size(0), self.embedding_size, device=x.device)
+
+#     #             for i in range(len(is_query)):
+#     #                 if is_query[i].item() == 1:
+#     #                     self.query_embeddings.append(random_embeddings[i].unsqueeze(0))  # Query set
+#     #                     self.query_labels.append(target[i].unsqueeze(0))
+#     #                 else:
+#     #                     self.gallery_embeddings.append(random_embeddings[i].unsqueeze(0))  # Gallery set
+#     #                     self.gallery_labels.append(target[i].unsqueeze(0))
+ 
+#     #         # Perform validation metric calculation using random embeddings
+#     #         # Compute the distance matrix using the random embeddings
+#     #         query_embeddings = torch.cat(self.query_embeddings)
+#     #         gallery_embeddings = torch.cat(self.gallery_embeddings)
+#     #         query_labels = torch.cat(self.query_labels)
+#     #         gallery_labels = torch.cat(self.gallery_labels)
+
+#     #         # Use a suitable distance metric for mAP calculation
+#     #         distmat = compute_distance_matrix('euclidean', query_embeddings, gallery_embeddings)
+#     #         random_mAP1 = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
+#     #         random_mAP5 = evaluate_map(distmat, query_labels, gallery_labels, top_k=5)
+            
+#     #         # Log the random baseline mAP
+#     #         print(f"Random mAP: {random_mAP1}")
+#     #         self.log("random_val/mAP1", random_mAP1)
+#     #         self.log("random_val/mAP5", random_mAP5)
+#     #     # Switch back to training mode
+#     #     self.train()
+
+#     def training_step(self, batch, batch_idx):
+#         images, labels = batch
+#         embeddings = self(images)
+#         mined_triplets = self.miner(embeddings, labels)
+#         loss = self.loss_fn(embeddings, labels, mined_triplets)
+#         self.log("train/loss", loss,  on_step=True, on_epoch=True, prog_bar=True, logger=True)
+#         return loss
+
+#     def on_validation_epoch_start(self):
+#         self.inferencer = InferenceSetup()
+
+#     def validation_step(self, batch, batch_idx):
+#         print("VALIDATION STEP")
+#         x, target, is_query = batch
+#         embeddings = self(x)
+#         # Process each item in the batch individually
+#         for i in range(len(is_query)):
+#             if is_query[i].item() == 1:  # Check if the current item is part of the query set
+#                 # Append to query lists
+#                 self.inferencer.append_to_query(embeddings[i], target[i])
+                
+#             else:
+#                 # Append to gallery lists
+#                 self.inferencer.append_to_gallery(embeddings[i], target[i])
+
+#     # def validation_step(self, batch, batch_idx):
+#     #     x, target, is_query = batch
+#     #     embeddings = self(x)
+#     #     # Convert is_query to boolean tensor
+#     #     is_query = is_query.bool()
+#     #     # Split embeddings and labels based on is_query
+#     #     query_embeddings = embeddings[is_query]
+#     #     query_labels = target[is_query]
+#     #     gallery_embeddings = embeddings[~is_query]
+#     #     gallery_labels = target[~is_query]
+
+#     #     print("QUERY EMBEDDINGS SHAPE", query_embeddings.shape)
+#     #     print("GALLERY EMBEDDINGS SHAPE", gallery_embeddings.shape)
+#     #     print("QUERY LABELS SHAPE", query_labels.shape)
+#     #     print("GALLERY LABELS SHAPE", gallery_labels.shape)
+
+#     #     self.query_embeddings.append(query_embeddings)
+#     #     self.query_labels.append(query_labels)
+#     #     self.gallery_embeddings.append(gallery_embeddings)
+#     #     self.gallery_labels.append(gallery_labels)
+
+#     # def validation_step(self, batch, batch_idx, dataloader_idx=0):
+#     #     x, target = batch
+#     #     embeddings = self(x)
+#     #     if dataloader_idx == 0:
+#     #         # Query data
+#     #         self.query_embeddings.append(embeddings)
+#     #         self.query_labels.append(target)
+#     #     else:
+#     #         # Gallery data
+#     #         self.gallery_embeddings.append(embeddings)
+#     #         self.gallery_labels.append(target)
+
+#     def on_validation_epoch_end(self):
+
+#         print("VALIDATION EPOCH END")
+#         # Concatenate all embeddings and labels
+#         query_embeddings, query_labels = self.inferencer.concat_query()
+#         gallery_embeddings, gallery_labels = self.inferencer.concat_gallery()
+#         # Compute distance matrix
+#         if self.re_ranking:
+#             distmat = re_ranking(query_embeddings, gallery_embeddings, k1=20, k2=6, lambda_value=0.3)
+#         else:
+#             distmat = compute_distance_matrix(self.distance_matrix, query_embeddings, gallery_embeddings, wildlife=True)
+
+#         # Compute mAP
+#         # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
+#         mAP1 = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
+#         mAP5 = evaluate_map(distmat, query_labels, gallery_labels, top_k=5)
+#         self.log('val/mAP1', mAP1)
+#         self.log('val/mAP5', mAP5)
+
+#     def configure_optimizers(self):
+#         if self.config:
+#             optimizer = get_optimizer(self.config, self.parameters())
+#             lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
+#             return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
+#         else:
+#             optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+#             return optimizer
