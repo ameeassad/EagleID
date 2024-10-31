@@ -6,6 +6,7 @@ from utils.triplet_loss_utils import KnnClassifier
 
 def wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels):
     similarity_function = CosineSimilarity()
+    similarity = similarity.cpu().numpy()
     similarity = similarity_function(query_embeddings, gallery_embeddings)["cosine"]
 
     # Convert gallery_labels to numpy if necessary

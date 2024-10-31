@@ -24,6 +24,7 @@ class GradCAMCallback(Callback):
         self.config = config
         self.outdir = outdir
         self.log_every_n_epochs = log_every_n_epochs
+        self.kp_included = config['preprocess_level'] >= 3
 
     def on_validation_epoch_end(self, trainer, pl_module):
 
@@ -43,6 +44,10 @@ class GradCAMCallback(Callback):
             pl_module.eval()  # Ensure model is in evaluation mode
             for batch_idx, batch in enumerate(trainer.val_dataloaders[0]): # first dataloader is the query images & labels
                 x, target, *rest = batch
+
+                if self.kp_included:
+                    # TODO: Implement GradCAM for higher dimension inputs
+                    break
 
                 # Move inputs and targets to the device
                 x = x.to(pl_module.device)
