@@ -1,6 +1,6 @@
 from wildlife_datasets import analysis, datasets, loader
 from data.raptors_wildlife import Raptors, WildlifeReidDataModule
-
+from data.wildlife_dataset import WildlifeDataModule
 import os
 import sys
 import wandb
@@ -24,7 +24,7 @@ def get_dataset(config, hardcode=None):
             config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv'
 
         dataset = Raptors(root=config['dataset'], include_video=False)
-        data = WildlifeReidDataModule(metadata=dataset.df, config = config)
+        data = WildlifeDataModule(metadata=dataset.df, config = config)
     
     elif config['wildlife_name'] == 'whaleshark':
         if config['use_wandb'] == True:
@@ -38,7 +38,7 @@ def get_dataset(config, hardcode=None):
             config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_whaleshark.csv'
 
         dataset = datasets.WhaleSharkID(config['dataset'])
-        data = WildlifeReidDataModule(metadata=dataset.df, config=config, only_cache=True)
+        data = WildlifeDataModule(metadata=dataset.df, config=config, only_cache=True)
     
     elif config['wildlife_name'] == 'ATRW':
         # datasets.ATRW.get_data(config['dataset'])
@@ -53,7 +53,7 @@ def get_dataset(config, hardcode=None):
             config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv'
 
         dataset = datasets.ATRW(config['dataset'])
-        data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+        data = WildlifeDataModule(metadata=dataset.df, config=config)
     
     elif config['wildlife_name'] == 'BirdIndividualID':
         if config['use_wandb'] == True:
@@ -71,7 +71,7 @@ def get_dataset(config, hardcode=None):
     elif config['wildlife_name'] == 'GiraffeZebraID':
         # try to get zebras only because giraffes is really close up
         dataset = datasets.GiraffeZebraID(config['dataset'])
-        data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+        data = WildlifeDataModule(metadata=dataset.df, config=config)
         config['animal_cat'] = 'mammal'
     elif config['wildlife_name'] == 'HyenaID2022':
         dataset = datasets.HyenaID2022(config['dataset'])
