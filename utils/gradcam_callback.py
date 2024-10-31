@@ -24,7 +24,7 @@ class GradCAMCallback(Callback):
         self.config = config
         self.outdir = outdir
         self.log_every_n_epochs = log_every_n_epochs
-        self.kp_included = config['preprocess_level'] >= 3
+        self.kp_included = config['preprocess_lvl'] >= 3
 
     def on_validation_epoch_end(self, trainer, pl_module):
 
