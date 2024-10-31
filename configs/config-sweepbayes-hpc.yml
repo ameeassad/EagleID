@@ -1,19 +1,19 @@
-name: sweeping-bayes-preprocess-levels
+name: sweeping-bayes
 method: bayes
 metric:
-  name: train/loss_epoch
+  name: train/loss
   goal: minimize
 parameters:
   model_architecture:
-    values: ['TripletModel']
+    values: ['TripletModel', 'EfficientNet', 'FusionModel']
+  backbone_name:
+    values: ['resnet50', 'swin_tiny_patch4_window7_224']
   wildlife_name:
     values: ['whaleshark', 'raptors']
-  preprocess_lvl:
-    values: [1, 2, 3, 4, 5]
   batch_size:
-    values: [64]
+    values: [64, 128]
   embedding_size:
-    values: [768]
+    values: [128, 768]
   triplet_loss:
     parameters:
       margin:
@@ -23,17 +23,17 @@ parameters:
   arcface_loss:
     parameters:
       margin:
-        distribution: 
-        mu:
-        sigma:
+        distribution: normal
+        mu: 0.32
+        sigma: 0.05
       scale:
-        distribution: 
-        mu:
-        sigma:
+        distribution: normal
+        mu: 50
+        sigma: 5
   solver:
     parameters:
       BASE_LR:
-        values: [0.001]
+        values: [0.0001, 0.001, 0.005]
       LR_SCHEDULER:
         values: ['reduce_on_plateau']
 

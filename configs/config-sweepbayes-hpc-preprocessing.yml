@@ -1,0 +1,29 @@
+name: sweeping-bayes-preprocess-levels
+method: bayes
+metric:
+  name: train/loss_epoch
+  goal: minimize
+parameters:
+  model_architecture:
+    values: ['TripletModel']
+  wildlife_name:
+    values: ['whaleshark', 'raptors']
+  preprocess_lvl:
+    values: [1, 2, 3, 4, 5]
+  batch_size:
+    values: [64]
+  embedding_size:
+    values: [768]
+  triplet_loss:
+    parameters:
+      margin:
+        values: [0.5]
+      mining_type:
+        values: ['semihard'] 
+  solver:
+    parameters:
+      BASE_LR:
+        values: [0.001]
+      LR_SCHEDULER:
+        values: ['reduce_on_plateau']
+
