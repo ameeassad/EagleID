@@ -378,9 +378,9 @@ class WildlifeDataModule(pl.LightningDataModule):
             df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
             df_test = fill_keypoints(df_test, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
 
-            # remove 'float' keypoints
-            # df_train = df_train[df_train['keypoints'].apply(lambda x: not isinstance(x, float))]
-            # df_test = df_test[df_test['keypoints'].apply(lambda x: not isinstance(x, float))]
+            # remove 'float' keypoints because NaN is treated as float
+            df_train = df_train[df_train['keypoints'].apply(lambda x: not isinstance(x, float))]
+            df_test = df_test[df_test['keypoints'].apply(lambda x: not isinstance(x, float))]
 
 
         if config:
