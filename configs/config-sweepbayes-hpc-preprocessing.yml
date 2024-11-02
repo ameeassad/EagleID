@@ -7,9 +7,9 @@ parameters:
   model_architecture:
     values: ['FusionModel']
   wildlife_name:
-    values: ['whaleshark', 'raptors', 'ATRW', 'BirdIndividualID']
+    values: ['whaleshark', 'ATRW', 'BirdIndividualID']
   preprocess_lvl:
-    values: [3, 4, 5]
+    values: [4, 5]
   batch_size:
     values: [64]
   embedding_size:

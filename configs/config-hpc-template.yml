@@ -73,14 +73,14 @@ solver:
 
 re_ranking: True
 
-param_grid:
-  use_grid: False
-  embedding_sizes: [128, 768, 2048]
-  learning_rates: [0.0001, 0.001, 0.005]
-  triplet:
-    margins: [0.2, 0.5, 0.7]
-    mining_types: ['semihard', 'hard']
-  arcface:
-    margins: [0.25,0.5]
-    scales: [32,64]
-    # theta_zeros: [0.1, 0.5, 0.785, 1.0]
+# param_grid:
+#   use_grid: False
+#   embedding_sizes: [128, 768, 2048]
+#   learning_rates: [0.0001, 0.001, 0.005]
+#   triplet:
+#     margins: [0.2, 0.5, 0.7]
+#     mining_types: ['semihard', 'hard']
+#   arcface:
+#     margins: [0.25,0.5]
+#     scales: [32,64]
+#     # theta_zeros: [0.1, 0.5, 0.785, 1.0]

@@ -35,7 +35,7 @@ def get_dataset(config, hardcode=None):
         else:
             config['animal_cat'] = 'fish'
             config['dataset']= '/proj/nobackup/aiforeagles/EDA-whaleshark/'
-            config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_whaleshark.csv'
+            config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_EDAwhaleshark.csv'
 
         dataset = datasets.WhaleSharkID(config['dataset'])
         data = WildlifeDataModule(metadata=dataset.df, config=config, only_cache=True)

@@ -4,6 +4,13 @@ from wildlife_tools.similarity.base import Similarity
 import torch.nn.functional as F
 from utils.triplet_loss_utils import KnnClassifier
 
+"""
+  a = torch.tensor(a).to(device=b.device if isinstance(b, torch.Tensor) else 'cpu')
+/pfs/proj/nobackup/fs/projnb10/aiforeagles/EagleID/utils/metrics.py:109: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  b = torch.tensor(b).to(device=a.device)
+/pfs/proj/nobackup/fs/projnb10/aiforeagles/EagleID/utils/metrics.py:108: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+
+"""
 
 def wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels):
     similarity_function = CosineSimilarity()
