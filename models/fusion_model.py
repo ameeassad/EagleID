@@ -22,7 +22,7 @@ from utils.metrics import compute_distance_matrix, evaluate_recall_at_k, wildlif
 
 class FusionModel(pl.LightningModule):
     def __init__(self, 
-                 backbone_model_name="resnet50", 
+                 backbone_model_name="resnet18", 
                  config=None, pretrained=True, 
                  embedding_size=128, margin=0.2, 
                  mining_type="semihard", 
@@ -33,7 +33,7 @@ class FusionModel(pl.LightningModule):
         super().__init__()
         self.config = config
         if config:
-            backbone_model_name=config['backbone_name'] if config['backbone_name'] else 'resnet50'
+            backbone_model_name=config['backbone_name'] if config['backbone_name'] else 'resnet18'
             self.embedding_size=int(config['embedding_size'])
             margin=config['triplet_loss']['margin']
             mining_type=config['triplet_loss']['mining_type']
@@ -56,6 +56,7 @@ class FusionModel(pl.LightningModule):
         self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=pretrained, num_classes=0, global_pool='', features_only=True)
         if self.preprocess_lvl >= 3:
             num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
+            self.kp_pool = nn.AvgPool2d(kernel_size=2, stride=2)
             self.backbone_kp = timm.create_model(backbone_model_name, pretrained=False, num_classes=0, in_chans=num_kp_channels, global_pool='', features_only=True)
         # Backbone network (ResNet-50 up to layer3)
         # self.backbone = timm.create_model(
@@ -128,6 +129,8 @@ class FusionModel(pl.LightningModule):
         features = self.backbone(x_rgb)[-1]  # Shape: (B, C_rgb, H, W)
         if self.preprocess_lvl >= 3:
             x_kp = x[:, 3:, :, :]
+            x_kp = self.kp_pool(x_kp)
+            x_kp = self.kp_pool(x_kp)
             features_kp = self.backbone_kp(x_kp)[-1]  # Shape: (B, C_kp, H, W)
 
             # Concatenate along channel dimension
