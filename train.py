@@ -102,7 +102,6 @@ def get_trainer(config) -> Trainer:
     accelerator, devices, strategy = get_gpu_settings(config['gpu_ids'], config['n_gpu'])
 
     if config['use_wandb']:
-        wandb.init(project=config['project_name'])
         wandb_logger = WandbLogger(project=config['project_name'], log_model=True)
         wandb_logger.watch(model, log='all', log_freq=10)
         # add multiple hyperparameters
@@ -152,6 +151,9 @@ if __name__ == '__main__':
         config = yaml.safe_load(config_file)
 
     seed_everything(config['seed'], workers=True)
+
+    if config['use_wandb']:
+        wandb.init(project=config['project_name'])
 
     # setup dataset
     data =  get_dataset(config)
