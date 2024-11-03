@@ -9,6 +9,7 @@ from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import seed_everything
+import wandb
 
 from data.combined_datasets import get_dataset
 from models.simple_model import SimpleModel
@@ -18,7 +19,6 @@ from models.efficientnet import EfficientNet
 from models.resnet_plus_model import ResNetPlusModel
 from models.triplet_loss_model import TripletModel
 from utils.gradcam_callback import GradCAMCallback
-from sklearn.model_selection import ParameterGrid
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Train classifier.')
@@ -102,25 +102,26 @@ def get_trainer(config) -> Trainer:
     accelerator, devices, strategy = get_gpu_settings(config['gpu_ids'], config['n_gpu'])
 
     if config['use_wandb']:
+        wandb.init(project=config['project_name'])
         wandb_logger = WandbLogger(project=config['project_name'], log_model=True)
-        wandb_logger.watch(model, log='all', log_freq=20)
+        wandb_logger.watch(model, log='all', log_freq=10)
         # add multiple hyperparameters
-        wandb_logger.experiment.config.update({"model_architecture": config['model_architecture'], 
-                                                "checkpoint": config['checkpoint'],
-                                                "preprocess_lvl": config['preprocess_lvl'],
-                                                "batch_size": config['batch_size'],
-                                                "img_size": config['img_size'], 
-                                                "seed": config['seed'],
-                                                "transforms": str(config['transforms']['mean']) + " / " + str(config['transforms']['std']),
-                                                "optimizer": config['solver']['OPT'],
-                                                "weight_decay": config['solver']['WEIGHT_DECAY'],
-                                                "momentum": config['solver']['MOMENTUM'],
-                                                "base_lr": config['solver']['BASE_LR'],
-                                                "lr_scheduler": config['solver']['LR_SCHEDULER'],
-                                                "lr_decay_rate": config['solver']['LR_DECAY_RATE'],
-                                                "lr_step_size": config['solver']['LR_STEP_SIZE'],
-                                                "lr_step_milestones": config['solver']['LR_STEP_MILESTONES']
-                                                })
+        # wandb_logger.experiment.config.update({"model_architecture": config['model_architecture'], 
+        #                                         "checkpoint": config['checkpoint'],
+        #                                         "preprocess_lvl": config['preprocess_lvl'],
+        #                                         "batch_size": config['batch_size'],
+        #                                         "img_size": config['img_size'], 
+        #                                         "seed": config['seed'],
+        #                                         "transforms": str(config['transforms']['mean']) + " / " + str(config['transforms']['std']),
+        #                                         "optimizer": config['solver']['OPT'],
+        #                                         "weight_decay": config['solver']['WEIGHT_DECAY'],
+        #                                         "momentum": config['solver']['MOMENTUM'],
+        #                                         "base_lr": config['solver']['BASE_LR'],
+        #                                         "lr_scheduler": config['solver']['LR_SCHEDULER'],
+        #                                         "lr_decay_rate": config['solver']['LR_DECAY_RATE'],
+        #                                         "lr_step_size": config['solver']['LR_STEP_SIZE'],
+        #                                         "lr_step_milestones": config['solver']['LR_STEP_MILESTONES']
+        #                                         })
     else:
         wandb_logger = None
 
@@ -160,7 +161,6 @@ if __name__ == '__main__':
     # dataset = datasets.WhaleSharkID(config['dataset'])
     # data = WildlifeDataModule(metadata=dataset.df, config=config, only_cache=True)
     
-    
     model_classes = {
         'TripletModel': TripletModel,
         'FusionModel': FusionModel,
@@ -173,63 +173,22 @@ if __name__ == '__main__':
     if model_class is None:
         raise ValueError(f"Unknown model architecture: {model_name}")
 
-    ##
-    param_grid = config['param_grid']['use_grid']
-    if param_grid == True:
-        config['epochs'] = 20
-        param_grid_triplet = {
-            'embedding_sizes': config['param_grid']['embedding_sizes'],
-            'margins': config['param_grid']['triplet']['margins'],
-            'mining_types': config['param_grid']['triplet']['mining_types'],
-            'learning_rates': config['param_grid']['learning_rates'],
-            }
-        param_grid_arcface = {
-            'scales': config['param_grid']['arcface']['scales'],
-            'margins': config['param_grid']['arcface']['margins'],
-            }
-        grid = ParameterGrid(param_grid_triplet)
-    else:
-        grid = range(1)
-
-    results = []
-
     # setup model
-    for params in grid:
-        if param_grid and config['model_architecture']=='TripletModel':
-            # triplet
-            config['embedding_size'] = params['embedding_sizes']
-            config['triplet_loss']['margin'] = params['margins']
-            config['triplet_loss']['mining_type'] = params['mining_types']
-            config['solver']['BASE_LR'] = params['learning_rates']
-        elif param_grid and config['model_architecture']=='ArcFaceModel':
-            # arcface
-            config['embedding_size'] = params['embedding_sizes']
-            config['arcface']['scale'] = params['scales']
-            config['arcface']['margin'] = params['margins']
-            config['solver']['BASE_LR'] = params['learning_rates']
+    if config['checkpoint']:  # pretrained=True because will load from checkpoint
+        print(f"Loading model {model_name} from checkpoint")
+        model = model_class(config=config, pretrained=False)
+        checkpoint = torch.load(config['checkpoint'])
+        model.load_state_dict(checkpoint["state_dict"])
+    else:
+        print(f"Start training {model_name} from pretrained model")
+        model = model_class(config=config, pretrained=True)
 
-        if config['checkpoint']:  # pretrained=True because will load from checkpoint
-            print(f"Loading model {model_name} from checkpoint")
-            model = model_class(config=config, pretrained=False)
-            checkpoint = torch.load(config['checkpoint'])
-            model.load_state_dict(checkpoint["state_dict"])
-        else:
-            print(f"Start training {model_name} from pretrained model")
-            model = model_class(config=config, pretrained=True)
+    trainer = get_trainer(config)
 
-        trainer = get_trainer(config)
+    print('Args:')
+    pprint(args.__dict__)
+    print('configuration:')
+    pprint(config)
 
-        print('Args:')
-        pprint(args.__dict__)
-        print('configuration:')
-        pprint(config)
-
+    trainer.fit(model, data)
         
-        trainer.fit(model, data)
-        
-        if param_grid:
-            results.append((params, trainer.callback_metrics['train/loss']))
-
-    if param_grid:
-        best_params = sorted(results, key=lambda x: x[1])[0]
-        print(f'Best parameters: {best_params[0]}, Validation Loss: {best_params[1]}')

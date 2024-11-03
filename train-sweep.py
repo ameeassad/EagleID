@@ -161,7 +161,6 @@ def get_model(config):
 
 
 def sweep_iteration():
-    wandb.init(project="sweep", config =config_yml)
     config=wandb.config
     print(config)
 

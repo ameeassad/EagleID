@@ -7,16 +7,16 @@ wildlife_name: whaleshark
 animal_cat: fish
 outdir: results
 dataset: /proj/nobackup/aiforeagles/EDA-whaleshark/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_whaleshark.csv
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_EDAwhaleshark.csv
 splitter: closed
 split_ratio: 0.8
 
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
 
-model_architecture: # TripletModel, FusionModel, EfficientNet, TransformerModel
-backbone_name: # efficientnet_b0, resnet50, swin_tiny_patch4_window7_224
+model_architecture: FusionModel # TripletModel, FusionModel, EfficientNet, TransformerModel
+backbone_name: resnet50 # efficientnet_b0, resnet50, swin_tiny_patch4_window7_224
 checkpoint: 
-preprocess_lvl: 2 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
+preprocess_lvl: 5 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
 
 batch_size: 64 # 32, 64, 128 (Larger can provide more diverse triplets in each batch -> impprove quality of mined triplets)
 img_size: 224 # 224, 256, 384, 512
@@ -57,8 +57,8 @@ solver:
   OPT: adam  # adam, SGD
   WEIGHT_DECAY: 0.0001 # 0.001, 0.0001 (small dataset)
   MOMENTUM: 0.9  # only when OPT is sgd
-  BASE_LR: 0.0001
-  LR_SCHEDULER: step  # step, multistep, reduce_on_plateau
+  BASE_LR: 0.001
+  LR_SCHEDULER: reduce_on_plateau  # step, multistep, reduce_on_plateau
   LR_DECAY_RATE: 0.1
   LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
   LR_STEP_MILESTONES: [20, 30]  # only when LR_SCHEDULER is multistep
@@ -72,15 +72,3 @@ solver:
   lr_decay: 0.8
 
 re_ranking: True
-
-param_grid:
-  use_grid: False
-  embedding_sizes: [128, 768, 2048]
-  learning_rates: [0.0001, 0.001, 0.005]
-  triplet:
-    margins: [0.2, 0.5, 0.7]
-    mining_types: ['semihard', 'hard']
-  arcface:
-    margins: [0.25,0.5]
-    scales: [32,64]
-    # theta_zeros: [0.1, 0.5, 0.785, 1.0]
