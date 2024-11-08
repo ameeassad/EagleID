@@ -1,0 +1,10 @@
+local:
+  base_dir: /Users/amee/Documents/code/master-thesis
+  dataset:
+    raptors:
+    BirdIndividualID:
+  cache_path:
+    raptors: ${local.base_dir}/training_config.yaml
+    BirdIndividualID: ${local.base_dir}/checkpoint.pth
+
+hpc:

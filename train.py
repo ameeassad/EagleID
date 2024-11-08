@@ -25,6 +25,9 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         '--config', type=str, required=True, default="./config.yaml", help='Path to config yaml file'
     )
+    # parser.add_argument(
+    #     '--test-local', action='store_true', help='Test local training'
+    # )
     args = parser.parse_args()
     return args
 

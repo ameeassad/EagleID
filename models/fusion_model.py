@@ -132,8 +132,12 @@ class FusionModel(pl.LightningModule):
             x_kp = self.kp_pool(x_kp)
             x_kp = self.kp_pool(x_kp)
             features_kp = self.backbone_kp(x_kp)[-1]  # Shape: (B, C_kp, H, W)
-
+            # # Upsample features_kp
+            # features_kp = F.interpolate(features_kp, size=features.shape[2:], mode='bilinear', align_corners=False)
+        
             # Concatenate along channel dimension
+            print(f"features shape: {features.shape}")
+            print(f"features_kp_resized shape: {features_kp.shape}")
             features = torch.cat((features, features_kp), dim=1)  # Shape: (B, C_rgb + C_kp, H, W)
 
         # Global pooling

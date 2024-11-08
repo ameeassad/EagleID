@@ -20,7 +20,7 @@ from wildlife_tools.data.dataset import WildlifeDataset
 
 import data. transforms as t
 from data.transforms import RGBTransforms, ResizeAndPadRGB, ValTransforms, SynchTransforms, resize_and_pad, rotate_image
-from data.data_utils import SplitQueryDatabase
+from data.data_utils import SplitQueryDatabase, analyze_split
 from data.raptors_wildlife import RaptorsWildlife
 
 from preprocess.preprocess_utils import create_mask, create_skeleton_channel, create_multichannel_heatmaps
@@ -44,7 +44,7 @@ class Wildlife(WildlifeDataset):
         col_path: str = "path",
         col_label: str = "identity", 
         load_label: bool = True,
-        chosen_split: str = "gallery", 
+        # chosen_split: str = "gallery", 
         col_label_idx: str = None,
     ):    
         super().__init__(
@@ -161,7 +161,11 @@ class Wildlife(WildlifeDataset):
 
         # Mask background using segmentation mask and crop to bounding box.
         elif self.img_load in ["bbox_mask", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
-            mask = mask_coco.decode(segmentation).astype("bool")
+            try:
+                mask = mask_coco.decode(segmentation).astype("bool")
+            except:
+                print(f"Error with segmentation: {segmentation}")
+                mask = mask_coco.decode(segmentation).astype("bool")
             img = Image.fromarray(img * mask[..., np.newaxis])
             img = img.crop((bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]))
 
@@ -278,7 +282,23 @@ class Wildlife(WildlifeDataset):
     
 
 class WildlifeDataModule(pl.LightningDataModule):
-    def __init__(self, metadata, config = None, data_dir="", preprocess_lvl=0, batch_size=8, size=256, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], num_workers=2, cache_path="../dataset/dataframe/cache.csv", animal_cat='bird', splitter ='closed', only_cache=False):
+    def __init__(self, 
+                 metadata, 
+                 config = None, 
+                 data_dir="", 
+                 preprocess_lvl=0, 
+                 batch_size=8, 
+                 size=224, 
+                 mean=[0.485, 0.456, 0.406], 
+                 std=[0.229, 0.224, 0.225], 
+                 num_workers=2, 
+                 cache_path="../dataset/dataframe/cache.csv", 
+                 animal_cat='bird', 
+                 splitter ='closed', 
+                 only_cache=False,
+                 wildlife_names=None,
+                ):
+        # if using config, does not consider rest of parameters
         super().__init__()
         self.config = config
         self.metadata = metadata
@@ -295,6 +315,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.animal_cat = config['animal_cat']
             self.splitter = config['splitter']
             self.only_cache = config['only_cache']
+            self.wildlife_names = config['wildlife_name']
         else:
             self.data_dir = data_dir
             self.num_workers = num_workers
@@ -308,6 +329,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.animal_cat = animal_cat
             self.splitter = splitter
             self.only_cache = only_cache
+            self.wildlife_names = wildlife_names
 
         if self.preprocess_lvl == 3:
             resize_and_pad = t.ResizeAndPadBoth(self.size, skeleton=True)
@@ -340,57 +362,88 @@ class WildlifeDataModule(pl.LightningDataModule):
         if 'date' in self.metadata.columns and self.metadata['date'].isna().any():
             self.metadata.loc[pd.isna(self.metadata['date']), 'date'] = "unknown" 
         
-        if self.splitter == 'closed':
-            splitter = splits.ClosedSetSplit(self.split_ratio) # All individuals are both in the training and testing set.
-        elif self.splitter == 'open':
-            splitter = splits.OpenSetSplit(self.split_ratio, 0.1) # Some individuals are in the testing but not in the training set
-        for idx_train, idx_test in splitter.split(metadata):
-            splits.analyze_split(self.metadata, idx_train, idx_test)
+        # if self.splitter == 'closed':
+        #     splitter = splits.ClosedSetSplit(self.split_ratio) # All individuals are both in the training and testing set.
+        # elif self.splitter == 'open':
+        #     splitter = splits.OpenSetSplit(self.split_ratio, 0.1) # Some individuals are in the testing but not in the training set
+        # for idx_train, idx_test in splitter.split(metadata):
+        #     analyze_split(self.metadata, idx_train, idx_test)
 
-        df_train, df_test = self.metadata.loc[idx_train], metadata.loc[idx_test]
-        df_train.reset_index(drop=True, inplace=True)
-        df_test.reset_index(drop=True, inplace=True)
+        # df_train, df_test = self.metadata.loc[idx_train], metadata.loc[idx_test]
+        # df_train.reset_index(drop=True, inplace=True)
+        # df_test.reset_index(drop=True, inplace=True)
 
-        print(f"Train set size before pre-processing: {len(df_train)}")
-        print(f"Test set size before pre-processing: {len(df_test)}")
+        # print(f"Train set size before pre-processing: {len(df_train)}")
+        # print(f"Test set size before pre-processing: {len(df_test)}")
+
+        if self.only_cache:
+            cache_df = pd.read_csv(self.cache_path)
+            df_all = cache_df.copy()
+            df_all = self.clean_segmentation(df_all)
+            df_all = df_all[df_all['keypoints'].apply(lambda x: not isinstance(x, float))]
+        else:
+            df_all = metadata.copy()
+        print(f"Dataset size before pre-processing: {len(df_all)}")
 
         # preprocessing
-        if self.preprocess_lvl > 0: # 1: bounding box cropped image or 2: masked image
+        if self.preprocess_lvl > 0 and not self.only_cache: # 1: bounding box cropped image or 2: masked image
             from preprocess.segmenter import add_segmentations
 
-            df_train = add_segmentations(df_train, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
-            df_test = add_segmentations(df_test, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
+            # df_train = add_segmentations(df_train, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
+            # df_test = add_segmentations(df_test, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
 
             # print(f"df_train: {len(df_train)}, columns: {df_train.columns} and values: {df_train.iloc[0]}")
             # print(f"df_query: {len(df_query)}, columns: {df_query.columns} and values: {df_query.iloc[0]}")
             # print(f"df_gallery: {len(df_gallery)}, columns: {df_gallery.columns} and values: {df_gallery.iloc[0]}")
 
-            df_train = self.clean_segmentation(df_train)
-            df_test = self.clean_segmentation(df_test)
-            # df_gallery = self.clean_segmentation(df_gallery)
+            # df_train = self.clean_segmentation(df_train)
+            # df_test = self.clean_segmentation(df_test)
+
+            df_all = add_segmentations(metadata, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
+            df_all = self.clean_segmentation(df_all)
+
         
-        if self.preprocess_lvl >= 3: # 3: masked + pose (skeleton) image in 1 channel or 4: masked + body part clusters in channels
+        if self.preprocess_lvl >= 3 and not self.only_cache: # 3: masked + pose (skeleton) image in 1 channel or 4: masked + body part clusters in channels
             from preprocess.mmpose_fill import fill_keypoints, get_skeleton_info, get_keypoints_info
 
             self.keypoints = get_keypoints_info()
             self.skeleton = get_skeleton_info()
 
-            df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
-            df_test = fill_keypoints(df_test, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
+            # df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
+            # df_test = fill_keypoints(df_test, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
 
             # remove 'float' keypoints because NaN is treated as float
-            df_train = df_train[df_train['keypoints'].apply(lambda x: not isinstance(x, float))]
-            df_test = df_test[df_test['keypoints'].apply(lambda x: not isinstance(x, float))]
+            # df_train = df_train[df_train['keypoints'].apply(lambda x: not isinstance(x, float))]
+            # df_test = df_test[df_test['keypoints'].apply(lambda x: not isinstance(x, float))]
 
+            df_all = fill_keypoints(df_all, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
+            df_all = df_all[df_all['keypoints'].apply(lambda x: not isinstance(x, float))]
+
+
+        # # Remove only one image per individual
+        # train_counts = df_train['identity'].value_counts()
+        # train_valid_identities = train_counts[df_train['identity'].value_counts() > 1].index
+        # # Filter the dataframe
+        # df_train = df_train[df_train['identity'].isin(train_valid_identities)].reset_index(drop=True)
+        counts = df_all['identity'].value_counts()
+        valid_identities = counts[df_all['identity'].value_counts() > 1].index
+        # Filter the dataframe
+        df_all = df_all[df_all['identity'].isin(valid_identities)].reset_index(drop=True)
+
+
+        if self.splitter == 'closed':
+            splitter = splits.ClosedSetSplit(self.split_ratio) # All individuals are both in the training and testing set.
+        elif self.splitter == 'open':
+            splitter = splits.OpenSetSplit(self.split_ratio, 0.1) # Some individuals are in the testing but not in the training set
+        for idx_train, idx_test in splitter.split(df_all):
+            analyze_split(df_all, idx_train, idx_test)
+
+        df_train, df_test = df_all.loc[idx_train], df_all.loc[idx_test]
+        df_train.reset_index(drop=True, inplace=True)
+        df_test.reset_index(drop=True, inplace=True)
 
         if config:
             config['arcface_loss']['n_classes'] = len(df_train['identity'].unique())
-
-        # Remove only one image per individual
-        train_counts = df_train['identity'].value_counts()
-        train_valid_identities = train_counts[df_train['identity'].value_counts() > 1].index
-        # Filter the dataframe
-        df_train = df_train[df_train['identity'].isin(train_valid_identities)].reset_index(drop=True)
 
         print("Training Set")
         print(f"Length: {len(df_train)}")
