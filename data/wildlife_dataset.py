@@ -161,11 +161,7 @@ class Wildlife(WildlifeDataset):
 
         # Mask background using segmentation mask and crop to bounding box.
         elif self.img_load in ["bbox_mask", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
-            try:
-                mask = mask_coco.decode(segmentation).astype("bool")
-            except:
-                print(f"Error with segmentation: {segmentation}")
-                mask = mask_coco.decode(segmentation).astype("bool")
+            mask = mask_coco.decode(segmentation).astype("bool")
             img = Image.fromarray(img * mask[..., np.newaxis])
             img = img.crop((bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]))
 
@@ -534,6 +530,8 @@ class WildlifeDataModule(pl.LightningDataModule):
         df[segmentation_col] = df[segmentation_col].apply(self.parse_segmentation)
         # Drop rows where segmentation is None (invalid)
         df_cleaned = df.dropna(subset=[segmentation_col])
+        #DROP ROWS where seg is "nan" float value
+        df_cleaned = df_cleaned[df_cleaned[segmentation_col].apply(lambda x: not isinstance(x, float))]
         print(f"Removed {len(df) - len(df_cleaned)} rows with invalid segmentation data.")
         return df_cleaned
     

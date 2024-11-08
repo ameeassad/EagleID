@@ -13,14 +13,14 @@ split_ratio: 0.8
 
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
 
-model_architecture: EfficientNet # TripletModel, FusionModel, EfficientNet, TransformerModel
-backbone_name: efficientnet_b0 # swin_tiny_patch4_window7_224, efficientnet_b0, resnet18
+model_architecture: FusionModel # TripletModel, FusionModel, EfficientNet, TransformerModel
+backbone_name: resnet18 # swin_tiny_patch4_window7_224, efficientnet_b0, resnet18
 checkpoint: 
 preprocess_lvl: 3 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
 
 batch_size: 32 # 32, 64, 128 (Larger can provide more diverse triplets in each batch -> impprove quality of mined triplets)
 img_size: 224 # 224, 256, 384, 512
-epochs: 2
+epochs: 1
 save_interval: 10
 n_gpu: 0
 num_workers: 2

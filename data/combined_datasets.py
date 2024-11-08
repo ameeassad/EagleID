@@ -121,31 +121,20 @@ def get_dataset(config, hardcode=None):
             data = WildlifeReidDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
     else:  # combined datasets -- only works with cache
-        # in DataModule ( splits and gets segs, keypoints)
-        # config['wildlife_name'] = list
         if 'raptors' and 'BirdIndividualID' in config['wildlife_name'] and len(config['wildlife_name']) == 2:
             if config['use_wandb'] == True:
-                wandb.config.update({"animal_cat": ['bird', 
-                                                    'bird'], 
-                                    "dataset": ['/proj/nobackup/aiforeagles/raptor_individuals_cropped/', 
-                                                '/proj/nobackup/aiforeagles/BirdIndividualID/'],
-                                    "cache_path": ['/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv', 
-                                                   '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_BirdIndividualID.csv'],
-                                    "cache_only": True, 
-                                    }, allow_val_change=True)
+                wandb.config.update({"animal_cat": ['bird','bird'], 
+                                    "dataset": '/proj/nobackup/aiforeagles/',
+                                    "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_birds.csv',
+                                    "cache_only": True, }, allow_val_change=True)
             else:
-                # config['animal_cat'] = ['bird', 
-                #                         'bird']
-                # config['dataset']= ['/proj/nobackup/aiforeagles/raptor_individuals_cropped/', 
-                #                     '/proj/nobackup/aiforeagles/BirdIndividualID/']
-                # config['cache_path']= ['/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv', 
-                #                        '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_BirdIndividualID.csv']
-                # config['cache_only']= True
-                config['animal_cat'] = ['bird', 
-                                        'bird']
+                config['animal_cat'] = ['bird', 'bird']
+                config['dataset']= '/proj/nobackup/aiforeagles/'
+                config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_birds.csv'
+                config['cache_only']= True
+
                 config['dataset']= '/Users/amee/Documents/code/master-thesis/datasets/'
                 config['cache_path']= '/Users/amee/Documents/code/master-thesis/EagleID/dataset/dataframe/cache_birds.csv'
-                config['cache_only']= True
 
             raptor_path = os.path.join(config['dataset'], 'raptor_individuals_cropped')
             birds_path = os.path.join(config['dataset'], 'BirdIndividualID')
@@ -159,9 +148,42 @@ def get_dataset(config, hardcode=None):
             dataset_df = pd.concat([dataset1.df, dataset2.df], ignore_index=True)
 
             data = WildlifeDataModule(metadata=dataset_df, config = config)
-        elif config['wildlife_name'] == 'MULTI_SPECIES':
-            #TODO
-            pass
+        elif 'raptors' and 'BirdIndividualID' and 'ATRW' and 'Whaleshark' in config['wildlife_name'] and len(config['wildlife_name']) == 4:
+            if config['use_wandb'] == True:
+                wandb.config.update({"animal_cat": ['bird','bird', 'mammal', 'fish'], 
+                                    "dataset": '/proj/nobackup/aiforeagles/',
+                                    "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_multispecies.csv',
+                                    "cache_only": True, }, allow_val_change=True)
+            else:
+                config['animal_cat'] = ['bird', 'bird', 'mammal', 'fish']
+                config['dataset']= '/proj/nobackup/aiforeagles/'
+                config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_multispecies.csv'
+                config['cache_only']= True
+
+                config['dataset']= '/Users/amee/Documents/code/master-thesis/datasets/'
+                config['cache_path']= '/Users/amee/Documents/code/master-thesis/EagleID/dataset/dataframe/cache_multispecies.csv'
+
+            raptor_path = os.path.join(config['dataset'], 'raptor_individuals_cropped')
+            birds_path = os.path.join(config['dataset'], 'BirdIndividualID')
+            atrw_path = os.path.join(config['dataset'], 'ATRW')
+            whaleshark_path = os.path.join(config['dataset'], 'EDA-whaleshark')
+
+            dataset1 = Raptors(root=raptor_path, include_video=False)
+            dataset1.df['wildlife_name'] = 'raptors'
+            dataset1.df['path'] = dataset1.df['path'].apply(lambda x: os.path.join('raptor_individuals_cropped', x))
+            dataset2 = datasets.BirdIndividualID(birds_path)
+            dataset2.df['wildlife_name'] = 'BirdIndividualID'
+            dataset2.df['path'] = dataset2.df['path'].apply(lambda x: os.path.join('BirdIndividualID', x))
+            dataset3 = datasets.WhaleSharkID(whaleshark_path)
+            dataset3.df['wildlife_name'] = 'whaleshark'
+            dataset3.df['path'] = dataset3.df['path'].apply(lambda x: os.path.join('EDA-whaleshark', x))
+            dataset4 = datasets.ATRW(atrw_path)
+            dataset4.df['wildlife_name'] = 'ATRW'
+            dataset4.df['path'] = dataset4.df['path'].apply(lambda x: os.path.join('ATRW', x))
+
+            dataset_df = pd.concat([dataset1.df, dataset2.df, dataset3.df, dataset4.df], ignore_index=True)
+
+            data = WildlifeDataModule(metadata=dataset_df, config = config)
         else:
             raise ValueError(f"Unknown dataset {config['wildlife_name']}")
     
