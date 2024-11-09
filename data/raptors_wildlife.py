@@ -177,7 +177,24 @@ class Raptors(datasets.DatasetFactory):
             return int(match.group(0))  # Return the year as a string
         return int(2000)
 
-    
+class GoldensWildlife(Raptors):
+    """
+    Calls on Raptors directory and creates the dataset but only for golden eagles.
+    """
+    def __init__(
+        self,
+        df = None,
+        include_video = True,
+        root: str | None = None,
+        **kwargs
+    ):
+        if df is None:
+            temp_raptors = Raptors(root=root, include_video=include_video, **kwargs)
+            new_df = temp_raptors.df[temp_raptors.df['species'] == 'goleag'].reset_index(drop=True)
+        
+        # Pass the filtered df to the parent class to initialize it directly
+        super().__init__(root=root, df=new_df, include_video=include_video, **kwargs)
+
 class RaptorsWildlife(WildlifeDataset):
     """
     Custom Dataset for Raptors, inheriting from WildlifeDataset.
@@ -374,28 +391,6 @@ class RaptorsWildlife(WildlifeDataset):
     
     def get_df(self) -> pd.DataFrame:
         return self.metadata
-
-# class GoldensWildlife(RaptorsWildlife):
-#     """
-#     Calls on Raptors directory and creates the dataset but only for golden eagles.
-#     """
-#     def __init__(
-#         self,
-#         metadata: pd.DataFrame | None = None,
-#         root: str | None = None,
-#         transform: callable = None,
-#         **kwargs
-#     ):
-#         if metadata is None:
-#             raptor_dataset = Raptors(root)
-#             metadata = raptor_dataset.df[raptor_dataset.df['species'] == 'goleag']
-#         else:
-#             metadata = metadata[metadata['species'] == 'goleag']
-
-#         super().__init__(metadata=metadata, root=root, transform=transform, **kwargs)
-#         # if metadata is None:
-#         #     raptor_dataset = Raptors(root)
-#         #     metadata = raptor_dataset.df['species'] == 'goleag'
     
 class WildlifeReidDataModule(pl.LightningDataModule):
     def __init__(self, metadata, config = None, data_dir="", preprocess_lvl=0, batch_size=8, size=256, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], num_workers=2, cache_path="../dataset/dataframe/cache.csv", animal_cat='bird', splitter ='closed', only_cache=False):

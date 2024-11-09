@@ -1,5 +1,5 @@
 from wildlife_datasets import analysis, datasets, loader
-from data.raptors_wildlife import Raptors, WildlifeReidDataModule
+from data.raptors_wildlife import Raptors, GoldensWildlife
 from data.wildlife_dataset import WildlifeDataModule
 import os
 import sys
@@ -29,6 +29,20 @@ def get_dataset(config, hardcode=None):
                 config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv'
 
             dataset = Raptors(root=config['dataset'], include_video=False)
+            data = WildlifeDataModule(metadata=dataset.df, config = config)
+
+        elif config['wildlife_name'] == 'goleag':
+            if config['use_wandb'] == True:
+                wandb.config.update({"animal_cat": "bird", 
+                                    "dataset": '/proj/nobackup/aiforeagles/raptor_individuals_cropped/',
+                                    "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/goleag_cache.csv'
+                                    }, allow_val_change=True)
+            else:
+                config['animal_cat'] = 'bird'
+                config['dataset']= '/proj/nobackup/aiforeagles/raptor_individuals_cropped/'
+                config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/goleag_cache.csv'
+
+            dataset = GoldensWildlife(root=config['dataset'], include_video=False)
             data = WildlifeDataModule(metadata=dataset.df, config = config)
         
         elif config['wildlife_name'] == 'whaleshark':
@@ -71,7 +85,7 @@ def get_dataset(config, hardcode=None):
                 config['dataset']= '/proj/nobackup/aiforeagles/BirdIndividualID/'
                 config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_BirdIndividualID.csv'
             dataset = datasets.BirdIndividualID(config['dataset'])
-            data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+            data = WildlifeDataModule(metadata=dataset.df, config=config)
             
         elif config['wildlife_name'] == 'GiraffeZebraID':
             # try to get zebras only because giraffes is really close up
@@ -80,35 +94,35 @@ def get_dataset(config, hardcode=None):
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'HyenaID2022':
             dataset = datasets.HyenaID2022(config['dataset'])
-            data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+            data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'IPanda50':
             dataset = datasets.IPanda50(config['dataset'])
-            data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+            data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'LeopardID2022':
             dataset = datasets.LeopardID2022(config['dataset'])
-            data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+            data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'LionData':
             dataset = datasets.LionData(config['dataset'])
-            data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+            data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'MPDD':
             dataset = datasets.MPDD(config['dataset'])
-            data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+            data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'NyalaData':
             dataset = datasets.NyalaData(config['dataset'])
-            data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+            data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'PolarBearVidID':
             dataset = datasets.PolarBearVidID(config['dataset'])
-            data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+            data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'SealIDSegmented':
             dataset = datasets.SealIDSegmented(config['dataset'])
-            data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+            data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'SeaTurtleID2022':
             # don't use bbox (it is only face)
@@ -118,7 +132,7 @@ def get_dataset(config, hardcode=None):
         elif config['wildlife_name'] == 'StripeSpotter': 
             # don't use bbox
             dataset = datasets.StripeSpotter(config['dataset'])
-            data = WildlifeReidDataModule(metadata=dataset.df, config=config)
+            data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
     else:  # combined datasets -- only works with cache
         if 'raptors' and 'BirdIndividualID' in config['wildlife_name'] and len(config['wildlife_name']) == 2:

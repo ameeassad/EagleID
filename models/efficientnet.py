@@ -70,7 +70,9 @@ class EfficientNet(pl.LightningModule):
             self.re_ranking=re_ranking
             self.distance_matrix = 'euclidean'
             outdir=outdir
-        
+
+
+        # preprocess lvl 3: RuntimeError: Given groups=1, weight of size [32, 4, 3, 3], expected input[32, 320, 7, 7] to have 4 channels, but got 320 channels instead
 
         if self.backbone_model_name not in ['efficientnet_b0','efficientnet_b3','efficientnetv2_rw']:
             raise ValueError(f"Backbone model {self.backbone_model_name} not supported.")
@@ -94,29 +96,37 @@ class EfficientNet(pl.LightningModule):
         if self.preprocess_lvl >= 3:
             in_channels = calculate_num_channels(self.preprocess_lvl)
             # Get the first convolutional layer
-            first_conv = list(self.backbone.children())[0]
-            if isinstance(first_conv, nn.Conv2d):
-                new_conv = nn.Conv2d(
-                    in_channels=in_channels,
-                    out_channels=first_conv.out_channels,
-                    kernel_size=first_conv.kernel_size,
-                    stride=first_conv.stride,
-                    padding=first_conv.padding,
-                    bias=first_conv.bias is not None
-                )
-                # Copy weights from the existing conv layer
-                with torch.no_grad():
-                    new_conv.weight[:, :first_conv.in_channels] = first_conv.weight
-                self.backbone.conv_stem = new_conv  # or set the appropriate attribute
+            # Depending on the backbone, it might be 'conv_stem' or 'conv1'
+            if hasattr(self.backbone, 'conv_stem'):
+                first_conv = self.backbone.conv_stem
+                conv_attr = 'conv_stem'
+            elif hasattr(self.backbone, 'conv1'):
+                first_conv = self.backbone.conv1
+                conv_attr = 'conv1'
+            else:
+                raise AttributeError("Backbone model does not have 'conv_stem' or 'conv1' attribute.")
 
-            # Initialize weights of the new conv layer using Kaiming normalization
-            nn.init.kaiming_normal_(new_conv.weight, mode='fan_out', nonlinearity='relu')
+            # Create a new convolutional layer with the desired number of input channels
+            new_conv = nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=first_conv.out_channels,
+                kernel_size=first_conv.kernel_size,
+                stride=first_conv.stride,
+                padding=first_conv.padding,
+                bias=first_conv.bias is not None
+            )
+            # Copy weights from the existing conv layer for the first few channels
+            with torch.no_grad():
+                if in_channels <= first_conv.in_channels:
+                    new_conv.weight[:, :in_channels, :, :] = first_conv.weight[:, :in_channels, :, :]
+                else:
+                    new_conv.weight[:, :first_conv.in_channels, :, :] = first_conv.weight
+                    # Initialize additional channels if needed
+                    if in_channels > first_conv.in_channels:
+                        nn.init.kaiming_normal_(new_conv.weight[:, first_conv.in_channels:, :, :], mode='fan_out', nonlinearity='relu')
 
             # Replace the old convolutional layer with the new one
-            if hasattr(self.backbone, 'conv_head'):
-                self.backbone.conv_head = new_conv
-            else:
-                self.backbone.conv1 = new_conv
+            setattr(self.backbone, conv_attr, new_conv)
 
         # Determine the number of input features for the final layer
         # self.final_in_features = self.backbone.classifier.in_features

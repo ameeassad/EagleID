@@ -1,0 +1,10 @@
+name: sweeping-bayes
+method: bayes
+metric:
+  name: train/loss
+  goal: minimize
+parameters:
+  preprocess_lvl:
+    values: [1, 2, 3, 4, 5]
+   
+

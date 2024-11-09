@@ -180,6 +180,9 @@ if __name__ == '__main__':
     config_file_path = yaml.safe_load(args.config)
     with open(config_file_path, 'r') as config_file:
         config_yml = yaml.safe_load(config_file)
+    
+    if type(config_yml['only_cache']) != list:
+        config_yml['only_cache'] = [config_yml['only_cache'], config_yml['only_cache']]
 
     sweep_params_path = yaml.safe_load(args.sweep_config)
     with open(sweep_params_path, 'r') as sweep_file:

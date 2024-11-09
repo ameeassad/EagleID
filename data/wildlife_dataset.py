@@ -372,17 +372,19 @@ class WildlifeDataModule(pl.LightningDataModule):
         # print(f"Train set size before pre-processing: {len(df_train)}")
         # print(f"Test set size before pre-processing: {len(df_test)}")
 
-        if self.only_cache:
+        if self.only_cache[0]:
             cache_df = pd.read_csv(self.cache_path)
+            print(f"Dataset size before pre-processing and cleaning: {len(cache_df)}")
             df_all = cache_df.copy()
             df_all = self.clean_segmentation(df_all)
-            df_all = df_all[df_all['keypoints'].apply(lambda x: not isinstance(x, float))]
+            if self.only_cache[1]:
+                df_all = df_all[df_all['keypoints'].apply(lambda x: not isinstance(x, float))]
         else:
             df_all = metadata.copy()
-        print(f"Dataset size before pre-processing: {len(df_all)}")
+            print(f"Dataset size before pre-processing and cleaning: {len(df_all)}")
 
         # preprocessing
-        if self.preprocess_lvl > 0 and not self.only_cache: # 1: bounding box cropped image or 2: masked image
+        if self.preprocess_lvl > 0 and not self.only_cache[0]: # 1: bounding box cropped image or 2: masked image
             from preprocess.segmenter import add_segmentations
 
             # df_train = add_segmentations(df_train, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
@@ -395,11 +397,11 @@ class WildlifeDataModule(pl.LightningDataModule):
             # df_train = self.clean_segmentation(df_train)
             # df_test = self.clean_segmentation(df_test)
 
-            df_all = add_segmentations(metadata, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
+            df_all = add_segmentations(metadata, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache[0])
             df_all = self.clean_segmentation(df_all)
 
         
-        if self.preprocess_lvl >= 3 and not self.only_cache: # 3: masked + pose (skeleton) image in 1 channel or 4: masked + body part clusters in channels
+        if self.preprocess_lvl >= 3 and not self.only_cache[1]: # 3: masked + pose (skeleton) image in 1 channel or 4: masked + body part clusters in channels
             from preprocess.mmpose_fill import fill_keypoints, get_skeleton_info, get_keypoints_info
 
             self.keypoints = get_keypoints_info()
@@ -412,7 +414,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             # df_train = df_train[df_train['keypoints'].apply(lambda x: not isinstance(x, float))]
             # df_test = df_test[df_test['keypoints'].apply(lambda x: not isinstance(x, float))]
 
-            df_all = fill_keypoints(df_all, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
+            df_all = fill_keypoints(df_all, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache[1])
             df_all = df_all[df_all['keypoints'].apply(lambda x: not isinstance(x, float))]
 
 
