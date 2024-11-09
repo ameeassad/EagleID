@@ -1,5 +1,5 @@
-name: sweeping-bayes
-method: bayes
+name: sweeping-preprocess-lvls
+method: grid
 metric:
   name: train/loss
   goal: minimize
