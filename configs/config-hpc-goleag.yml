@@ -3,8 +3,8 @@ notes:
 use_wandb: True
 wandb_entity: winniethepooh
 
-wildlife_name: 
-animal_cat: goleag
+wildlife_name: goleag
+animal_cat: bird
 outdir: results
 dataset: 
 cache_path: 
