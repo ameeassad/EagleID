@@ -193,6 +193,9 @@ if __name__ == '__main__':
 
     # override epochs
     config_yml['epochs'] = 50
+    
+    # Update sweep config to include base parameters from config.yaml
+    sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters']})
 
     sweep_id = wandb.sweep(sweep_config, project="sweep-test")
 
