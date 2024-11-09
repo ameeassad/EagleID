@@ -15,9 +15,6 @@ def get_dataset(config, hardcode=None):
     # if os.path.exists(config['dataset']) is False:
     #         os.makedirs(config['dataset'])
 
-    if config['use_wandb']:
-        wandb.init()
-
     # single datasets
     if type(config['wildlife_name']) != list:
         if config['wildlife_name'] == 'raptors':
