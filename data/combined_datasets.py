@@ -42,7 +42,7 @@ def get_dataset(config, hardcode=None):
                 config['dataset']= '/proj/nobackup/aiforeagles/raptor_individuals_cropped/'
                 config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/goleag_cache.csv'
 
-            dataset = GoldensWildlife(root=config['dataset'], include_video=False)
+            dataset = GoldensWildlife(root=config['dataset'], include_video=True)
             data = WildlifeDataModule(metadata=dataset.df, config = config)
         
         elif config['wildlife_name'] == 'whaleshark':

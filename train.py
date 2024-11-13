@@ -160,6 +160,8 @@ if __name__ == '__main__':
 
     if config['use_wandb']:
         wandb.init(project=config['project_name'])
+        config=wandb.config
+        
 
     # setup dataset
     data =  get_dataset(config)
