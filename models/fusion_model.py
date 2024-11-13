@@ -54,10 +54,15 @@ class FusionModel(pl.LightningModule):
             outdir=outdir
             
         self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=pretrained, num_classes=0, global_pool='', features_only=True)
-        if self.preprocess_lvl >= 3:
+        if self.preprocess_lvl == 3:
             num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
-            self.kp_pool = nn.AvgPool2d(kernel_size=2, stride=2)
+            in_chans = 1 # skeleton
+            # self.kp_pool = nn.AvgPool2d(kernel_size=2, stride=2)
             self.backbone_kp = timm.create_model(backbone_model_name, pretrained=False, num_classes=0, in_chans=num_kp_channels, global_pool='', features_only=True)
+        elif self.preprocess_lvl == 4:
+            in_chans = 3 # parts
+        elif self.preprocess_lvl == 5:
+            in_chans = 1 # heatmaps
         # Backbone network (ResNet-50 up to layer3)
         # self.backbone = timm.create_model(
         #     backbone_model_name, pretrained=pretrained, features_only=True,
@@ -90,8 +95,11 @@ class FusionModel(pl.LightningModule):
             #     self.backbone_img.layer2,
             # )
 
+        # # Global pooling
+        # self.global_pool = nn.AdaptiveAvgPool2d(1)
         # Global pooling
-        self.global_pool = nn.AdaptiveAvgPool2d(1)
+        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.kp_pools = nn.ModuleList([nn.AdaptiveAvgPool2d((1, 1)) for _ in range(num_kp_channels)])
 
         # Embedding layer
         if self.preprocess_lvl >= 3:
