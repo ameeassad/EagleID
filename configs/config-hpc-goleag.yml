@@ -6,8 +6,8 @@ wandb_entity: winniethepooh
 wildlife_name: goleag
 animal_cat: bird
 outdir: results
-dataset: 
-cache_path: 
+dataset: /proj/nobackup/aiforeagles/raptor_individuals_cropped/
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/goleag_cache.csv
 splitter: closed
 split_ratio: 0.8
 
