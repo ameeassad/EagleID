@@ -54,15 +54,20 @@ class FusionModel(pl.LightningModule):
             outdir=outdir
             
         self.backbone = timm.create_model(model_name=backbone_model_name, pretrained=pretrained, num_classes=0, global_pool='', features_only=True)
-        if self.preprocess_lvl == 3:
-            num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
-            in_chans = 1 # skeleton
+        if self.preprocess_lvl >= 3:
+
+            if self.preprocess_lvl == 3:
+                num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
+                in_chans = 1 # skeleton
+                self.backbone_kp = timm.create_model(backbone_model_name, pretrained=False, num_classes=0, in_chans=num_kp_channels, global_pool='', features_only=True)
+            elif self.preprocess_lvl == 4:
+                num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
+                in_chans = 3 # parts each RGB channel
+            elif self.preprocess_lvl == 5:
+                num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
+                in_chans = 1 # heatmap each 1 channel
             # self.kp_pool = nn.AvgPool2d(kernel_size=2, stride=2)
             self.backbone_kp = timm.create_model(backbone_model_name, pretrained=False, num_classes=0, in_chans=num_kp_channels, global_pool='', features_only=True)
-        elif self.preprocess_lvl == 4:
-            in_chans = 3 # parts
-        elif self.preprocess_lvl == 5:
-            in_chans = 1 # heatmaps
         # Backbone network (ResNet-50 up to layer3)
         # self.backbone = timm.create_model(
         #     backbone_model_name, pretrained=pretrained, features_only=True,
@@ -132,29 +137,43 @@ class FusionModel(pl.LightningModule):
         self.lr = lr
 
     def forward(self, x):
-        # Process RGB image
-        x_rgb = x[:, :3, :, :] 
-        features = self.backbone(x_rgb)[-1]  # Shape: (B, C_rgb, H, W)
-        if self.preprocess_lvl >= 3:
-            x_kp = x[:, 3:, :, :]
-            x_kp = self.kp_pool(x_kp)
-            x_kp = self.kp_pool(x_kp)
-            features_kp = self.backbone_kp(x_kp)[-1]  # Shape: (B, C_kp, H, W)
-            # # Upsample features_kp
-            # features_kp = F.interpolate(features_kp, size=features.shape[2:], mode='bilinear', align_corners=False)
+        # Process RGB image through global backbone
+        x_rgb = x[:, :3, :, :]
+        features_rgb = self.backbone(x_rgb)[-1]  # Shape: (B, C_rgb, H, W)
         
-            # Concatenate along channel dimension
-            print(f"features shape: {features.shape}")
-            print(f"features_kp_resized shape: {features_kp.shape}")
-            features = torch.cat((features, features_kp), dim=1)  # Shape: (B, C_rgb + C_kp, H, W)
+        if self.preprocess_lvl >= 3:
+            # Process each keypoint part separately through the keypoint backbone
+            x_kp = x[:, 3:, :, :]
+            kp_features = []
+            if self.preprocess_lvl == 3:
+                kp_feature = self.backbone_kp(x_kp)[-1]  # Single grayscale channel
+                kp_pooled = self.kp_pool(kp_feature).view(kp_feature.size(0), -1)
+                kp_features.append(kp_pooled) 
+            elif self.preprocess_lvl == 4:
+                for i in range(x_kp.shape[1] // 3):  # Assuming 3 channels per part
+                    kp_part = x_kp[:, i*3:(i+1)*3, :, :]
+                    kp_feature = self.backbone_kp(kp_part)[-1]
+                    kp_pooled = self.kp_pools[i](kp_feature).view(kp_feature.size(0), -1)  # Shape: (B, C_kp)
+                    kp_features.append(kp_pooled)
+            elif self.preprocess_lvl == 5:
+                for i in range(x_kp.shape[1]):  # Each channel is a separate grayscale keypoint
+                    kp_part = x_kp[:, i:i+1, :, :]  # Select each single-channel keypoint
+                    kp_feature = self.backbone_kp(kp_part)[-1]
+                    kp_pooled = self.kp_pools[i](kp_feature).view(kp_feature.size(0), -1)  # Shape: (B, C_kp)
+                    kp_features.append(kp_pooled)
+                
+            # Concatenate keypoint features along the channel dimension
+            kp_features = torch.cat(kp_features, dim=1)  # Shape: (B, C_kp_total)
 
-        # Global pooling
-        pooled_features = self.global_pool(features)  # Shape: (B, C_rgb + C_kp, 1, 1)
-        pooled_features = pooled_features.view(pooled_features.size(0), -1)  # Shape: (B, C_rgb + C_kp)
+            # Concatenate RGB features with keypoint features
+            features_rgb_pooled = self.global_pool(features_rgb).view(features_rgb.size(0), -1)  # Shape: (B, C_rgb)
+            features = torch.cat((features_rgb_pooled, kp_features), dim=1)  # Shape: (B, C_rgb + C_kp_total)
+        else:
+            features = self.global_pool(features_rgb).view(features_rgb.size(0), -1)
 
         # Embedding
-        embeddings = self.embedding(pooled_features)
-        embeddings = nn.functional.normalize(embeddings, p=2, dim=1) # L2 normalization
+        embeddings = self.embedding(features)
+        embeddings = nn.functional.normalize(embeddings, p=2, dim=1)  # L2 normalization
         return embeddings
     
     def on_train_start(self): # to run only once: on_train_start / for every val: on_validation_start
