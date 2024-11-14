@@ -59,15 +59,14 @@ class FusionModel(pl.LightningModule):
             if self.preprocess_lvl == 3:
                 num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
                 in_chans = 1 # skeleton
-                self.backbone_kp = timm.create_model(backbone_model_name, pretrained=False, num_classes=0, in_chans=num_kp_channels, global_pool='', features_only=True)
             elif self.preprocess_lvl == 4:
-                num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
+                num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3 // 3
                 in_chans = 3 # parts each RGB channel
             elif self.preprocess_lvl == 5:
                 num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
                 in_chans = 1 # heatmap each 1 channel
             # self.kp_pool = nn.AvgPool2d(kernel_size=2, stride=2)
-            self.backbone_kp = timm.create_model(backbone_model_name, pretrained=False, num_classes=0, in_chans=num_kp_channels, global_pool='', features_only=True)
+            self.backbone_kp = timm.create_model(backbone_model_name, pretrained=False, num_classes=0, in_chans=in_chans, global_pool='', features_only=True)
         # Backbone network (ResNet-50 up to layer3)
         # self.backbone = timm.create_model(
         #     backbone_model_name, pretrained=pretrained, features_only=True,
