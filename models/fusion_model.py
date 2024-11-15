@@ -57,13 +57,13 @@ class FusionModel(pl.LightningModule):
         if self.preprocess_lvl >= 3:
 
             if self.preprocess_lvl == 3:
-                num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
+                num_kp_groups = calculate_num_channels(self.preprocess_lvl) - 3
                 in_chans = 1 # skeleton
             elif self.preprocess_lvl == 4:
-                num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3 // 3
+                num_kp_groups = calculate_num_channels(self.preprocess_lvl) - 3 // 3
                 in_chans = 3 # parts each RGB channel
             elif self.preprocess_lvl == 5:
-                num_kp_channels = calculate_num_channels(self.preprocess_lvl) - 3
+                num_kp_groups = calculate_num_channels(self.preprocess_lvl) - 3
                 in_chans = 1 # heatmap each 1 channel
             # self.kp_pool = nn.AvgPool2d(kernel_size=2, stride=2)
             self.backbone_kp = timm.create_model(backbone_model_name, pretrained=False, num_classes=0, in_chans=in_chans, global_pool='', features_only=True)
@@ -103,7 +103,7 @@ class FusionModel(pl.LightningModule):
         # self.global_pool = nn.AdaptiveAvgPool2d(1)
         # Global pooling
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.kp_pools = nn.ModuleList([nn.AdaptiveAvgPool2d((1, 1)) for _ in range(num_kp_channels)])
+        self.kp_pools = nn.ModuleList([nn.AdaptiveAvgPool2d((1, 1)) for _ in range(num_kp_groups)])
 
         # Embedding layer
         if self.preprocess_lvl >= 3:
@@ -146,7 +146,7 @@ class FusionModel(pl.LightningModule):
             kp_features = []
             if self.preprocess_lvl == 3:
                 kp_feature = self.backbone_kp(x_kp)[-1]  # Single grayscale channel
-                kp_pooled = self.kp_pool(kp_feature).view(kp_feature.size(0), -1)
+                kp_pooled = self.kp_pools[0](kp_feature).view(kp_feature.size(0), -1)
                 kp_features.append(kp_pooled) 
             elif self.preprocess_lvl == 4:
                 for i in range(x_kp.shape[1] // 3):  # Assuming 3 channels per part
