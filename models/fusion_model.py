@@ -67,6 +67,7 @@ class FusionModel(pl.LightningModule):
                 in_chans = 1 # heatmap each 1 channel
             # self.kp_pool = nn.AvgPool2d(kernel_size=2, stride=2)
             self.backbone_kp = timm.create_model("resnet18", pretrained=False, num_classes=0, in_chans=in_chans, global_pool='', features_only=True)
+            self.kp_pools = nn.ModuleList([nn.AdaptiveAvgPool2d((1, 1)) for _ in range(num_kp_groups)])
             # self.keypoint_branch = nn.Sequential(
             #     nn.Conv2d(in_channels=num_kp_channels, out_channels=64, kernel_size=7, stride=2, padding=3, bias=False),
             #     nn.BatchNorm2d(64),
@@ -79,7 +80,6 @@ class FusionModel(pl.LightningModule):
         # Pooling
         # self.global_pool = nn.AdaptiveAvgPool2d(1)
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.kp_pools = nn.ModuleList([nn.AdaptiveAvgPool2d((1, 1)) for _ in range(num_kp_groups)])
 
         # Embedding layer
         if self.preprocess_lvl >= 3:
