@@ -129,6 +129,7 @@ def get_trainer(config) -> Trainer:
 
     trainer_args = {
         'max_epochs': config['epochs'],
+        'log_every_n_steps': 1,
         'callbacks': callbacks,
         'default_root_dir': config['outdir'],
         'accelerator': accelerator,
