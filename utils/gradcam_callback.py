@@ -24,7 +24,7 @@ class GradCAMCallback(Callback):
         self.config = config
         self.outdir = outdir
         self.log_every_n_epochs = log_every_n_epochs
-        self.kp_included = config['preprocess_lvl'] >= 3
+        self.kp_included = config['preprocess_lvl'] >= 3 and config['model_architecture'] == 'FusionModel'
 
     def on_validation_epoch_end(self, trainer, pl_module):
 
@@ -45,13 +45,13 @@ class GradCAMCallback(Callback):
             for batch_idx, batch in enumerate(trainer.val_dataloaders[0]): # first dataloader is the query images & labels
                 x, target, *rest = batch
 
-                if self.kp_included:
-                    # TODO: Implement GradCAM for higher dimension inputs
-                    break
-
                 # Move inputs and targets to the device
                 x = x.to(pl_module.device)
                 target = target.to(pl_module.device)
+
+                if self.kp_included:
+                    x = x[:, :3, :, :] # only take rgb channels
+                    # TODO: Implement GradCAM for higher dimension inputs
 
                 # GradCAM logic (same as before)
                 with torch.enable_grad():
