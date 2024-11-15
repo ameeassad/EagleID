@@ -58,7 +58,7 @@ def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
             model=model, 
             config=config, 
             outdir=config['outdir'], 
-            log_every_n_epochs=1 
+            log_every_n_epochs=10 
         )
         callbacks.append(gradcam_callback)
 

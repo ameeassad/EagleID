@@ -12,7 +12,7 @@ from data.transforms import denormalize
 
 
 class GradCAMCallback(Callback):
-    def __init__(self, model, config, outdir='results', log_every_n_epochs=1):
+    def __init__(self, model, config, outdir='results', log_every_n_epochs=10):
         """
         Args:
             model: The model to use for GradCAM visualizations.
@@ -27,6 +27,10 @@ class GradCAMCallback(Callback):
         self.kp_included = config['preprocess_lvl'] >= 3 and config['model_architecture'] == 'FusionModel'
 
     def on_validation_epoch_end(self, trainer, pl_module):
+
+        # Check if the current epoch is a multiple of log_every_n_epochs
+        if (trainer.current_epoch + 1) % self.log_every_n_epochs != 0:
+            return  # Skip GradCAM computation
 
         # Check if validation dataloader exists
         if not trainer.val_dataloaders:

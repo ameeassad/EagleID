@@ -67,7 +67,7 @@ def get_basic_callbacks(config, model) -> list:
             model=model, 
             config=config, 
             outdir=config['outdir'], 
-            log_every_n_epochs=1 
+            log_every_n_epochs=10
         )
         callbacks.append(gradcam_callback)
 
