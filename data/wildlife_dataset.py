@@ -85,6 +85,26 @@ class Wildlife(WildlifeDataset):
         self.col_path = col_path
         self.col_label = col_label
         self.load_label = load_label
+
+    # Preprocess and cache JSON or metadata:
+    # Use json.loads during data preparation and store the parsed results.
+    # Save processed metadata in a CSV or pickle file for direct loading.
+
+    # Precompute masks, skeleton channels, heatmaps, or other intensive operations and save them 
+    # to disk in a more accessible format (e.g., .npz, .h5, or PyTorch tensors).
+    # Load precomputed data during training: img = load_preprocessed(mask_path)
+    # def preprocess_data(metadata):
+    #     for idx, data in metadata.iterrows():
+    #         img_path = os.path.join(root, data[col_path])
+    #         img = load_image(img_path)  # Load image using cv2 or Pillow
+    #         if "segmentation" in data:
+    #             mask = mask_coco.decode(eval(data["segmentation"])).astype("bool")
+    #             save_preprocessed(mask, path)
+    #         if "keypoints" in data:
+    #             keypoints = eval(data["keypoints"])
+    #             skeleton = create_skeleton_channel(keypoints, ...)
+    #             save_preprocessed(skeleton, path)
+
         
     def get_image(self, path):
         """

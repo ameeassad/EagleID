@@ -54,8 +54,10 @@ class GradCAMCallback(Callback):
                 target = target.to(pl_module.device)
 
                 if self.kp_included:
-                    x = x[:, :3, :, :] # only take rgb channels
                     # TODO: Implement GradCAM for higher dimension inputs
+                    break
+                    x = x[:, :3, :, :] # only take rgb channels
+                    # then run through forward with only rgb
 
                 # GradCAM logic (same as before)
                 with torch.enable_grad():
