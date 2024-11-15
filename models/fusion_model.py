@@ -66,30 +66,7 @@ class FusionModel(pl.LightningModule):
                 num_kp_groups = calculate_num_channels(self.preprocess_lvl) - 3
                 in_chans = 1 # heatmap each 1 channel
             # self.kp_pool = nn.AvgPool2d(kernel_size=2, stride=2)
-            self.backbone_kp = timm.create_model(backbone_model_name, pretrained=False, num_classes=0, in_chans=in_chans, global_pool='', features_only=True)
-        # Backbone network (ResNet-50 up to layer3)
-        # self.backbone = timm.create_model(
-        #     backbone_model_name, pretrained=pretrained, features_only=True,
-        #     out_indices=(0, 1, 2, 3)  # Extract layers up to layer3
-        # )
-        
-        # self.feature_dim = self.backbone.feature_info[-1]['num_chs']
-
-        # Transformation layers for each part
-        # self.part_transforms = nn.ModuleList([
-        #     nn.Sequential(
-        #         nn.Linear(self.feature_dim, self.embedding_size),
-        #         nn.BatchNorm1d(self.embedding_size),
-        #         nn.ReLU(inplace=True)
-        #     ) for _ in range(self.num_parts)
-        # ])
-
-        # if preprocess_lvl >= 3:
-        #     # Backbone for keypoint channels (Define a small CNN or use parts of the main backbone)
-        #     num_kp_channels = calculate_num_channels(preprocess_lvl) - 3
-        #     self.backbone_kp = timm.create_model(
-        #         backbone_model_name, pretrained=False, num_classes=0, in_chans=num_kp_channels, global_pool=''
-        #     )
+            self.backbone_kp = timm.create_model("resnet18", pretrained=False, num_classes=0, in_chans=in_chans, global_pool='', features_only=True)
             # self.keypoint_branch = nn.Sequential(
             #     nn.Conv2d(in_channels=num_kp_channels, out_channels=64, kernel_size=7, stride=2, padding=3, bias=False),
             #     nn.BatchNorm2d(64),
@@ -99,9 +76,8 @@ class FusionModel(pl.LightningModule):
             #     self.backbone_img.layer2,
             # )
 
-        # # Global pooling
+        # Pooling
         # self.global_pool = nn.AdaptiveAvgPool2d(1)
-        # Global pooling
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
         self.kp_pools = nn.ModuleList([nn.AdaptiveAvgPool2d((1, 1)) for _ in range(num_kp_groups)])
 
@@ -112,25 +88,6 @@ class FusionModel(pl.LightningModule):
             total_feature_dim = self.backbone.feature_info[-1]['num_chs']
         self.embedding = nn.Linear(total_feature_dim, embedding_size)
 
-
-        # # Final transformation for concatenated part features
-        # self.final_transform = nn.Sequential(
-        #     nn.Linear(self.embedding_size * self.num_parts, self.embedding_size),
-        #     nn.BatchNorm1d(self.embedding_size),
-        #     nn.ReLU(inplace=True)
-        # )
-        # OR # Fusion layer
-        # Assuming both backbones output the same feature map size and number of channels
-        # self.fusion_layer = nn.Sequential(
-        #     nn.Conv2d(
-        #         in_channels=self.backbone_img.feature_info[-1]['num_chs'] * 2,
-        #         out_channels=self.backbone_img.feature_info[-1]['num_chs'],
-        #         kernel_size=1,
-        #         bias=False
-        #     ),
-        #     nn.BatchNorm2d(self.backbone_img.feature_info[-1]['num_chs']),
-        #     nn.ReLU(inplace=True)
-        # )
         self.loss_fn = losses.TripletMarginLoss(margin=margin)
         self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
         self.lr = lr
