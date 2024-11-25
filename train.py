@@ -14,6 +14,7 @@ import wandb
 from data.combined_datasets import get_dataset
 from models.simple_model import SimpleModel
 from models.fusion_model import FusionModel
+from models.megadescriptor import MegaDescriptor
 from models.transformer_model import TransformerModel
 from models.efficientnet import EfficientNet
 from models.resnet_plus_model import ResNetPlusModel
@@ -79,7 +80,7 @@ def get_gpu_settings(
         tuple[str, int, str]: accelerator, devices, strategy
     """
     if not torch.cuda.is_available():
-        if torch.backends.mps.is_available():
+        if n_gpu>0 and torch.backends.mps.is_available():
             return "mps", 1, None
         else:
             return "cpu", 1, None
@@ -173,6 +174,7 @@ if __name__ == '__main__':
         'FusionModel': FusionModel,
         'TransformerModel': TransformerModel,
         'EfficientNet': EfficientNet,
+        'MegaDescriptor': MegaDescriptor,
     }
     model_name = config['model_architecture']
     model_class = model_classes.get(model_name)

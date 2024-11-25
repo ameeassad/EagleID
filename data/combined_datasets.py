@@ -51,7 +51,7 @@ def get_dataset(config, hardcode=None):
                                     "dataset": '/proj/nobackup/aiforeagles/EDA-whaleshark/',
                                     "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_whaleshark.csv'
                                     }, allow_val_change=True)
-            else:
+            elif not config['dataset'].startswith('/Users'):
                 config['animal_cat'] = 'fish'
                 config['dataset']= '/proj/nobackup/aiforeagles/EDA-whaleshark/'
                 config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_EDAwhaleshark.csv'
@@ -66,7 +66,7 @@ def get_dataset(config, hardcode=None):
                                     "dataset": '/proj/nobackup/aiforeagles/ATRW/',
                                     "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv'
                                     }, allow_val_change=True)
-            else:
+            elif not config['dataset'].startswith('/Users'):
                 config['animal_cat'] = 'mammal'
                 config['dataset']= '/proj/nobackup/aiforeagles/ATRW/'
                 config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv'
@@ -80,7 +80,7 @@ def get_dataset(config, hardcode=None):
                                     "dataset": '/proj/nobackup/aiforeagles/BirdIndividualID/',
                                     "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_BirdIndividualID.csv'
                                     }, allow_val_change=True)
-            else:
+            elif not config['dataset'].startswith('/Users'):
                 config['animal_cat'] = 'bird'
                 config['dataset']= '/proj/nobackup/aiforeagles/BirdIndividualID/'
                 config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_BirdIndividualID.csv'

@@ -26,6 +26,8 @@ class MegaDescriptor(pl.LightningModule):
                  config=None, pretrained=True, 
                  embedding_size=128,
                  lr=0.001, 
+                 scale=50,
+                 n_classes =0,
                  preprocess_lvl=0, 
                  re_ranking=True, 
                  outdir="results"):
@@ -35,7 +37,9 @@ class MegaDescriptor(pl.LightningModule):
             backbone_model_name=config['backbone_name'] if config['backbone_name'] else 'resnet18'
             self.embedding_size=int(config['embedding_size'])
             margin=config['triplet_loss']['margin']
+            scale=config['arcface_loss']['scale']
             mining_type=config['triplet_loss']['mining_type']
+            self.n_classes=config['arcface_loss']['n_classes']
             self.preprocess_lvl=int(config['preprocess_lvl'])
             self.re_ranking=config['re_ranking']
             self.distance_matrix = config['triplet_loss']['distance_matrix']
@@ -46,7 +50,9 @@ class MegaDescriptor(pl.LightningModule):
             backbone_model_name=backbone_model_name
             self.embedding_size=embedding_size
             margin=margin
+            scale=scale
             mining_type=mining_type
+            self.n_classes=n_classes
             self.preprocess_lvl=preprocess_lvl
             self.re_ranking=re_ranking
             self.distance_matrix = 'euclidean'
@@ -54,17 +60,18 @@ class MegaDescriptor(pl.LightningModule):
             
         self.backbone = timm.create_model('hf-hub:BVRA/MegaDescriptor-T-224', num_classes=0, pretrained=True)
 
-        self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)
+        # self.embedder = nn.Linear(self.backbone.feature_info[-1]["num_chs"], embedding_size)
         # self.fc = nn.Linear(self.model.output_size, embedding_size)  # Embedding layer
-        self.loss_fn = losses.TripletMarginLoss(margin=margin)
-        self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
+        self.loss_fn = losses.ArcFaceLoss(num_classes=self.n_classes, embedding_size=self.embedding_size, margin=margin, scale=scale)
         self.lr = lr
 
     def forward(self, x):
         features = self.backbone(x) # Extract features using the backbone
-        embeddings = self.embedder(features) # Project features into the embedding space
-        embeddings = nn.functional.normalize(embeddings, p=2, dim=1)  # L2 normalization
-        return embeddings
+        # embeddings = self.embedder(features)
+        # embeddings = nn.functional.normalize(embeddings, p=2, dim=1)  # L2 normalization
+        # return embeddings
+        features = F.normalize(features, p=2, dim=1)
+        return features
     
     def on_train_start(self): # to run only once: on_train_start / for every val: on_validation_start
         self.eval()
@@ -105,8 +112,7 @@ class MegaDescriptor(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         images, labels = batch
         embeddings = self(images)
-        mined_triplets = self.miner(embeddings, labels)
-        loss = self.loss_fn(embeddings, labels, mined_triplets)
+        loss = self.loss_fn(embeddings, labels)
         self.log("train/loss", loss,  on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
@@ -142,9 +148,10 @@ class MegaDescriptor(pl.LightningModule):
             distmat = compute_distance_matrix(self.distance_matrix, query_embeddings, gallery_embeddings, wildlife=True)
 
         # Compute mAP
-        # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
+        mAP = evaluate_map(distmat, query_labels, gallery_labels)
         mAP1 = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
         mAP5 = evaluate_map(distmat, query_labels, gallery_labels, top_k=5)
+        self.log('val/mAP', mAP)
         self.log('val/mAP1', mAP1)
         self.log('val/mAP5', mAP5)
 
