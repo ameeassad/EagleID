@@ -11,7 +11,7 @@ cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.c
 splitter: closed
 split_ratio: 0.8
 
-only_cache: False # if only_cache, will not run mmpose inference / segmentation and will only use cache results
+only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
 
 model_architecture: FusionModel # TripletModel, FusionModel, EfficientNet, TransformerModel
 backbone_name: resnet50 # efficientnet_b0, resnet50, swin_tiny_patch4_window7_224
