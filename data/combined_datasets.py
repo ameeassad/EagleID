@@ -162,6 +162,33 @@ def get_dataset(config, hardcode=None):
             dataset_df = pd.concat([dataset1.df, dataset2.df], ignore_index=True)
 
             data = WildlifeDataModule(metadata=dataset_df, config = config)
+        elif 'raptors' and 'ATRW' in config['wildlife_name'] and len(config['wildlife_name']) == 2:
+            if config['use_wandb'] == True:
+                wandb.config.update({"animal_cat": ['bird','bird'], 
+                                    "dataset": '/proj/nobackup/aiforeagles/',
+                                    "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_birds.csv',
+                                    "cache_only": True, }, allow_val_change=True)
+            else:
+                config['animal_cat'] = ['bird', 'mammal']
+                config['dataset']= '/proj/nobackup/aiforeagles/'
+                config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_multitype.csv'
+                config['cache_only']= True
+
+                config['dataset']= '/Users/amee/Documents/code/master-thesis/datasets/'
+                config['cache_path']= '/Users/amee/Documents/code/master-thesis/EagleID/dataset/dataframe/cache_multitype.csv'
+
+            raptor_path = os.path.join(config['dataset'], 'raptor_individuals_cropped')
+            birds_path = os.path.join(config['dataset'], 'ATRW')
+
+            dataset1 = Raptors(root=raptor_path, include_video=False)
+            dataset1.df['wildlife_name'] = 'raptors'
+            dataset1.df['path'] = dataset1.df['path'].apply(lambda x: os.path.join('raptor_individuals_cropped', x))
+            dataset2 = datasets.BirdIndividualID(birds_path)
+            dataset2.df['wildlife_name'] = 'ATRW'
+            dataset2.df['path'] = dataset2.df['path'].apply(lambda x: os.path.join('ATRW', x))
+            dataset_df = pd.concat([dataset1.df, dataset2.df], ignore_index=True)
+
+            data = WildlifeDataModule(metadata=dataset_df, config = config)
         elif 'raptors' and 'BirdIndividualID' and 'ATRW' and 'Whaleshark' in config['wildlife_name'] and len(config['wildlife_name']) == 4:
             if config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": ['bird','bird', 'mammal', 'fish'], 

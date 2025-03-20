@@ -46,7 +46,7 @@ arcface_loss:
   n_classes:
 
 early_stopping:
-  enabled: True
+  enabled: False
   monitor: val/loss
   min_delta: 0.0005
   patience: 50
