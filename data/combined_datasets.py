@@ -134,8 +134,10 @@ def get_dataset(config, hardcode=None):
             dataset = datasets.StripeSpotter(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
+        else:
+            raise ValueError(f"Unknown dataset {config['wildlife_name']}")
     else:  # combined datasets -- only works with cache
-        if 'raptors' and 'BirdIndividualID' in config['wildlife_name'] and len(config['wildlife_name']) == 2:
+        if 'raptors' in config['wildlife_name'] and 'BirdIndividualID' in config['wildlife_name'] and len(config['wildlife_name']) == 2:
             if config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": ['bird','bird'], 
                                     "dataset": '/proj/nobackup/aiforeagles/',
@@ -187,7 +189,8 @@ def get_dataset(config, hardcode=None):
         #     dataset_df = pd.concat([dataset1.df, dataset2.df], ignore_index=True)
 
         #     data = WildlifeDataModule(metadata=dataset_df, config = config)
-        elif 'raptors' and 'BirdIndividualID' and 'ATRW' and 'whaleshark' in config['wildlife_name'] and len(config['wildlife_name']) == 4:
+        elif 'raptors' in config['wildlife_name'] and 'BirdIndividualID' in config['wildlife_name'] and 'ATRW' in config['wildlife_name'] \
+            and 'whaleshark' in config['wildlife_name'] and len(config['wildlife_name']) == 4:
             if config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": ['bird','bird', 'mammal', 'fish'], 
                                     "dataset": '/proj/nobackup/aiforeagles/',
