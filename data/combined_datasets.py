@@ -16,7 +16,7 @@ def get_dataset(config, hardcode=None):
     #         os.makedirs(config['dataset'])
 
     if isinstance(config['wildlife_name'], str):
-        wildlife_names = wildlife_names.split(', ')
+        wildlife_names = config['wildlife_name'].split(', ')
 
     # single datasets
     if type(config['wildlife_name']) != list and len(wildlife_names) == 1:
