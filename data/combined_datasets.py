@@ -140,7 +140,7 @@ def get_dataset(config, hardcode=None):
         else:
             raise ValueError(f"Unknown dataset {config['wildlife_name']}")
     else:  # combined datasets -- only works with cache
-        if 'raptors' in wildlife_names and 'BirdIndividualID' in wildlife_names and len(config['wildlife_name']) == 2:
+        if 'raptors' in wildlife_names and 'BirdIndividualID' in wildlife_names and len(wildlife_names) == 2:
             if config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": ['bird','bird'], 
                                     "dataset": '/proj/nobackup/aiforeagles/',
@@ -193,7 +193,7 @@ def get_dataset(config, hardcode=None):
 
         #     data = WildlifeDataModule(metadata=dataset_df, config = config)
         elif 'raptors' in wildlife_names and 'BirdIndividualID' in wildlife_names and 'ATRW' in wildlife_names \
-            and 'whaleshark' in wildlife_names and len(config['wildlife_name']) == 4:
+            and 'whaleshark' in wildlife_names and len(wildlife_names) == 4:
             if config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": ['bird','bird', 'mammal', 'fish'], 
                                     "dataset": '/proj/nobackup/aiforeagles/',
