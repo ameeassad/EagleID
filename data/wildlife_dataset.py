@@ -7,7 +7,7 @@ import numpy as np
 
 from wildlife_datasets import datasets, splits
 import pytorch_lightning as pl
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Sampler
 from torchvision import transforms
 from typing import Callable
 
@@ -20,7 +20,7 @@ from wildlife_tools.data.dataset import WildlifeDataset
 
 import data. transforms as t
 from data.transforms import RGBTransforms, ResizeAndPadRGB, ValTransforms, SynchTransforms, resize_and_pad, rotate_image
-from data.data_utils import SplitQueryDatabase, analyze_split
+from data.data_utils import SplitQueryDatabase, analyze_split, RandomIdentitySampler
 from data.raptors_wildlife import RaptorsWildlife
 
 from preprocess.preprocess_utils import create_mask, create_skeleton_channel, create_multichannel_heatmaps
@@ -30,8 +30,7 @@ from preprocess.mmpose_fill import get_keypoints_info, get_skeleton_info
 
 class Wildlife(WildlifeDataset):
     """
-    Custom Dataset for Raptors, inheriting from WildlifeDataset.
-    Can be used to also call on Raptors class without already having the dataframe ready.
+
     """
 
     def __init__(
@@ -263,7 +262,7 @@ class Wildlife(WildlifeDataset):
 
         # if self.split:
         #     return img, self.labels[idx], bool(data['query'])
-        if self.load_label:
+        if self.load_label: # default is True
             return img, self.labels[idx]
         else:
             return img
@@ -271,30 +270,30 @@ class Wildlife(WildlifeDataset):
     def get_df(self) -> pd.DataFrame:
         return self.metadata
     
-    def get_query_df(self) -> pd.DataFrame:
-        if 'query' in self.metadata.columns:
-            # return self.metadata[self.metadata['query'] == True]
-            return self.metadata[self.metadata['query']]
-        else:
-            print("No query column found.")
-            return self.metadata
+    # def get_query_df(self) -> pd.DataFrame:
+    #     if 'query' in self.metadata.columns:
+    #         # return self.metadata[self.metadata['query'] == True]
+    #         return self.metadata[self.metadata['query']]
+    #     else:
+    #         print("No query column found.")
+    #         return self.metadata
     
-    def get_gallery_df(self) -> pd.DataFrame:
-        if 'query' in self.metadata.columns:
-            return self.metadata[~self.metadata['query']]
-        else:
-            print("No query column found.")
-            return self.metadata
+    # def get_gallery_df(self) -> pd.DataFrame:
+    #     if 'query' in self.metadata.columns:
+    #         return self.metadata[~self.metadata['query']]
+    #     else:
+    #         print("No query column found.")
+    #         return self.metadata
     
-    def get_query_labels(self) -> np.ndarray:
-        # return self.labels[self.metadata['query']]
-        df = self.get_query_df()
-        return df[self.col_label].values
+    # def get_query_labels(self) -> np.ndarray:
+    #     # return self.labels[self.metadata['query']]
+    #     df = self.get_query_df()
+    #     return df[self.col_label].values
     
-    def get_gallery_labels(self) -> np.ndarray:
-        # return self.labels[~self.metadata['query']]
-        df = self.get_gallery_df()
-        return df[self.col_label].values
+    # def get_gallery_labels(self) -> np.ndarray:
+    #     # return self.labels[~self.metadata['query']]
+    #     df = self.get_gallery_df()
+    #     return df[self.col_label].values
     
 
 class WildlifeDataModule(pl.LightningDataModule):
@@ -478,7 +477,7 @@ class WildlifeDataModule(pl.LightningDataModule):
         print(f"Max images per individual: {df_test['identity'].value_counts().max()}")
 
 
-
+        # label IDs recalculated for the remaining identities to ensure consistency within the filtered dataset
         df_test_labels, df_test_labels_map = pd.factorize(df_test['identity'].values)
         df_test['identity_idx'] = df_test_labels
 
@@ -512,7 +511,10 @@ class WildlifeDataModule(pl.LightningDataModule):
         self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity',  col_label_idx ='identity_idx', img_load=self.method)
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+        # return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+        # Because we are using Triplet loss need an anchor and a positive in same identity class:
+        sampler = RandomIdentitySampler(dataset=self.train_dataset, batch_size=self.batch_size)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, sampler=sampler, num_workers=self.num_workers)
     
     def val_dataloader(self):
         query_loader = DataLoader(self.val_query_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)

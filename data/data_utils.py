@@ -3,6 +3,56 @@ from preprocess.mmpose_fill import get_keypoints_info
 import pandas as pd
 from wildlife_tools.data.split import Split
 
+from torch.utils.data import Sampler
+import numpy as np
+
+from torch.utils.data.sampler import Sampler
+import numpy as np
+import random
+
+class RandomIdentitySampler(Sampler):
+    """
+    Needed for Triplet Mining
+    """
+    def __init__(self, dataset, batch_size, num_instances=2):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.num_instances = num_instances
+        self.num_pids_per_batch = self.batch_size // self.num_instances
+        
+        # Get all unique labels (animal IDs)
+        self.labels = self.dataset.labels  # Assume dataset.labels exists
+        
+        # Create dictionary: {label: [indices]}
+        self.label_to_indices = dict(list)
+        for idx, label in enumerate(self.labels):
+            self.label_to_indices[label].append(idx)
+        
+        # Filter out classes with <2 instances
+        self.valid_labels = [
+            lbl for lbl in self.label_to_indices 
+            if len(self.label_to_indices[lbl]) >= self.num_instances
+        ]
+
+    def __iter__(self):
+        batch_indices = []
+        
+        # Shuffle valid labels
+        shuffled_labels = np.random.permutation(self.valid_labels)
+        
+        for label in shuffled_labels:
+            # Randomly sample 2 instances for this class
+            instances = random.sample(self.label_to_indices[label], self.num_instances)
+            batch_indices.extend(instances)
+            
+            # Yield a batch when we have enough samples
+            if len(batch_indices) >= self.batch_size:
+                yield batch_indices[:self.batch_size]
+                batch_indices = batch_indices[self.batch_size:]
+
+    def __len__(self):
+        return (len(self.valid_labels) * self.num_instances) // self.batch_size
+
 def unnormalize(x, mean, std):
     """
     Unnormalizes a tensor by applying the inverse of the normalization transform.

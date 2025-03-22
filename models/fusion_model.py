@@ -86,7 +86,7 @@ class FusionModel(pl.LightningModule):
             total_feature_dim = self.backbone.feature_info[-1]['num_chs'] + self.backbone_kp.feature_info[-1]['num_chs']
         else:
             total_feature_dim = self.backbone.feature_info[-1]['num_chs']
-        self.embedding = nn.Linear(total_feature_dim, embedding_size)
+        self.embedding = nn.Linear(total_feature_dim, self.embedding_size)
 
         self.loss_fn = losses.TripletMarginLoss(margin=margin)
         self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
