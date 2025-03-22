@@ -15,8 +15,11 @@ def get_dataset(config, hardcode=None):
     # if os.path.exists(config['dataset']) is False:
     #         os.makedirs(config['dataset'])
 
+    if isinstance(config['wildlife_name'], str):
+        wildlife_names = wildlife_names.split(', ')
+
     # single datasets
-    if type(config['wildlife_name']) != list:
+    if type(config['wildlife_name']) != list and len(wildlife_names) == 1:
         if config['wildlife_name'] == 'raptors':
             if config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": "bird", 
@@ -137,7 +140,7 @@ def get_dataset(config, hardcode=None):
         else:
             raise ValueError(f"Unknown dataset {config['wildlife_name']}")
     else:  # combined datasets -- only works with cache
-        if 'raptors' in config['wildlife_name'] and 'BirdIndividualID' in config['wildlife_name'] and len(config['wildlife_name']) == 2:
+        if 'raptors' in wildlife_names and 'BirdIndividualID' in wildlife_names and len(config['wildlife_name']) == 2:
             if config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": ['bird','bird'], 
                                     "dataset": '/proj/nobackup/aiforeagles/',
@@ -189,8 +192,8 @@ def get_dataset(config, hardcode=None):
         #     dataset_df = pd.concat([dataset1.df, dataset2.df], ignore_index=True)
 
         #     data = WildlifeDataModule(metadata=dataset_df, config = config)
-        elif 'raptors' in config['wildlife_name'] and 'BirdIndividualID' in config['wildlife_name'] and 'ATRW' in config['wildlife_name'] \
-            and 'whaleshark' in config['wildlife_name'] and len(config['wildlife_name']) == 4:
+        elif 'raptors' in wildlife_names and 'BirdIndividualID' in wildlife_names and 'ATRW' in wildlife_names \
+            and 'whaleshark' in wildlife_names and len(config['wildlife_name']) == 4:
             if config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": ['bird','bird', 'mammal', 'fish'], 
                                     "dataset": '/proj/nobackup/aiforeagles/',
