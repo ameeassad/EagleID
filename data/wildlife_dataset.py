@@ -511,10 +511,10 @@ class WildlifeDataModule(pl.LightningDataModule):
         self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity',  col_label_idx ='identity_idx', img_load=self.method)
 
     def train_dataloader(self):
-        # return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
-        # Because we are using Triplet loss need an anchor and a positive in same identity class:
-        sampler = RandomIdentitySampler(dataset=self.train_dataset, batch_size=self.batch_size)
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, sampler=sampler, num_workers=self.num_workers)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+        # If using Triplet loss need an anchor and a positive in same identity class:
+        # sampler = RandomIdentitySampler(dataset=self.train_dataset, batch_size=self.batch_size)
+        # return DataLoader(self.train_dataset, batch_size=self.batch_size, sampler=sampler, num_workers=self.num_workers)
     
     def val_dataloader(self):
         query_loader = DataLoader(self.val_query_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
