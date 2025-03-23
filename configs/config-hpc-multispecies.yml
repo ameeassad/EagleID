@@ -27,7 +27,7 @@ num_workers: 8
 gpu_ids: 
 seed: 42
 
-use_gradcam: True
+use_gradcam: False
 
 transforms:
   mean: [0.485, 0.456, 0.406]
