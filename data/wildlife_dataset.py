@@ -391,6 +391,8 @@ class WildlifeDataModule(pl.LightningDataModule):
         # print(f"Train set size before pre-processing: {len(df_train)}")
         # print(f"Test set size before pre-processing: {len(df_test)}")
 
+        if isinstance(self.only_cache, bool):
+            self.only_cache = [self.only_cache, self.only_cache]
         if self.only_cache[0]:
             cache_df = pd.read_csv(self.cache_path)
             print(f"Dataset size before pre-processing and cleaning: {len(cache_df)}")

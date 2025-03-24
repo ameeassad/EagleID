@@ -27,6 +27,7 @@ class MegaDescriptor(pl.LightningModule):
                  embedding_size=128,
                  lr=0.001, 
                  scale=50,
+                 margin=0.5,
                  n_classes =0,
                  preprocess_lvl=0, 
                  re_ranking=True, 
@@ -38,7 +39,6 @@ class MegaDescriptor(pl.LightningModule):
             self.embedding_size=int(config['embedding_size'])
             margin=config['triplet_loss']['margin']
             scale=config['arcface_loss']['scale']
-            mining_type=config['triplet_loss']['mining_type']
             self.n_classes=config['arcface_loss']['n_classes']
             self.preprocess_lvl=int(config['preprocess_lvl'])
             self.re_ranking=config['re_ranking']
@@ -51,7 +51,6 @@ class MegaDescriptor(pl.LightningModule):
             self.embedding_size=embedding_size
             margin=margin
             scale=scale
-            mining_type=mining_type
             self.n_classes=n_classes
             self.preprocess_lvl=preprocess_lvl
             self.re_ranking=re_ranking
@@ -70,7 +69,7 @@ class MegaDescriptor(pl.LightningModule):
         # embeddings = self.embedder(features)
         # embeddings = nn.functional.normalize(embeddings, p=2, dim=1)  # L2 normalization
         # return embeddings
-        features = F.normalize(features, p=2, dim=1)
+        # features = F.normalize(features, p=2, dim=1) # MegaDescriptor-T already includes normalization
         return features
     
     def on_train_start(self): # to run only once: on_train_start / for every val: on_validation_start

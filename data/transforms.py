@@ -495,7 +495,7 @@ def denormalize(x, mean, std):
     mean = np.array(mean).reshape(3, 1, 1)
     std = np.array(std).reshape(3, 1, 1)
 
-    denorm = A.Normalize(
+    denorm = A.Normalize( 
         mean=[-m / s for m, s in zip(mean, std)],
         std=[1.0 / s for s in std],
         always_apply=True,

@@ -11,6 +11,9 @@ import numpy as np
 import torch
 import pandas as pd
 
+from pytorch_metric_learning import distances, losses, miners
+
+
 
 
 def get_all_embeddings(extractor, dataloader):
@@ -385,3 +388,32 @@ class CrossEntropyLabelSmooth(nn.Module):
         targets = (1 - self.epsilon) * targets + self.epsilon / self.num_classes
         loss = (- targets * log_probs).mean(0).sum()
         return loss
+    
+
+class TripletLoss_wildlife(nn.Module):
+    """
+    Wraps Pytorch Metric Learning TripletMarginLoss.
+
+    Mining is one of: 'all', 'hard', 'semihard'
+    Distance is one of: 'cosine', 'l2', 'l2_squared'
+    """
+
+    def __init__(self, margin=0.2, mining="seminard", distance="l2_squared"):
+        super().__init__()
+        if distance == "cosine":
+            distance = distances.CosineSimilarity()
+        elif distance == "l2":
+            distance = distances.LpDistance(normalize_embeddings=True, p=2, power=1)
+        elif distance == "l2_squared":
+            distance = distances.LpDistance(normalize_embeddings=True, p=2, power=2)
+        else:
+            raise ValueError(f"Invalid distance: {distance}")
+
+        self.loss = losses.TripletMarginLoss(distance=distance, margin=margin)
+        self.miner = miners.TripletMarginMiner(
+            distance=distance, type_of_triplets=mining, margin=margin
+        )
+
+    def forward(self, embeddings, y):
+        indices_tuple = self.miner(embeddings, y)
+        return self.loss(embeddings, y, indices_tuple)
