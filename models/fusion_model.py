@@ -60,7 +60,8 @@ class FusionModel(pl.LightningModule):
                 num_kp_groups = calculate_num_channels(self.preprocess_lvl) - 3
                 in_chans = 1 # skeleton
             elif self.preprocess_lvl == 4:
-                num_kp_groups = calculate_num_channels(self.preprocess_lvl) - 3 // 3
+                # num_kp_groups = calculate_num_channels(self.preprocess_lvl) - 3 // 3
+                num_kp_groups = 5
                 in_chans = 3 # parts each RGB channel
             elif self.preprocess_lvl == 5:
                 num_kp_groups = calculate_num_channels(self.preprocess_lvl) - 3
@@ -82,8 +83,13 @@ class FusionModel(pl.LightningModule):
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
 
         # Embedding layer
+        # if self.preprocess_lvl >= 3:
+        #     total_feature_dim = self.backbone.feature_info[-1]['num_chs'] + self.backbone_kp.feature_info[-1]['num_chs']
         if self.preprocess_lvl >= 3:
-            total_feature_dim = self.backbone.feature_info[-1]['num_chs'] + self.backbone_kp.feature_info[-1]['num_chs']
+            total_feature_dim = (
+                self.backbone.feature_info[-1]['num_chs'] + 
+                (num_kp_groups * self.backbone_kp.feature_info[-1]['num_chs'])  # Multiply by num_kp_groups
+            )
         else:
             total_feature_dim = self.backbone.feature_info[-1]['num_chs']
         self.embedding = nn.Linear(total_feature_dim, self.embedding_size)
