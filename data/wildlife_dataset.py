@@ -9,6 +9,7 @@ from wildlife_datasets import datasets, splits
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader, Sampler
 from torchvision import transforms
+
 from typing import Callable
 
 import cv2
@@ -257,8 +258,8 @@ class Wildlife(WildlifeDataset):
 
             else:
                 # img = resize_and_pad(img, self.size)
-                img = self.transform[0](img)
-                img = self.transform[1](img)
+                for i in range(len(self.transform)):
+                    img = self.transform[i](img)
 
         # if self.split:
         #     return img, self.labels[idx], bool(data['query'])
@@ -312,6 +313,7 @@ class WildlifeDataModule(pl.LightningDataModule):
                  splitter ='closed', 
                  only_cache=False,
                  wildlife_names=None,
+                 classic_transform=False
                 ):
         # if using config, does not consider rest of parameters
         super().__init__()
@@ -331,6 +333,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.splitter = config['splitter']
             self.only_cache = config['only_cache']
             self.wildlife_names = config['wildlife_name']
+            self.classic_transform=False
         else:
             self.data_dir = data_dir
             self.num_workers = num_workers
@@ -345,6 +348,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.splitter = splitter
             self.only_cache = only_cache
             self.wildlife_names = wildlife_names
+            self.classic_transform = classic_transform
 
         if self.preprocess_lvl == 3:
             resize_and_pad = t.ResizeAndPadBoth(self.size, skeleton=True)
@@ -365,11 +369,19 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.train_transforms =  [resize_and_pad, sync_transform]
             self.val_transforms = [resize_and_pad, sync_val_transform]
         else:
-            resize_and_pad = t.ResizeAndPadRGB(self.size)
-            rgb_transform = t.RGBTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
-            rgb_val_tranform = t.RGBTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
-            self.train_transforms =  [resize_and_pad, rgb_transform]
-            self.val_transforms = [resize_and_pad, rgb_val_tranform]
+            if self.classic_transform:
+                transforms_list = [transforms.T.Resize([224, 224]), 
+                            transforms.T.ToTensor(), 
+                            transforms.T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+                ]
+                self.train_transforms = transforms_list
+                self.val_transforms = transforms_list
+            else:
+                resize_and_pad = t.ResizeAndPadRGB(self.size)
+                rgb_transform = t.RGBTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
+                rgb_val_tranform = t.RGBTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
+                self.train_transforms =  [resize_and_pad, rgb_transform]
+                self.val_transforms = [resize_and_pad, rgb_val_tranform]
 
         # Need to fix splits
         #  will i also offer open set split? aka some individuals in the query might not be present in the gallery. 
