@@ -16,7 +16,7 @@ only_cache: True # if only_cache, will not run mmpose inference / segmentation a
 model_architecture: FusionModel # TripletModel, FusionModel, EfficientNet, TransformerModel
 backbone_name: resnet50 # efficientnet_b0, resnet50, swin_tiny_patch4_window7_224
 checkpoint: 
-preprocess_lvl: 3 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
+preprocess_lvl: 0 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
 
 batch_size: 64 # 32, 64, 128 (Larger can provide more diverse triplets in each batch -> impprove quality of mined triplets)
 img_size: 224 # 224, 256, 384, 512
@@ -27,13 +27,13 @@ num_workers: 8
 gpu_ids: 
 seed: 42
 
-use_gradcam: True
+use_gradcam: False
 
 transforms:
   mean: [0.485, 0.456, 0.406]
   std: [0.229, 0.224, 0.225]
 
-embedding_size: 768 # choose between: 128, 256, 512, 768, 2048
+embedding_size: 128 # choose between: 128, 256, 512, 768, 2048
 
 triplet_loss:
   margin: 0.5 # choose between: 0.2, 0,5, 0.7 (higher encourages harder triplet mining and stronger gradients)

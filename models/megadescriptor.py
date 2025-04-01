@@ -19,6 +19,11 @@ from utils.re_ranking import re_ranking
 from data.data_utils import calculate_num_channels
 from utils.metrics import compute_distance_matrix, evaluate_map, evaluate_recall_at_k, wildlife_accuracy
 
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+import numpy as np
+from utils.triplet_loss_utils import KnnClassifier
+
+
 
 class MegaDescriptor(pl.LightningModule):
     def __init__(self, 
@@ -54,7 +59,7 @@ class MegaDescriptor(pl.LightningModule):
             self.n_classes=n_classes
             self.preprocess_lvl=preprocess_lvl
             self.re_ranking=re_ranking
-            self.distance_matrix = 'euclidean'
+            self.distance_matrix = 'cosine'
             outdir=outdir
             
         self.backbone = timm.create_model('hf-hub:BVRA/MegaDescriptor-T-224', num_classes=0, pretrained=True)
@@ -69,7 +74,7 @@ class MegaDescriptor(pl.LightningModule):
         # embeddings = self.embedder(features)
         # embeddings = nn.functional.normalize(embeddings, p=2, dim=1)  # L2 normalization
         # return embeddings
-        # features = F.normalize(features, p=2, dim=1) # MegaDescriptor-T already includes normalization
+        # features = F.normalize(features, p=2, dim=1) # MegaDescriptor-T already includes normalization?
         return features
     
     def on_train_start(self): # to run only once: on_train_start / for every val: on_validation_start
@@ -127,38 +132,75 @@ class MegaDescriptor(pl.LightningModule):
         if dataloader_idx == 0:
             # Query data
             self.query_embeddings.append(embeddings)
-            self.query_labels.append(target)
+            self.query_labels.extend(target)
         else:
             # Gallery data
             self.gallery_embeddings.append(embeddings)
-            self.gallery_labels.append(target)
+            self.gallery_labels.extend(target)
 
+    # def on_validation_epoch_end(self):
+    #     # Concatenate all embeddings and labels
+    #     query_embeddings = torch.cat(self.query_embeddings)
+    #     query_labels = torch.cat(self.query_labels)
+    #     gallery_embeddings = torch.cat(self.gallery_embeddings)
+    #     gallery_labels = torch.cat(self.gallery_labels)
+        
+    #     # Compute distance matrix
+    #     if self.re_ranking:
+    #         distmat = re_ranking(query_embeddings, gallery_embeddings, k1=20, k2=6, lambda_value=0.3)
+    #     else:
+    #         distmat = compute_distance_matrix(self.distance_matrix, query_embeddings, gallery_embeddings, wildlife=True)
+
+    #     # Compute mAP
+    #     mAP = evaluate_map(distmat, query_labels, gallery_labels)
+    #     mAP1 = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
+    #     mAP5 = evaluate_map(distmat, query_labels, gallery_labels, top_k=5)
+    #     self.log('val/mAP', mAP)
+    #     self.log('val/mAP1', mAP1)
+    #     self.log('val/mAP5', mAP5)
+
+    #     recall_at_k = evaluate_recall_at_k(distmat, query_labels, gallery_labels, k=5)
+    #     self.log(f'val/Recall@5', recall_at_k)
+
+    #     accuracy = wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels)
+    #     self.log(f'val/accuracy', accuracy)
     def on_validation_epoch_end(self):
-        # Concatenate all embeddings and labels
+        # Concatenate embeddings and get string labels
         query_embeddings = torch.cat(self.query_embeddings)
-        query_labels = torch.cat(self.query_labels)
         gallery_embeddings = torch.cat(self.gallery_embeddings)
-        gallery_labels = torch.cat(self.gallery_labels)
+        query_labels = np.array(self.query_labels)
+        gallery_labels = np.array(self.gallery_labels)
 
-        # Compute distance matrix
+        # Compute cosine similarity
+        similarity = CosineSimilarity()(query_embeddings, gallery_embeddings)
+        similarity_matrix = similarity['cosine']
+
+        # Re-ranking if enabled
         if self.re_ranking:
-            distmat = re_ranking(query_embeddings, gallery_embeddings, k1=20, k2=6, lambda_value=0.3)
-        else:
-            distmat = compute_distance_matrix(self.distance_matrix, query_embeddings, gallery_embeddings, wildlife=True)
+            from utils.re_ranking import re_ranking
+            dist_matrix = compute_distance_matrix(
+                torch.from_numpy(query_embeddings), 
+                torch.from_numpy(gallery_embeddings), 
+                metric='euclidean'
+            )
+            reranked_dist = re_ranking(dist_matrix.numpy())
+            similarity_matrix = -reranked_dist  # Convert distance to similarity
 
-        # Compute mAP
-        mAP = evaluate_map(distmat, query_labels, gallery_labels)
-        mAP1 = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
-        mAP5 = evaluate_map(distmat, query_labels, gallery_labels, top_k=5)
-        self.log('val/mAP', mAP)
-        self.log('val/mAP1', mAP1)
-        self.log('val/mAP5', mAP5)
+        # KNN Classifier
+        classifier = KnnClassifier(k=1, database_labels=gallery_labels)
+        predictions = classifier(similarity_matrix)
 
-        recall_at_k = evaluate_recall_at_k(distmat, query_labels, gallery_labels, k=5)
-        self.log(f'val/Recall@5', recall_at_k)
+        # Compute metrics
+        accuracy = accuracy_score(query_labels, predictions)
+        precision = precision_score(query_labels, predictions, average='weighted', zero_division=1)
+        recall = recall_score(query_labels, predictions, average='weighted', zero_division=1)
+        f1 = f1_score(query_labels, predictions, average='weighted', zero_division=1)
 
-        accuracy = wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels)
-        self.log(f'val/accuracy', accuracy)
+        # Log metrics
+        self.log('val/accuracy', accuracy, prog_bar=True)
+        self.log('val/precision', precision)
+        self.log('val/recall', recall)
+        self.log('val/f1', f1)
 
     def configure_optimizers(self):
         if self.config:
