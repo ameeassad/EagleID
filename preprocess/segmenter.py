@@ -11,6 +11,7 @@ import pandas as pd
 from ultralytics import YOLO
 
 from shapely.geometry import Polygon
+import ast
 
 
 
@@ -93,6 +94,11 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None, only_cac
             bbox = row['bbox']
             x, y, w, h = bbox
             image = image.crop((x, y, x + w, y + h))
+        elif 'bbox' in row and pd.notnull(row['bbox']):
+            bbox = row['bbox']
+            if isinstance(bbox, str):
+                bbox = ast.literal_eval(bbox)  # Convert string to list
+            x, y, w, h = bbox
         else:
             bbox_exists = False
 
