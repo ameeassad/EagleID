@@ -99,6 +99,7 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None, only_cac
             if isinstance(bbox, str):
                 bbox = ast.literal_eval(bbox)  # Convert string to list
             x, y, w, h = bbox
+            image = image.crop((x, y, x + w, y + h))
         else:
             bbox_exists = False
 

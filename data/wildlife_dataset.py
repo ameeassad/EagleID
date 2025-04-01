@@ -350,6 +350,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.wildlife_names = wildlife_names
             self.classic_transform = classic_transform
 
+        # Handle transforms
         if self.preprocess_lvl == 3:
             resize_and_pad = t.ResizeAndPadBoth(self.size, skeleton=True)
             sync_transform = t.SynchTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
@@ -383,26 +384,12 @@ class WildlifeDataModule(pl.LightningDataModule):
                 self.train_transforms =  [resize_and_pad, rgb_transform]
                 self.val_transforms = [resize_and_pad, rgb_val_tranform]
 
-        # Need to fix splits
-        #  will i also offer open set split? aka some individuals in the query might not be present in the gallery. 
-        # This implies that a query can return "unknown" results if the individual is not part of the gallery.
+        # Add date if present in metadata
         if 'date' in self.metadata.columns and self.metadata['date'].isna().any():
             self.metadata.loc[pd.isna(self.metadata['date']), 'date'] = "unknown" 
-        
-        # if self.splitter == 'closed':
-        #     splitter = splits.ClosedSetSplit(self.split_ratio) # All individuals are both in the training and testing set.
-        # elif self.splitter == 'open':
-        #     splitter = splits.OpenSetSplit(self.split_ratio, 0.1) # Some individuals are in the testing but not in the training set
-        # for idx_train, idx_test in splitter.split(metadata):
-        #     analyze_split(self.metadata, idx_train, idx_test)
 
-        # df_train, df_test = self.metadata.loc[idx_train], metadata.loc[idx_test]
-        # df_train.reset_index(drop=True, inplace=True)
-        # df_test.reset_index(drop=True, inplace=True)
-
-        # print(f"Train set size before pre-processing: {len(df_train)}")
-        # print(f"Test set size before pre-processing: {len(df_test)}")
-
+        # If only dealing with cache (no real time preprocessing), read the cache and clean it up (segs and keypoints possibly)
+        # Else, just copy the metadata and work with that
         if isinstance(self.only_cache, bool):
             self.only_cache = [self.only_cache, self.only_cache]
         if self.only_cache[0]:
@@ -416,19 +403,9 @@ class WildlifeDataModule(pl.LightningDataModule):
             df_all = metadata.copy()
             print(f"Dataset size before pre-processing and cleaning: {len(df_all)}")
 
-        # preprocessing
+        # Preprocessing
         if self.preprocess_lvl > 0 and not self.only_cache[0]: # 1: bounding box cropped image or 2: masked image
             from preprocess.segmenter import add_segmentations
-
-            # df_train = add_segmentations(df_train, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
-            # df_test = add_segmentations(df_test, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache)
-
-            # print(f"df_train: {len(df_train)}, columns: {df_train.columns} and values: {df_train.iloc[0]}")
-            # print(f"df_query: {len(df_query)}, columns: {df_query.columns} and values: {df_query.iloc[0]}")
-            # print(f"df_gallery: {len(df_gallery)}, columns: {df_gallery.columns} and values: {df_gallery.iloc[0]}")
-
-            # df_train = self.clean_segmentation(df_train)
-            # df_test = self.clean_segmentation(df_test)
 
             df_all = add_segmentations(metadata, self.data_dir, cache_path=self.cache_path, only_cache=self.only_cache[0])
             df_all = self.clean_segmentation(df_all)
@@ -440,36 +417,36 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.keypoints = get_keypoints_info()
             self.skeleton = get_skeleton_info()
 
-            # df_train = fill_keypoints(df_train, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
-            # df_test = fill_keypoints(df_test, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache)
-
-            # remove 'float' keypoints because NaN is treated as float
-            # df_train = df_train[df_train['keypoints'].apply(lambda x: not isinstance(x, float))]
-            # df_test = df_test[df_test['keypoints'].apply(lambda x: not isinstance(x, float))]
-
             df_all = fill_keypoints(df_all, self.data_dir, cache_path=self.cache_path, animal_cat=self.animal_cat, only_cache=self.only_cache[1])
+            # remove 'float' keypoints because NaN is treated as float
             df_all = df_all[df_all['keypoints'].apply(lambda x: not isinstance(x, float))]
 
 
-        # # Remove only one image per individual
-        # train_counts = df_train['identity'].value_counts()
-        # train_valid_identities = train_counts[df_train['identity'].value_counts() > 1].index
-        # # Filter the dataframe
-        # df_train = df_train[df_train['identity'].isin(train_valid_identities)].reset_index(drop=True)
+        # Remove only one image per individual
         counts = df_all['identity'].value_counts()
         valid_identities = counts[df_all['identity'].value_counts() > 1].index
-        # Filter the dataframe
+        # Filter the dataframe so each identity has 2 or more images
         df_all = df_all[df_all['identity'].isin(valid_identities)].reset_index(drop=True)
 
+        # Split the dataset according to closed or open or default via metadata values
+        if self.splitter == 'original_split':
+            df_train = df_all[df_all['original_split'] == 'train']
+            df_test = df_all[df_all['original_split'] == 'test']
 
-        if self.splitter == 'closed':
-            splitter = splits.ClosedSetSplit(self.split_ratio) # All individuals are both in the training and testing set.
-        elif self.splitter == 'open':
-            splitter = splits.OpenSetSplit(self.split_ratio, 0.1) # Some individuals are in the testing but not in the training set
-        for idx_train, idx_test in splitter.split(df_all):
-            analyze_split(df_all, idx_train, idx_test)
-
-        df_train, df_test = df_all.loc[idx_train], df_all.loc[idx_test]
+            analyze_split(df_all, df_train.index, df_test.index)
+        else:
+            if self.splitter == 'closed':
+                # Closed-set split (same individuals in train/test)
+                splitter = splits.ClosedSetSplit(self.split_ratio)
+            elif self.splitter == 'open':
+                # Open-set split (some individuals only in test)
+                splitter = splits.OpenSetSplit(self.split_ratio, 0.1)
+                # TODO: Add an "unknown" class to the model’s output layer if new identities are expected
+            for idx_train, idx_test in splitter.split(df_all):
+                analyze_split(df_all, idx_train, idx_test)
+            df_train, df_test = df_all.loc[idx_train], df_all.loc[idx_test]
+        
+        # Reset indices
         df_train.reset_index(drop=True, inplace=True)
         df_test.reset_index(drop=True, inplace=True)
 
@@ -492,18 +469,21 @@ class WildlifeDataModule(pl.LightningDataModule):
         print(f"Max images per individual: {df_test['identity'].value_counts().max()}")
 
 
-        # label IDs recalculated for the remaining identities to ensure consistency within the filtered dataset
-        df_test_labels, df_test_labels_map = pd.factorize(df_test['identity'].values)
-        df_test['identity_idx'] = df_test_labels
+        # Original identity label is 'identity' and the new factorized one for remaining identities is 'tmp_idx'
+        # tmp_index is only for model training and cannot be used for evaluation
+        df_train_tmp_idx, train_labels_map = pd.factorize(df_train['identity'].values)
+        df_train['tmp_idx'] = df_train_tmp_idx
+        df_test_tmp_idx, test_labels_map = pd.factorize(df_test['identity'].values)
+        df_test['tmp_idx'] = df_test_tmp_idx
 
-
+        # Split query set and gallery set for evaluation via SplitQueryDatabase
         self.val_split = SplitQueryDatabase()
         df_test = self.val_split(df_test)
         df_test['query'] = df_test['query'].astype(bool)
         df_query = df_test[df_test['query']]
         df_gallery = df_test[~df_test['query']]
 
-
+        # Handle for Wildlife class parameter
         if self.preprocess_lvl == 0:
             self.method = 'full'
         elif self.preprocess_lvl == 1:
@@ -517,17 +497,14 @@ class WildlifeDataModule(pl.LightningDataModule):
         elif self.preprocess_lvl == 5:
             self.method = "bbox_mask_heatmaps"
 
-        self.train_dataset = Wildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, img_load=self.method)
-        # self.test_dataset = Wildlife(metadata=df_test, root=self.data_dir, split = self.val_split, transform=self.val_transforms, img_load=self.method)
-        # self.val_query_dataset = Wildlife(metadata=df_test, root=self.data_dir, split=self.val_split, transform=self.val_transforms, img_load=self.method, chosen_split="query")
-        # self.val_gallery_dataset = Wildlife(metadata=df_test, root=self.data_dir, split=self.val_split, transform=self.val_transforms, img_load=self.method, chosen_split="gallery")
+        self.train_dataset = Wildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, img_load=self.method, col_label = 'identity', col_label_idx ='tmp_idx')
 
-        self.val_query_dataset = Wildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', col_label_idx ='identity_idx', img_load=self.method)
-        self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity',  col_label_idx ='identity_idx', img_load=self.method)
+        self.val_query_dataset = Wildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', col_label_idx ='tmp_idx', img_load=self.method)
+        self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity',  col_label_idx ='tmp_idx', img_load=self.method)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
-        # If using Triplet loss need an anchor and a positive in same identity class:
+        # If using Triplet loss need an anchor and a positive in same identity class: // handled by triplet loss function
         # sampler = RandomIdentitySampler(dataset=self.train_dataset, batch_size=self.batch_size)
         # return DataLoader(self.train_dataset, batch_size=self.batch_size, sampler=sampler, num_workers=self.num_workers)
     
@@ -535,24 +512,7 @@ class WildlifeDataModule(pl.LightningDataModule):
         query_loader = DataLoader(self.val_query_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
         gallery_loader = DataLoader(self.val_gallery_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
         return [query_loader, gallery_loader]
-    
-    # def val_dataloader(self):
-    #     return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
-    
-    # def filter_identities(self, metadata, min_images=2):
-    #     """
-    #     Filters out identities with fewer than a minimum number of images.
-
-    #     Args:
-    #         metadata (pd.DataFrame): Dataframe containing image metadata.
-    #         min_images (int): Minimum number of images required per identity.
-
-    #     Returns:
-    #         filtered_metadata (pd.DataFrame): Metadata filtered to only include identities with the required number of images.
-    #     """
-    #     identity_counts = metadata['identity'].value_counts()
-    #     valid_identities = identity_counts[identity_counts >= min_images].index
-    #     return metadata[metadata['identity'].isin(valid_identities)].reset_index(drop=True)
+    #   return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
 
     def clean_segmentation(self, df, segmentation_col='segmentation'):
         """
@@ -588,17 +548,15 @@ class WildlifeDataModule(pl.LightningDataModule):
                 print("Segmentation is a string but not valid JSON.")
                 return None
 
-        # Ensure the segmentation is now a list after possible string conversion
         if not isinstance(segmentation, list):
             print("No segmentation data found: Not a list after conversion.")
             return None
-        
         # Check for empty lists or lists containing only empty lists
         if not segmentation or (len(segmentation) == 1 and not segmentation[0]):
             print("No segmentation data found: Empty list or list containing empty list.")
             return None
         
-        # Check if the first element is a list of coordinates
+        # If the first element is a list of coordinates
         if isinstance(segmentation[0], list) and all(isinstance(coord, (int, float)) for coord in segmentation[0]):
             return segmentation  # Already in the correct format
         
@@ -606,7 +564,7 @@ class WildlifeDataModule(pl.LightningDataModule):
         if all(isinstance(coord, (int, float)) for coord in segmentation):
             return [segmentation]  # Convert to a list of lists
         
-        # If none of the conditions are met, return None
+        # None of the conditions are met: return None
         print("Segmentation format is not recognized.")
         return None
 
