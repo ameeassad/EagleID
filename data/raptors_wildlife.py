@@ -114,7 +114,7 @@ class Raptors(datasets.DatasetFactory):
                                 data.append({
                                     'image_id': int(image_counter),
                                     'species': species_name,
-                                    'identity_id': identity_map[animal_id],
+                                    'identity_id': int(identity_map[animal_id]),
                                     'identity': animal_id,
                                     'path': os.path.join(directory, sub_entry, screenshot),
                                     'from_video': True,
@@ -128,7 +128,7 @@ class Raptors(datasets.DatasetFactory):
                         data.append({
                             'image_id': int(image_counter),
                             'species': species_name,
-                            'identity_id': identity_map[animal_id],
+                            'identity_id': int(identity_map[animal_id]),
                             'identity': animal_id,
                             'path': os.path.join(directory, sub_entry),
                             'from_video': False,
