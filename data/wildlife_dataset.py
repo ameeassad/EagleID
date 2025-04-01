@@ -370,9 +370,9 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.val_transforms = [resize_and_pad, sync_val_transform]
         else:
             if self.classic_transform:
-                transforms_list = [transforms.T.Resize([224, 224]), 
-                            transforms.T.ToTensor(), 
-                            transforms.T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+                transforms_list = [transforms.Resize([224, 224]), 
+                            transforms.ToTensor(), 
+                            transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
                 ]
                 self.train_transforms = transforms_list
                 self.val_transforms = transforms_list
@@ -473,19 +473,20 @@ class WildlifeDataModule(pl.LightningDataModule):
         df_train.reset_index(drop=True, inplace=True)
         df_test.reset_index(drop=True, inplace=True)
 
+
         if config:
             config['arcface_loss']['n_classes'] = len(df_train['identity'].unique())
 
         print("Training Set")
         print(f"Length: {len(df_train)}")
-        print(f"Number of individuals: {len(df_train['identity'].unique())}")
+        print(f"Number of individuals (classes): {len(df_train['identity'].unique())}")
         print(f"Mean images/individual: {df_train['identity'].value_counts().mean()}")
         print(f"Min images/individual: {df_train['identity'].value_counts().min()}")
         print(f"Max images/individual: {df_train['identity'].value_counts().max()}")
 
         print("Test Set")
         print(f"Length: {len(df_test)}")
-        print(f"Number of individuals: {len(df_test['identity'].unique())}")
+        print(f"Number of individuals (classes): {len(df_test['identity'].unique())}")
         print(f"Mean images per individual: {df_test['identity'].value_counts().mean()}")
         print(f"Min images per individual: {df_test['identity'].value_counts().min()}")
         print(f"Max images per individual: {df_test['identity'].value_counts().max()}")
@@ -538,20 +539,20 @@ class WildlifeDataModule(pl.LightningDataModule):
     # def val_dataloader(self):
     #     return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
     
-    def filter_identities(self, metadata, min_images=2):
-        """
-        Filters out identities with fewer than a minimum number of images.
+    # def filter_identities(self, metadata, min_images=2):
+    #     """
+    #     Filters out identities with fewer than a minimum number of images.
 
-        Args:
-            metadata (pd.DataFrame): Dataframe containing image metadata.
-            min_images (int): Minimum number of images required per identity.
+    #     Args:
+    #         metadata (pd.DataFrame): Dataframe containing image metadata.
+    #         min_images (int): Minimum number of images required per identity.
 
-        Returns:
-            filtered_metadata (pd.DataFrame): Metadata filtered to only include identities with the required number of images.
-        """
-        identity_counts = metadata['identity'].value_counts()
-        valid_identities = identity_counts[identity_counts >= min_images].index
-        return metadata[metadata['identity'].isin(valid_identities)].reset_index(drop=True)
+    #     Returns:
+    #         filtered_metadata (pd.DataFrame): Metadata filtered to only include identities with the required number of images.
+    #     """
+    #     identity_counts = metadata['identity'].value_counts()
+    #     valid_identities = identity_counts[identity_counts >= min_images].index
+    #     return metadata[metadata['identity'].isin(valid_identities)].reset_index(drop=True)
 
     def clean_segmentation(self, df, segmentation_col='segmentation'):
         """
