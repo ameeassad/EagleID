@@ -68,7 +68,6 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None, only_cac
     else:
         cache_df = pd.DataFrame(columns=df.columns)
 
-    model = YOLO('../checkpoints/yolov8x-seg.pt')
 
     updated_rows = []
     for _, row in df.iterrows():
@@ -92,20 +91,29 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None, only_cac
             bbox_exists = True
             print("running segmentation on pre-existing bbox")
             bbox = row['bbox']
-            x, y, w, h = bbox
+            if isinstance(bbox, str):
+                bbox_exists = True
+                bbox = ast.literal_eval(bbox)  # Convert string to list
+            if bbox == [0,0,0,0]:
+                x, y, w, h = 0, 0, og_width, og_height
+            else:
+                x, y, w, h = bbox
             image = image.crop((x, y, x + w, y + h))
         elif 'bbox' in row and pd.notnull(row['bbox']):
             bbox = row['bbox']
             if isinstance(bbox, str):
+                bbox_exists = True
                 bbox = ast.literal_eval(bbox)  # Convert string to list
-            x, y, w, h = bbox
-            image = image.crop((x, y, x + w, y + h))
+                if bbox == [0,0,0,0]:
+                    x, y, w, h = 0, 0, og_width, og_height
+                else:
+                    x, y, w, h = bbox
+                image = image.crop((x, y, x + w, y + h))
         else:
             bbox_exists = False
 
-        W, H = image.size
-
         # If no cache or segmentation is missing, run YOLOv8 model
+        model = YOLO('../checkpoints/yolov8x-seg.pt')
         results = model(image)
         if len(results)>1:
             print("WARNING: Multiple objects detected in image")

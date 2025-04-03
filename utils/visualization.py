@@ -19,6 +19,56 @@ def load_image(path):
     img = Image.open(img_path)
     return img
 
+def query_prediction_results_similarity(
+        root,
+        query_metadata,
+        db_metadata,
+        query_start,
+        similarity_scores, 
+        num_images=10
+    ):
+    fig, axes = plt.subplots(num_images, 3, figsize=(10, 3 * num_images))
+    fig.tight_layout(pad=0.5)
+    
+    for i in range(num_images):
+        idx = query_start + i
+        
+        # Query image
+        query_img_path = query_metadata.iloc[idx]['path']
+        query_img = load_image(os.path.join(root, query_img_path))
+        
+        # Predicted image (EXACT MATCH)
+        # Get index of most similar database image
+        closest_db_idx = np.argmax(similarity_scores[idx])
+        predicted_img_path = db_metadata.iloc[closest_db_idx]['path']
+        predicted_img = load_image(os.path.join(root, predicted_img_path))
+        
+        # Ground truth image (for comparison)
+        ground_truth_label = query_metadata.iloc[idx]['identity']
+        filtered_id_truth = db_metadata[db_metadata['identity'] == ground_truth_label]
+        ground_truth_img_path = filtered_id_truth['path'].values[0]
+        ground_truth_img = load_image(os.path.join(root, ground_truth_img_path))
+        
+        # --- Visualization Logic ---
+        # Display query image
+        axes[i, 0].imshow(query_img)
+        axes[i, 0].set_title(f'Query: {query_metadata.iloc[idx]["identity"]}')
+        axes[i, 0].axis('off')
+        
+        # Display predicted image (exact match)
+        predicted_label = db_metadata.iloc[closest_db_idx]['identity']
+        is_correct = (predicted_label == ground_truth_label)
+        axes[i, 1].imshow(predicted_img)
+        axes[i, 1].set_title(f'Predicted: {predicted_label}', color='green' if is_correct else 'red')
+        axes[i, 1].axis('off')
+        
+        # Display ground truth image
+        axes[i, 2].imshow(ground_truth_img)
+        axes[i, 2].set_title(f'Ground Truth: {ground_truth_label}')
+        axes[i, 2].axis('off')
+    
+    plt.show()  
+
 def query_prediction_results(root, query_metadata, db_metadata, query_start, predictions, num_images=10):
     fig, axes = plt.subplots(num_images, 3, figsize=(10, 3 * num_images))
     fig.tight_layout(pad=0.5)
@@ -32,9 +82,10 @@ def query_prediction_results(root, query_metadata, db_metadata, query_start, pre
         query_img = load_image(os.path.join(root, query_img_path))
         
         # Predicted image
-        predicted_label = predictions[i]
+        predicted_label = predictions[idx]
         # print("predicted label:", predicted_label)
-        filtered_id_pred = db_metadata[db_metadata['identity'] == predicted_label]
+        
+        filtered_id_pred = db_metadata[db_metadata['identity'] == predicted_label] #predicted IDENTITY (NOT image necessarily)
         # print("filtered id pred:", filtered_id_pred)
 
         predicted_img_path = filtered_id_pred['path'].values[0]

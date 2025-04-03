@@ -30,10 +30,6 @@ from preprocess.mmpose_fill import get_keypoints_info, get_skeleton_info
 
 
 class Wildlife(WildlifeDataset):
-    """
-
-    """
-
     def __init__(
         self,
         metadata: pd.DataFrame | None = None,
@@ -44,8 +40,7 @@ class Wildlife(WildlifeDataset):
         col_path: str = "path",
         col_label: str = "identity", 
         load_label: bool = True,
-        # chosen_split: str = "gallery", 
-        col_label_idx: str = None,
+        # col_label_idx: str = None,
     ):    
         super().__init__(
             metadata=metadata,
@@ -57,34 +52,27 @@ class Wildlife(WildlifeDataset):
             col_label=col_label,
             load_label=load_label
         )
-        metadata = metadata.reset_index(drop=True)
-        if col_label_idx != "identity_idx":
-            self.labels, self.labels_map = pd.factorize(
-                metadata[col_label].values
-            )
-        else:
-            self.labels = metadata[col_label_idx].values
-        # self.split = split
-        # if self.split:
-        #     self.metadata = self.split(metadata)
-        #     self.metadata['query'] = self.metadata['query'].astype(bool)
-        #     if chosen_split == "gallery":
-        #         self.metadata = self.get_gallery_df()
-        #         print(f"Number of gallery images: {len(self.metadata)}")
-        #     else:
-        #         self.metadata = self.get_query_df()
-        #         print(f"Number of query images: {len(self.metadata)}")
-            
-        # self.metadata = self.metadata.reset_index(drop=True)
+        # metadata = metadata.reset_index(drop=True)
+        # if col_label_idx != "tmp_idx":
+        #     self.labels, self.labels_map = pd.factorize(
+        #         metadata[col_label].values
+        #     )
+        # else:
+        #     self.labels = metadata[col_label_idx].values
 
-        self.metadata = metadata.reset_index(drop=True)
+        # if col_label_idx == "tmp_idx":
+        #     self.labels = metadata[col_label_idx].values
 
-        self.root = root
-        self.transform = transform
-        self.img_load = img_load
-        self.col_path = col_path
-        self.col_label = col_label
-        self.load_label = load_label
+        # self.labels = self.labels  # Inherited from parent
+        # self.labels_map = self.labels_map  # Inherited from 
+        
+        # self.metadata = metadata.reset_index(drop=True)
+        # self.root = root
+        # self.transform = transform
+        # self.img_load = img_load
+        # self.col_path = col_path
+        # self.col_label = col_label
+        # self.load_label = load_label
 
     # Preprocess and cache JSON or metadata:
     # Use json.loads during data preparation and store the parsed results.
@@ -333,7 +321,8 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.splitter = config['splitter']
             self.only_cache = config['only_cache']
             self.wildlife_names = config['wildlife_name']
-            self.classic_transform=False
+            self.classic_transform = config.get("custom_transform", False)
+
         else:
             self.data_dir = data_dir
             self.num_workers = num_workers
@@ -471,10 +460,10 @@ class WildlifeDataModule(pl.LightningDataModule):
 
         # Original identity label is 'identity' and the new factorized one for remaining identities is 'tmp_idx'
         # tmp_index is only for model training and cannot be used for evaluation
-        df_train_tmp_idx, train_labels_map = pd.factorize(df_train['identity'].values)
-        df_train['tmp_idx'] = df_train_tmp_idx
-        df_test_tmp_idx, test_labels_map = pd.factorize(df_test['identity'].values)
-        df_test['tmp_idx'] = df_test_tmp_idx
+        # df_train_tmp_idx, train_labels_map = pd.factorize(df_train['identity'].values)
+        # df_train['tmp_idx'] = df_train_tmp_idx
+        # df_test_tmp_idx, test_labels_map = pd.factorize(df_test['identity'].values)
+        # df_test['tmp_idx'] = df_test_tmp_idx
 
         # Split query set and gallery set for evaluation via SplitQueryDatabase
         self.val_split = SplitQueryDatabase()
@@ -497,10 +486,10 @@ class WildlifeDataModule(pl.LightningDataModule):
         elif self.preprocess_lvl == 5:
             self.method = "bbox_mask_heatmaps"
 
-        self.train_dataset = Wildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, img_load=self.method, col_label = 'identity', col_label_idx ='tmp_idx')
+        self.train_dataset = Wildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, col_label = 'identity', img_load=self.method)
 
-        self.val_query_dataset = Wildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', col_label_idx ='tmp_idx', img_load=self.method)
-        self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity',  col_label_idx ='tmp_idx', img_load=self.method)
+        self.val_query_dataset = Wildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method)
+        self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
