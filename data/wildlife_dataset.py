@@ -21,7 +21,7 @@ from wildlife_tools.data.dataset import WildlifeDataset
 
 import data. transforms as t
 from data.transforms import RGBTransforms, ResizeAndPadRGB, ValTransforms, SynchTransforms, resize_and_pad, rotate_image
-from data.data_utils import SplitQueryDatabase, analyze_split, RandomIdentitySampler
+from data.data_utils import CustomClosedSetSplit, StratifiedSpeciesSplit, SplitQueryDatabase, analyze_split, RandomIdentitySampler
 from data.raptors_wildlife import RaptorsWildlife
 
 from preprocess.preprocess_utils import create_mask, create_skeleton_channel, create_multichannel_heatmaps
@@ -411,26 +411,31 @@ class WildlifeDataModule(pl.LightningDataModule):
             df_all = df_all[df_all['keypoints'].apply(lambda x: not isinstance(x, float))]
 
 
-        # Remove only one image per individual
-        counts = df_all['identity'].value_counts()
-        valid_identities = counts[df_all['identity'].value_counts() > 1].index
-        # Filter the dataframe so each identity has 2 or more images
-        df_all = df_all[df_all['identity'].isin(valid_identities)].reset_index(drop=True)
+        # # Remove only one image per individual
+        # counts = df_all['identity'].value_counts()
+        # valid_identities = counts[df_all['identity'].value_counts() > 1].index
+        # # Filter the dataframe so each identity has 2 or more images
+        # df_all = df_all[df_all['identity'].isin(valid_identities)].reset_index(drop=True)
 
         # Split the dataset according to closed or open or default via metadata values
         if self.splitter == 'original_split':
             df_train = df_all[df_all['original_split'] == 'train']
             df_test = df_all[df_all['original_split'] == 'test']
-
             analyze_split(df_all, df_train.index, df_test.index)
         else:
             if self.splitter == 'closed':
-                # Closed-set split (same individuals in train/test)
+                # Closed-set split x(same individuals in train/test)
                 splitter = splits.ClosedSetSplit(self.split_ratio)
             elif self.splitter == 'open':
                 # Open-set split (some individuals only in test)
                 splitter = splits.OpenSetSplit(self.split_ratio, 0.1)
-                # TODO: Add an "unknown" class to the model’s output layer if new identities are expected
+            elif self.splitter == 'closed_species_stratified':
+                splitter = StratifiedSpeciesSplit(self.split_ratio)
+            elif self.splitter == 'custom_closed':
+                splitter = CustomClosedSetSplit(self.split_ratio)
+            else:
+                print(f"Unknown splitter: {self.splitter}. Using closed-set split.")
+                splitter = splits.ClosedSetSplit(self.split_ratio)
             for idx_train, idx_test in splitter.split(df_all):
                 analyze_split(df_all, idx_train, idx_test)
             df_train, df_test = df_all.loc[idx_train], df_all.loc[idx_test]

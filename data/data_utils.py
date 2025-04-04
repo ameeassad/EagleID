@@ -6,9 +6,8 @@ from wildlife_tools.data.split import Split
 from torch.utils.data import Sampler
 import numpy as np
 
-from torch.utils.data.sampler import Sampler
-import numpy as np
-import random
+
+from wildlife_datasets import splits
 
 class RandomIdentitySampler(Sampler):
     """
@@ -209,3 +208,158 @@ def analyze_split(df, idx_train, idx_test):
     print('')    
     print('Fraction of train set     = %1.2f%%' % (100*ratio_train))
     print('Fraction of test set only = %1.2f%%' % (100*ratio_test_only))
+
+
+class CustomClosedSetSplit(splits.ClosedSetSplit):
+    """Closed-set split with strict ratio adherence via adjustable samples."""
+
+    def __init__(
+        self,
+        ratio_train: float,
+        seed: int = 666,
+        identity_skip: str = 'unknown',
+        tolerance: float = 0.05
+    ) -> None:
+        super().__init__(ratio_train, seed, identity_skip)
+        self.tolerance = tolerance
+
+    def general_split(
+            self,
+            df: pd.DataFrame,
+            individual_train: list[str],
+            individual_test: list[str],
+        ) -> tuple[np.ndarray, np.ndarray]:
+        
+        lcg = self.initialize_lcg()
+        idx_train, idx_test = [], []
+        adjustable_train, adjustable_test = [], []
+
+        # First pass: Initial split per identity
+        for individual, df_individual in df.groupby('identity'):
+            n = len(df_individual)
+            shuffled_indices = df_individual.index[lcg.random_permutation(n)].tolist()
+
+            if n == 1:
+                idx_train.extend(shuffled_indices)
+            elif n == 2:
+                idx_train.extend(shuffled_indices)
+            elif n == 3:
+                idx_train.extend(shuffled_indices[:2])
+                test_idx = shuffled_indices[2:]
+                idx_test.extend(test_idx)
+                adjustable_test.extend(test_idx)
+            elif n == 4:
+                train_part = shuffled_indices[:2]
+                test_part = shuffled_indices[2:]
+                idx_train.extend(train_part)
+                idx_test.extend(test_part)
+            else:  # n > 4
+                train_fixed = shuffled_indices[:2]
+                test_fixed = shuffled_indices[2:4]
+                remaining = shuffled_indices[4:]
+                n_remaining_train = int(np.round(self.ratio_train * len(remaining)))
+                train_remaining = remaining[:n_remaining_train]
+                test_remaining = remaining[n_remaining_train:]
+                idx_train.extend(train_fixed + train_remaining)
+                idx_test.extend(test_fixed + test_remaining)
+                adjustable_train.extend(train_remaining)
+                adjustable_test.extend(test_remaining)
+
+        # Second pass: Adjust to meet ratio within tolerance
+        total = len(idx_train) + len(idx_test)
+        desired = self.ratio_train
+        current_ratio = len(idx_train) / total if total > 0 else 0.0
+
+        while abs(current_ratio - desired) > self.tolerance:
+            if current_ratio < desired - self.tolerance:
+                if not adjustable_test:
+                    break
+                permuted_indices = lcg.random_permutation(len(adjustable_test))
+                move_idx = permuted_indices[0]
+
+                sample = adjustable_test.pop(move_idx)
+                idx_test.remove(sample)
+                idx_train.append(sample)
+                adjustable_train.append(sample)
+            elif current_ratio > desired + self.tolerance:
+                if not adjustable_train:
+                    break
+                move_idx = lcg.choice(len(adjustable_train))
+                sample = adjustable_train.pop(move_idx)
+                idx_train.remove(sample)
+                idx_test.append(sample)
+                adjustable_test.append(sample)
+            else:
+                break
+            current_ratio = len(idx_train) / (len(idx_train) + len(idx_test))
+
+        # Feedback on final ratio
+        if abs(current_ratio - desired) > self.tolerance:
+            print(f"Closest Achieved Ratio: {current_ratio:.2%} (Target: {desired:.0%} ±{self.tolerance:.0%})")
+
+        return np.array(idx_train), np.array(idx_test)
+    
+class StratifiedSpeciesSplit(CustomClosedSetSplit):
+    """Stratified split that maintains the train-test ratio per species using custom closed-set splitting.
+    
+    For each species group, the group's index is reset so that the custom split returns local indices.
+    Then these local indices are mapped back to global indices.
+    """
+
+    def split(self, df: pd.DataFrame) -> list[tuple[np.ndarray, np.ndarray]]:
+        # Group data by species (wildlife_name)
+        grouped = df.groupby('wildlife_name', group_keys=False)
+        
+        idx_train_list, idx_test_list = [], []
+        for species, group in grouped:
+            # Reset index to get a local index column, but save the original global index.
+            group_reset = group.reset_index()  # The original global index is in the 'index' column.
+            
+            # Call custom closed-set split (from CustomClosedSetSplit) on the group_reset.
+            group_splits = super().split(group_reset)
+            if not group_splits:
+                continue
+            group_idx_train, group_idx_test = group_splits[0]
+            
+            # Map local indices (from group_reset) to global indices using the 'index' column.
+            global_train_indices = group_reset.loc[group_idx_train, "index"].to_numpy()
+            global_test_indices = group_reset.loc[group_idx_test, "index"].to_numpy()
+            
+            idx_train_list.extend(global_train_indices)
+            idx_test_list.extend(global_test_indices)
+        
+        return [(np.array(idx_train_list), np.array(idx_test_list))]
+
+
+# class StratifiedSpeciesSplit(splits.ClosedSetSplit):
+#     """Stratified split that maintains the train-test ratio per species."""
+
+#     def split(self, df: pd.DataFrame) -> list[tuple[np.ndarray, np.ndarray]]:
+#         """Split the dataset such that each species maintains the specified train-test ratio.
+        
+#         For each species group, the group's index is reset so that the split method
+#         returns local indices. Then, these local indices are mapped back to global indices.
+#         """
+#         # Group data by species (wildlife_name)
+#         grouped = df.groupby('wildlife_name', group_keys=False)
+        
+#         idx_train_list, idx_test_list = [], []
+#         for species, group in grouped:
+#             # Reset index to get a local index column, but save the original global index.
+#             group_reset = group.reset_index()  # The original global index is in the 'index' column.
+            
+#             # Apply the closed-set split on the group_reset DataFrame.
+#             # This should now return indices relative to the group_reset.
+#             group_splits = super().split(group_reset)
+#             if not group_splits:
+#                 continue
+#             group_idx_train, group_idx_test = group_splits[0]
+            
+#             # Map local indices (from group_reset) to global indices using the 'index' column.
+#             global_train_indices = group_reset.loc[group_idx_train, "index"].to_numpy()
+#             global_test_indices = group_reset.loc[group_idx_test, "index"].to_numpy()
+            
+#             idx_train_list.extend(global_train_indices)
+#             idx_test_list.extend(global_test_indices)
+        
+#         return [(np.array(idx_train_list), np.array(idx_test_list))]
