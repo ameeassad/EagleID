@@ -8,175 +8,195 @@ import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
 from PIL import Image
-from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from torchmetrics import Accuracy
-
-from pytorch_grad_cam import GradCAM
-from pytorch_grad_cam.utils.image import show_cam_on_image
-from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-
-from data.data_utils import unnormalize
 
 from utils.triplet_loss_utils import TripletLoss
 from utils.optimizer import get_optimizer, get_lr_scheduler_config
 from utils.weights_initializer import weights_init_kaiming, weights_init_classifier
 
-class ResNetPlusModel(LightningModule):
-    def __init__(
-        self,
-        config: dict,
-        model_name: str = 'resnet18',
-        pretrained: bool = True, # Use ImageNet pre-trained weights
-        num_classes: int | None = None,
-        outdir: str = 'results',
-        frozen_layers: int = 10,
-    ):
+import torch.nn.functional as F
+import pytorch_lightning as pl
+from pytorch_metric_learning import losses, miners
+from torch import nn
+
+from wildlife_tools.similarity.cosine import CosineSimilarity
+from utils.metrics import evaluate_map, compute_average_precision
+
+from utils.re_ranking import re_ranking
+from data.data_utils import calculate_num_channels
+from utils.metrics import compute_distance_matrix, evaluate_recall_at_k, wildlife_accuracy
+
+
+class ResNetPlusModel(pl.LightningModule):
+    def __init__(self, 
+                 backbone_model_name="resnet50", 
+                 config=None, 
+                 pretrained=True, # Use ImageNet pre-trained weights
+                 embedding_size=256, 
+                 margin=0.2, 
+                 mining_type="semihard", 
+                 lr=0.001, 
+                 preprocess_lvl=0, 
+                 re_ranking=True, 
+                 outdir="results"):
         super().__init__()
-        self.save_hyperparameters()
         self.config = config
+        if config:
+            backbone_model_name=config['backbone_name'] if config['backbone_name'] else backbone_model_name
+            self.embedding_size=int(config['embedding_size'])
+            margin=config['triplet_loss']['margin']
+            mining_type=config['triplet_loss']['mining_type']
+            self.preprocess_lvl=int(config['preprocess_lvl'])
+            self.re_ranking=config['re_ranking']
+            self.distance_matrix = config['triplet_loss']['distance_matrix']
+            outdir=config['outdir']
+            if not config['use_wandb']:
+                self.save_hyperparameters()
+        else:
+            backbone_model_name=backbone_model_name
+            self.embedding_size=embedding_size
+            margin=margin
+            mining_type=mining_type
+            self.preprocess_lvl=preprocess_lvl
+            self.re_ranking=re_ranking
+            self.distance_matrix = 'euclidean'
+            outdir=outdir
 
-        self.model = timm.create_model(model_name=model_name, pretrained=pretrained, num_classes=0)  # No classification head yet
+        total_channels = calculate_num_channels(self.preprocess_lvl)
 
-        # Freeze the ResNet backbone (except last 3 layers)
-        self.frozen_layers = frozen_layers
-        self.resnet_layers = list(self.model.named_parameters())
-        for name, param in self.resnet_layers[:-1*self.frozen_layers]:
-            param.requires_grad = False
 
-        # Bottleneck
-        num_bottleneck = 512
-        self.fc = nn.Sequential(
-            nn.Linear(2048, num_bottleneck),
-            nn.BatchNorm1d(num_bottleneck),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=0.5),
+        self.backbone = timm.create_model(
+            model_name=backbone_model_name, 
+            pretrained=pretrained,
+            num_classes=0,  # disable final classification layer
+            in_chans=total_channels, # RGB + other channels
+            global_pool=''
         )
-        self.fc.apply(weights_init_kaiming)  # Apply Kaiming initialization
-
-        # Classifier 
-        self.classifier = nn.Sequential(
-            nn.Linear(num_bottleneck, num_classes)
-        )
-        self.classifier.apply(weights_init_classifier)  # Apply classifier initialization
+        # Initialize first layer properly
+        if pretrained:
+            pretrained_conv1 = timm.create_model("resnet50", pretrained=True).conv1
+            # Initialize new weights: copy RGB weights, random for other channels
+            with torch.no_grad():
+                new_weights = self.backbone.conv1.weight.data.clone()
+                new_weights[:, :3] = pretrained_conv1.weight.data  # First 3 channels (RGB)
+                nn.init.kaiming_normal_(new_weights[:, 3:], mode='fan_out')  # the Plus channels
+            self.backbone.conv1.weight = nn.Parameter(new_weights) # Replace weights
         
-        self.train_loss = nn.CrossEntropyLoss()
-        self.train_acc = Accuracy(task='multiclass', num_classes=num_classes)
-        self.val_loss = nn.CrossEntropyLoss()
-        self.val_acc = Accuracy(task='multiclass', num_classes=num_classes)
-        self.gradient = None
-        self.outdir = outdir
-    
-    def activations_hook(self, grad):
-        self.gradient = grad
+        # Feature processing (Pooling)
+        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+        # self.fc = nn.Linear(2048, embedding_size)
+        self.embedding = nn.Linear(self.backbone.feature_info[-1]['num_chs'], 
+                                   self.embedding_size)
+        
+        # Loss and mining
+        self.loss_fn = losses.TripletMarginLoss(margin=margin)
+        self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
 
-    def get_gradient(self):
-        return self.gradient
-
-    def get_activations(self, x):
-        for name, module in self.model.named_modules():
-            if name == 'layer4':
-                x = module(x)
-                x.register_hook(self.activations_hook)
-                return x
-        return None
+       
 
     def forward(self, x):
-         # Forward pass through ResNet-50 backbone
-        features = self.model(x)
-
-        x = features.view(features.size(0), -1) # Flatten output
-        x = self.fc(x)  # Bottleneck
-        x = self.classifier(x)  # Classifier
-
-        return x
-
-    def training_step(self, batch, batch_idx):
-        x, target = batch
-
-        out = self(x)
-        _, pred = out.max(1)
-
-        loss = self.train_loss(out, target)
-        acc = self.train_acc(pred, target)
-        self.log_dict({'train/loss': loss, 'train/acc': acc}, prog_bar=True)
-
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        if config['use_gradcam']:
-            for param in self.model.parameters():
-                param.requires_grad = True
-            with torch.enable_grad():
-                x, target = batch
-                out = self(x)
-                _, pred = out.max(1)
-
-                loss = self.val_loss(out, target)
-                acc = self.val_acc(pred, target)
-                self.log_dict({'val/loss': loss, 'val/acc': acc})
-
-                unnormalized_x = unnormalize(x[0].cpu(), config['transforms']['mean'], config['transforms']['std']).permute(1, 2, 0).numpy()
-                unnormalized_x = np.clip(unnormalized_x, 0, 1)  # Ensure the values are within [0, 1]
-
-
-                cam = GradCAM(model=self.model, target_layers=[self.model.layer4[-1]])
-                targets = [ClassifierOutputTarget(class_idx) for class_idx in target]
-                grayscale_cam = cam(input_tensor=x, targets=targets)
-                grayscale_cam = grayscale_cam[0, :]
-                visualization = show_cam_on_image(unnormalized_x, grayscale_cam, use_rgb=True)
-                img = Image.fromarray((visualization * 255).astype(np.uint8))
-
-                # Log image to 
-                if config['use_wandb']:
-                    wandb_img = wandb.Image(visualization, caption=f"GradCAM Batch {batch_idx} Image 0")
-                    self.logger.experiment.log({"GradCAM Images": wandb_img})
-
-                
-                # save locally
-                os.makedirs(self.outdir, exist_ok=True)
-                img.save(os.path.join(self.outdir, f'cam_image_val_batch{batch_idx}_img0.png'))
-                
-                # To save all images in batch:
-                # for i in range(len(x)):
-                #     grayscale_cam_img = 
-                # grayscale_cam[i]
-                #     visualization = show_cam_on_image(x[i].cpu().numpy().transpose(1, 2, 0), grayscale_cam_img, use_rgb=True)
-                #     img = Image.fromarray((visualization * 255).astype(np.uint8))
-                #     os.makedirs(self.hparams.outdir, exist_ok=True)
-                #     img.save(os.path.join(self.hparams.outdir, f'cam_image_val_batch{batch_idx}_img{i}.png'))
-                
-                # self.model.train()
-            # Re-freeze the model parameters after computing the Grad-CAM
-            for name, param in self.resnet_layers[:-1*self.frozen_layers]:
-                param.requires_grad = False
-        else:
-            x, target = batch
-            out = self(x)
-            _, pred = out.max(1)
-
-            loss = self.val_loss(out, target)
-            acc = self.val_acc(pred, target)
-            self.log_dict({'val/loss': loss, 'val/acc': acc})
-
-    def test_step(self, batch, batch_idx):
-            x, target = batch
-
-            x = x.to(torch.device('cpu'))
-            target = target.to(torch.device('cpu'))
-
-            x.requires_grad = True
-        
-            out = self(x)
-
-            _, pred = out.max(1)
-            if pred.numel() == 1:
-                print(f"BATCH {batch_idx} PREDICTION: {pred.item()}")
-            else:
-                print(f"BATCH {batch_idx} PREDICTIONS: {pred.tolist()}")
-
+        """Input shape: (B, 3+N, H, W)"""
+        features = self.backbone(x)[-1]
+        pooled = self.global_pool(features).flatten(1)
+        embeddings = self.embedding(pooled)
+        embeddings = nn.functional.normalize(embeddings, p=2, dim=1)
+        return embeddings
     
+    def training_step(self, batch, batch_idx):
+        images, labels = batch
+        embeddings = self(images)
+        mined_triplets = self.miner(embeddings, labels)
+        loss = self.loss_fn(embeddings, labels, mined_triplets)
+        self.log("train/loss", loss,  on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        return loss
+    
+    def on_train_start(self): # to run only once: on_train_start / for every val: on_validation_start
+        self.eval()
+        self.on_validation_epoch_start()  # Initialize query/gallery embeddings and labels
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(self.trainer.val_dataloaders[0]):
+                x, target = batch
+                # Generate random embeddings for the query set
+                random_embeddings = torch.randn(x.size(0), self.embedding_size, device=x.device)
+                self.query_embeddings.append(random_embeddings)
+                self.query_labels.append(target)
+            for batch_idx, batch in enumerate(self.trainer.val_dataloaders[1]):
+                x, target = batch
+                # Generate random embeddings for the gallery set
+                random_embeddings = torch.randn(x.size(0), self.embedding_size, device=x.device)
+                self.gallery_embeddings.append(random_embeddings)
+                self.gallery_labels.append(target)
+
+            # Perform validation metric calculation using random embeddings
+            # Compute the distance matrix using the random embeddings
+            query_embeddings = torch.cat(self.query_embeddings)
+            gallery_embeddings = torch.cat(self.gallery_embeddings)
+            query_labels = torch.cat(self.query_labels)
+            gallery_labels = torch.cat(self.gallery_labels)
+
+            # Use a suitable distance metric for mAP calculation
+            distmat = compute_distance_matrix('euclidean', query_embeddings, gallery_embeddings)
+            random_mAP = evaluate_map(distmat, query_labels, gallery_labels)
+            
+            # Log the random baseline mAP
+            print(f"Random mAP: {random_mAP}")
+            self.log("random_val/mAP", random_mAP)
+        # Switch back to training mode
+        self.train()
+    
+    def on_validation_epoch_start(self):
+        self.query_embeddings = []
+        self.query_labels = []
+        self.gallery_embeddings = []
+        self.gallery_labels = []
+
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        x, target = batch
+        embeddings = self(x)
+        if dataloader_idx == 0:
+            # Query data
+            self.query_embeddings.append(embeddings)
+            self.query_labels.append(target)
+        else:
+            # Gallery data
+            self.gallery_embeddings.append(embeddings)
+            self.gallery_labels.append(target)
+
+    def on_validation_epoch_end(self):
+        # Concatenate all embeddings and labels
+        query_embeddings = torch.cat(self.query_embeddings)
+        query_labels = torch.cat(self.query_labels)
+        gallery_embeddings = torch.cat(self.gallery_embeddings)
+        gallery_labels = torch.cat(self.gallery_labels)
+
+        # Compute distance matrix
+        if self.re_ranking:
+            distmat = re_ranking(query_embeddings, gallery_embeddings, k1=20, k2=6, lambda_value=0.3)
+        else:
+            distmat = compute_distance_matrix(self.distance_matrix, query_embeddings, gallery_embeddings, wildlife=True)
+
+        # Compute mAP
+        # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
+        mAP = evaluate_map(distmat, query_labels, gallery_labels)
+        mAP1 = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
+        mAP5 = evaluate_map(distmat, query_labels, gallery_labels, top_k=5)
+        self.log('val/mAP', mAP)
+        self.log('val/mAP1', mAP1)
+        self.log('val/mAP5', mAP5)
+
+        recall_at_k = evaluate_recall_at_k(distmat, query_labels, gallery_labels, k=5)
+        self.log(f'val/Recall@5', recall_at_k)
+
+        accuracy = wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels)
+        self.log(f'val/accuracy', accuracy)
+
     def configure_optimizers(self):
-        # Only optimize the parameters of the added fully connected layers
-        optimizer = get_optimizer(self.config, filter(lambda p: p.requires_grad, self.parameters()))
-        lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
-        return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
+        if self.config:
+            optimizer = get_optimizer(self.config, self.parameters())
+            lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
+            return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
+        else:
+            optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+            return optimizer
+
+

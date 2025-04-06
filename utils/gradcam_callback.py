@@ -14,6 +14,9 @@ from data.transforms import denormalize
 class GradCAMCallback(Callback):
     def __init__(self, model, config, outdir='results', log_every_n_epochs=10):
         """
+        GradCAM code is designed for classification models where the output corresponds to class scores: output is a tensor of size (batch_size, num_classes).
+        In FusionModel the model outputs embeddings, so using the class indices directly to index would not work.
+
         Args:
             model: The model to use for GradCAM visualizations.
             config: Configuration dict, should include the `use_wandb` flag.
@@ -72,7 +75,15 @@ class GradCAMCallback(Callback):
 
                     # cam = GradCAM(model=self.model, target_layers=[self.model.layer4[-1]])
                     cam = GradCAM(model=self.model, target_layers=[target_layer])
-                    targets = [ClassifierOutputTarget(class_idx) for class_idx in target]
+                    # Following targets fails if self.model outputs embeddings of size 128, and class indices higher
+                    # targets = [ClassifierOutputTarget(class_idx) for class_idx in target] # only works for class logits, NOT embedding models
+                    # 
+                    # alternative for embedding model:
+                    # maximize sum of embeddings, forcing the model to focus on regions that contribute to a strong embedding (possibly discriminative features)
+                    embeddings = self.model(x)
+                    targets = [lambda _: torch.sum(embeddings)]
+                    # 
+
                     grayscale_cam = cam(input_tensor=x, targets=targets)[0, :]
                     grayscale_cam = np.repeat(grayscale_cam[:, :, np.newaxis], 3, axis=2) # make it compatible with x - 3 channels
                     visualization = show_cam_on_image(unnormalized_x, grayscale_cam, use_rgb=True)

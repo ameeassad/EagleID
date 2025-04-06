@@ -175,6 +175,7 @@ if __name__ == '__main__':
         'TransformerModel': TransformerModel,
         'EfficientNet': EfficientNet,
         'MegaDescriptor': MegaDescriptor,
+        'ResNetPlusModel': ResNetPlusModel,
     }
     model_name = config['model_architecture']
     model_class = model_classes.get(model_name)

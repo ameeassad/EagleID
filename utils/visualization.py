@@ -6,6 +6,7 @@ import numpy as np
 import ast, math, os
 from PIL import Image
 import cv2
+import textwrap
 
 from data.data_utils import unnormalize
 from preprocess.preprocess_utils import create_mask
@@ -50,22 +51,45 @@ def query_prediction_results_similarity(
         ground_truth_img = load_image(os.path.join(root, ground_truth_img_path))
         
         # --- Visualization Logic ---
+        # Wrap text to a fixed width (20 characters)
+        query_title = textwrap.fill(query_metadata.iloc[idx]["identity"], width=20)
+        predicted_label = db_metadata.iloc[closest_db_idx]['identity']
+        predicted_title = textwrap.fill(predicted_label, width=20)
+        gt_title = textwrap.fill(ground_truth_label, width=20)
+
         # Display query image
         axes[i, 0].imshow(query_img)
-        axes[i, 0].set_title(f'Query: {query_metadata.iloc[idx]["identity"]}')
+        axes[i, 0].set_title(f'Query:\n{query_title}', fontsize=10)
         axes[i, 0].axis('off')
         
         # Display predicted image (exact match)
-        predicted_label = db_metadata.iloc[closest_db_idx]['identity']
         is_correct = (predicted_label == ground_truth_label)
         axes[i, 1].imshow(predicted_img)
-        axes[i, 1].set_title(f'Predicted: {predicted_label}', color='green' if is_correct else 'red')
+        axes[i, 1].set_title(f'Predicted:\n{predicted_title}', fontsize=10,
+                               color='green' if is_correct else 'red')
         axes[i, 1].axis('off')
         
         # Display ground truth image
         axes[i, 2].imshow(ground_truth_img)
-        axes[i, 2].set_title(f'Ground Truth: {ground_truth_label}')
+        axes[i, 2].set_title(f'Ground Truth:\n{gt_title}', fontsize=10)
         axes[i, 2].axis('off')
+    
+        # # Display query image
+        # axes[i, 0].imshow(query_img)
+        # axes[i, 0].set_title(f'Query: {query_metadata.iloc[idx]["identity"]}')
+        # axes[i, 0].axis('off')
+        
+        # # Display predicted image (exact match)
+        # predicted_label = db_metadata.iloc[closest_db_idx]['identity']
+        # is_correct = (predicted_label == ground_truth_label)
+        # axes[i, 1].imshow(predicted_img)
+        # axes[i, 1].set_title(f'Predicted: {predicted_label}', color='green' if is_correct else 'red')
+        # axes[i, 1].axis('off')
+        
+        # # Display ground truth image
+        # axes[i, 2].imshow(ground_truth_img)
+        # axes[i, 2].set_title(f'Ground Truth: {ground_truth_label}')
+        # axes[i, 2].axis('off')
     
     plt.show()  
 
