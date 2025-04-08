@@ -49,6 +49,7 @@ class ResNetPlusModel(pl.LightningModule):
             self.preprocess_lvl=int(config['preprocess_lvl'])
             self.re_ranking=config['re_ranking']
             self.distance_matrix = config['triplet_loss']['distance_matrix']
+            self.lr = config['solver']['BASE_LR']
             outdir=config['outdir']
             if not config['use_wandb']:
                 self.save_hyperparameters()
@@ -60,6 +61,7 @@ class ResNetPlusModel(pl.LightningModule):
             self.preprocess_lvl=preprocess_lvl
             self.re_ranking=re_ranking
             self.distance_matrix = 'euclidean'
+            self.lr = lr
             outdir=outdir
 
         total_channels = calculate_num_channels(self.preprocess_lvl)
@@ -69,19 +71,34 @@ class ResNetPlusModel(pl.LightningModule):
             model_name=backbone_model_name, 
             pretrained=pretrained,
             num_classes=0,  # disable final classification layer
-            in_chans=total_channels, # RGB + other channels
-            global_pool=''
+            features_only=True  # This returns multiple feature maps
         )
-        # Initialize first layer properly
-        if pretrained:
-            pretrained_conv1 = timm.create_model("resnet50", pretrained=True).conv1
-            # Initialize new weights: copy RGB weights, random for other channels
-            with torch.no_grad():
-                new_weights = self.backbone.conv1.weight.data.clone()
-                new_weights[:, :3] = pretrained_conv1.weight.data  # First 3 channels (RGB)
-                nn.init.kaiming_normal_(new_weights[:, 3:], mode='fan_out')  # the Plus channels
-            self.backbone.conv1.weight = nn.Parameter(new_weights) # Replace weights
+        print(self.backbone.feature_info)  # Check the feature info to see what each output corresponds to
         
+        old_conv = self.backbone.conv1
+        # print(f"Original conv1 weight shape: {old_conv.weight.shape}")  # Should be [64, 3, 7, 7]
+        new_conv = nn.Conv2d(
+            in_channels=total_channels, 
+            out_channels=old_conv.out_channels,  # 64
+            kernel_size=old_conv.kernel_size,  # (7, 7)
+            stride=old_conv.stride,  # Usually (2, 2) for ResNet
+            padding=old_conv.padding,  # Usually (3, 3)
+            bias=old_conv.bias is not None  # Usually False for conv1 followed by BN
+        )
+        # print(f"New conv weight shape: {new_conv.weight.shape}")  # Should be [64, total_channels, 7, 7]
+        if pretrained and total_channels >= 3:
+            nn.init.kaiming_normal_(new_conv.weight, mode='fan_out', nonlinearity='relu')
+            with torch.no_grad():
+                # Copy the pretrained weights for the first 3 channels
+                new_conv.weight.data[:, :3, :, :] = old_conv.weight.data.clone()
+                # Initialize the additional channels
+                if total_channels > 3:
+                    nn.init.kaiming_normal_(new_conv.weight.data[:, 3:, :, :], mode='fan_out', nonlinearity='relu')
+        else:
+            # If not pretrained, initialize all weights
+            nn.init.kaiming_normal_(new_conv.weight, mode='fan_out', nonlinearity='relu')
+        self.backbone.conv1 = new_conv
+       
         # Feature processing (Pooling)
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
         # self.fc = nn.Linear(2048, embedding_size)
@@ -92,13 +109,17 @@ class ResNetPlusModel(pl.LightningModule):
         self.loss_fn = losses.TripletMarginLoss(margin=margin)
         self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
 
-       
-
     def forward(self, x):
         """Input shape: (B, 3+N, H, W)"""
-        features = self.backbone(x)[-1]
-        pooled = self.global_pool(features).flatten(1)
-        embeddings = self.embedding(pooled)
+        # print(f"Input shape: {x.shape}")  # Debug: Should be [batch_size, in_channels, 224, 224]
+        features = self.backbone(x)  # Returns a tuple of feature maps
+        # Select the last feature map (assuming you want the deepest features)
+        features = features[-1]  # Take the last element of the tuple
+        # print(f"Features shape before pooling: {features.shape}")  # Should be [B, C, H, W]
+        
+        pooled = self.global_pool(features)  # Shape: (B, 2048, 1, 1)
+        flattened = pooled.view(pooled.size(0), -1)  # Shape: (B, 2048)
+        embeddings = self.embedding(flattened)
         embeddings = nn.functional.normalize(embeddings, p=2, dim=1)
         return embeddings
     

@@ -330,6 +330,21 @@ class SynchMultiChannelTransforms:
 
         # Apply normalization to the RGB image
         rgb_img = self.normalize_transform(image=rgb_img)['image']
+
+        # Ensure heatmap channels have the same spatial dimensions as the rgb_img.
+        if heatmap_channels is not None:
+            rgb_h, rgb_w, _ = rgb_img.shape
+            new_heatmaps = []
+            for hm in heatmap_channels:
+                # Check if current heatmap's dimensions match the RGB image.
+                hm_h, hm_w = hm.shape[:2]
+                if (hm_h, hm_w) != (rgb_h, rgb_w):
+                    # Resize heatmap to match: note that cv2.resize expects (width, height)
+                    hm_resized = cv2.resize(hm, (rgb_w, rgb_h), interpolation=cv2.INTER_LINEAR)
+                else:
+                    hm_resized = hm
+                new_heatmaps.append(hm_resized)
+            heatmap_channels = new_heatmaps
         
         # Convert both RGB image and heatmap channels to tensors
         rgb_img = torch.tensor(rgb_img, dtype=torch.float32).permute(2, 0, 1)  # [3, H, W] for RGB

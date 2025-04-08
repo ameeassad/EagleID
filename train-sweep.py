@@ -18,6 +18,7 @@ from models.fusion_model import FusionModel
 from models.transformer_model import TransformerModel
 from models.resnet_plus_model import ResNetPlusModel
 from models.triplet_loss_model import TripletModel
+from models.megadescriptor import MegaDescriptor
 from utils.gradcam_callback import GradCAMCallback
 
 global config_yml
@@ -26,6 +27,8 @@ MODEL_CLASSES = {
         'FusionModel': FusionModel,
         'TransformerModel': TransformerModel,
         'EfficientNet': EfficientNet,
+        'MegaDescriptor': MegaDescriptor,
+        'ResNetPlusModel': ResNetPlusModel,
     }
 
 

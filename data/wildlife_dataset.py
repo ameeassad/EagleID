@@ -4,6 +4,9 @@ import math
 import ast
 import pandas as pd
 import numpy as np
+from scipy import io
+from pathlib import Path
+import shutil
 
 from wildlife_datasets import datasets, splits
 import pytorch_lightning as pl
@@ -40,7 +43,6 @@ class Wildlife(WildlifeDataset):
         col_path: str = "path",
         col_label: str = "identity", 
         load_label: bool = True,
-        # col_label_idx: str = None,
     ):    
         super().__init__(
             metadata=metadata,
@@ -52,48 +54,7 @@ class Wildlife(WildlifeDataset):
             col_label=col_label,
             load_label=load_label
         )
-        # metadata = metadata.reset_index(drop=True)
-        # if col_label_idx != "tmp_idx":
-        #     self.labels, self.labels_map = pd.factorize(
-        #         metadata[col_label].values
-        #     )
-        # else:
-        #     self.labels = metadata[col_label_idx].values
 
-        # if col_label_idx == "tmp_idx":
-        #     self.labels = metadata[col_label_idx].values
-
-        # self.labels = self.labels  # Inherited from parent
-        # self.labels_map = self.labels_map  # Inherited from 
-        
-        # self.metadata = metadata.reset_index(drop=True)
-        # self.root = root
-        # self.transform = transform
-        # self.img_load = img_load
-        # self.col_path = col_path
-        # self.col_label = col_label
-        # self.load_label = load_label
-
-    # Preprocess and cache JSON or metadata:
-    # Use json.loads during data preparation and store the parsed results.
-    # Save processed metadata in a CSV or pickle file for direct loading.
-
-    # Precompute masks, skeleton channels, heatmaps, or other intensive operations and save them 
-    # to disk in a more accessible format (e.g., .npz, .h5, or PyTorch tensors).
-    # Load precomputed data during training: img = load_preprocessed(mask_path)
-    # def preprocess_data(metadata):
-    #     for idx, data in metadata.iterrows():
-    #         img_path = os.path.join(root, data[col_path])
-    #         img = load_image(img_path)  # Load image using cv2 or Pillow
-    #         if "segmentation" in data:
-    #             mask = mask_coco.decode(eval(data["segmentation"])).astype("bool")
-    #             save_preprocessed(mask, path)
-    #         if "keypoints" in data:
-    #             keypoints = eval(data["keypoints"])
-    #             skeleton = create_skeleton_channel(keypoints, ...)
-    #             save_preprocessed(skeleton, path)
-
-        
     def get_image(self, path):
         """
         Custom image loader, customized based on preprocessing level for raptor images.
@@ -111,18 +72,13 @@ class Wildlife(WildlifeDataset):
             img_path = data[self.col_path]
         img = self.get_image(img_path)
 
-        # print(img_path)
-
+        # SEGMENTATIONS required: segmentation data is wrt. original uncropped image
         if self.img_load in ["full_mask", "full_hide", "bbox_mask", "bbox_hide", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
             if not ("segmentation" in data):
                 raise ValueError(f"{self.img_load} selected but no segmentation found.")
             
             if type(data["segmentation"]) == str:
                 segmentation = eval(data["segmentation"])
-                # try:
-                #     segmentation = json.loads(data["segmentation"])
-                # except json.JSONDecodeError:
-                #     raise ValueError("Segmentation string could not be decoded. Ensure it is a valid JSON format.")
             else:
                 segmentation = data["segmentation"]
             seg_coco = segmentation
@@ -233,7 +189,7 @@ class Wildlife(WildlifeDataset):
             # Crop each heatmap to the bounding box
             cropped_heatmaps = [heatmap[y_min:y_min + h, x_min:x_min + w] for heatmap in keypoint_heatmaps]
 
-        if self.transform:
+        if self.transform: # handles augmentations and concatenations (if relevant)
             if self.img_load == "bbox_mask_skeleton":
                 img, skeleton_channel = self.transform[0](img, skeleton_channel)
                 img = self.transform[1](img, skeleton_channel) #concatenated 
@@ -258,32 +214,6 @@ class Wildlife(WildlifeDataset):
 
     def get_df(self) -> pd.DataFrame:
         return self.metadata
-    
-    # def get_query_df(self) -> pd.DataFrame:
-    #     if 'query' in self.metadata.columns:
-    #         # return self.metadata[self.metadata['query'] == True]
-    #         return self.metadata[self.metadata['query']]
-    #     else:
-    #         print("No query column found.")
-    #         return self.metadata
-    
-    # def get_gallery_df(self) -> pd.DataFrame:
-    #     if 'query' in self.metadata.columns:
-    #         return self.metadata[~self.metadata['query']]
-    #     else:
-    #         print("No query column found.")
-    #         return self.metadata
-    
-    # def get_query_labels(self) -> np.ndarray:
-    #     # return self.labels[self.metadata['query']]
-    #     df = self.get_query_df()
-    #     return df[self.col_label].values
-    
-    # def get_gallery_labels(self) -> np.ndarray:
-    #     # return self.labels[~self.metadata['query']]
-    #     df = self.get_gallery_df()
-    #     return df[self.col_label].values
-    
 
 class WildlifeDataModule(pl.LightningDataModule):
     def __init__(self, 
@@ -301,7 +231,8 @@ class WildlifeDataModule(pl.LightningDataModule):
                  splitter ='closed', 
                  only_cache=False,
                  wildlife_names=None,
-                 classic_transform=False
+                 classic_transform=False,
+                 precompute=False,
                 ):
         # if using config, does not consider rest of parameters
         super().__init__()
@@ -322,7 +253,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.only_cache = config['only_cache']
             self.wildlife_names = config['wildlife_name']
             self.classic_transform = config.get("custom_transform", False)
-
+            self.precompute = config.get("precompute", False)
         else:
             self.data_dir = data_dir
             self.num_workers = num_workers
@@ -338,6 +269,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.only_cache = only_cache
             self.wildlife_names = wildlife_names
             self.classic_transform = classic_transform
+            self.precompute = precompute
 
         # Handle transforms
         if self.preprocess_lvl == 3:
@@ -410,17 +342,14 @@ class WildlifeDataModule(pl.LightningDataModule):
             # remove 'float' keypoints because NaN is treated as float
             df_all = df_all[df_all['keypoints'].apply(lambda x: not isinstance(x, float))]
 
-
-        # # Remove only one image per individual
-        # counts = df_all['identity'].value_counts()
-        # valid_identities = counts[df_all['identity'].value_counts() > 1].index
-        # # Filter the dataframe so each identity has 2 or more images
-        # df_all = df_all[df_all['identity'].isin(valid_identities)].reset_index(drop=True)
-
         # Split the dataset according to closed or open or default via metadata values
         if self.splitter == 'original_split':
             df_train = df_all[df_all['original_split'] == 'train']
             df_test = df_all[df_all['original_split'] == 'test']
+            analyze_split(df_all, df_train.index, df_test.index)
+        elif self.splitter == 'metadata_split':
+            df_train = df_all[df_all['metadata_split'] == 'train']
+            df_test = df_all[df_all['metadata_split'] == 'test']
             analyze_split(df_all, df_train.index, df_test.index)
         else:
             if self.splitter == 'closed':
@@ -439,11 +368,17 @@ class WildlifeDataModule(pl.LightningDataModule):
             for idx_train, idx_test in splitter.split(df_all):
                 analyze_split(df_all, idx_train, idx_test)
             df_train, df_test = df_all.loc[idx_train], df_all.loc[idx_test]
+
+            # Save back to cache
+            df_all['metadata_split'] = ''
+            df_all.loc[idx_train, 'metadata_split'] = 'train'
+            df_all.loc[idx_test, 'metadata_split'] = 'test'
+            original_path = Path(self.cache_path)
+            df_all.to_csv(original_path.with_name(original_path.stem + '_split.csv'), index=False)
         
         # Reset indices
         df_train.reset_index(drop=True, inplace=True)
         df_test.reset_index(drop=True, inplace=True)
-
 
         if config:
             config['arcface_loss']['n_classes'] = len(df_train['identity'].unique())
@@ -462,17 +397,11 @@ class WildlifeDataModule(pl.LightningDataModule):
         print(f"Min images per individual: {df_test['identity'].value_counts().min()}")
         print(f"Max images per individual: {df_test['identity'].value_counts().max()}")
 
-
-        # Original identity label is 'identity' and the new factorized one for remaining identities is 'tmp_idx'
-        # tmp_index is only for model training and cannot be used for evaluation
-        # df_train_tmp_idx, train_labels_map = pd.factorize(df_train['identity'].values)
-        # df_train['tmp_idx'] = df_train_tmp_idx
-        # df_test_tmp_idx, test_labels_map = pd.factorize(df_test['identity'].values)
-        # df_test['tmp_idx'] = df_test_tmp_idx
-
         # Split query set and gallery set for evaluation via SplitQueryDatabase
-        self.val_split = SplitQueryDatabase()
-        df_test = self.val_split(df_test)
+        if not self.splitter == 'metadata_split':
+            self.val_split = SplitQueryDatabase()
+            df_test = self.val_split(df_test)
+        # or via metadata values (if 'query' column is already present)
         df_test['query'] = df_test['query'].astype(bool)
         df_query = df_test[df_test['query']]
         df_gallery = df_test[~df_test['query']]
@@ -491,10 +420,14 @@ class WildlifeDataModule(pl.LightningDataModule):
         elif self.preprocess_lvl == 5:
             self.method = "bbox_mask_heatmaps"
 
-        self.train_dataset = Wildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, col_label = 'identity', img_load=self.method)
-
-        self.val_query_dataset = Wildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method)
-        self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method)
+        if self.precompute:
+            self.train_dataset = PrecomputedWildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, col_label = 'identity', img_load=self.method, category="train_"+self.wildlife_names)
+            self.val_query_dataset = PrecomputedWildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, category="query_"+self.wildlife_names)
+            self.val_gallery_dataset = PrecomputedWildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, category="gallery_"+self.wildlife_names)
+        else:
+            self.train_dataset = Wildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, col_label = 'identity', img_load=self.method)
+            self.val_query_dataset = Wildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method)
+            self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
@@ -562,3 +495,295 @@ class WildlifeDataModule(pl.LightningDataModule):
         print("Segmentation format is not recognized.")
         return None
 
+class PrecomputedWildlife(WildlifeDataset):
+    def __init__(
+        self,
+        metadata: pd.DataFrame | None = None,
+        root: str | None = None,
+        split: Callable | None = None,
+        transform: callable = None,
+        img_load: str = "full",
+        col_path: str = "path",
+        col_label: str = "identity",
+        load_label: bool = True,
+        cache_dir: str = "../dataset/data_cache",
+        category: str = "example_wildlife",
+    ):
+        super().__init__(
+            metadata=metadata,
+            root=root,
+            split = split,
+            transform=transform,
+            img_load=img_load,
+            col_path=col_path,
+            col_label=col_label,
+            load_label=load_label
+        )
+        
+        os.makedirs(cache_dir, exist_ok=True)
+        self.cache_dir = cache_dir 
+        self.category = category
+
+        if img_load not in ["bbox_mask", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
+            raise ValueError(f"Invalid img_load argument: {img_load}. This class is only for preprocessed images.")
+
+        self.cache_files = {
+            "bbox_mask": os.path.join(self.cache_dir, category + "_masks.npz"),
+            "bbox_mask_skeleton": os.path.join(self.cache_dir, category +"_skeletons.npz"),
+            "bbox_mask_heatmaps": os.path.join(self.cache_dir, category +"_heatmaps.npz"),
+            "bbox_mask_components": os.path.join(self.cache_dir, category +"_components.npz")
+        }
+        self.data_cache = self._load_cache()
+        print(f"Precomputed data loaded from {img_load} for {category}. Only to be used for processing lvl 2-5")
+
+
+    def _load_cache(self):
+        """Load all precomputed data into memory as dictionaries"""
+        # Load the masks cache regardless of self.img_load
+        mask_cache_file = self.cache_files["bbox_mask"]
+        if not os.path.exists(mask_cache_file):
+            self._precompute_and_cache(mask = True)
+        masks_data = np.load(mask_cache_file, allow_pickle=True)
+        masks = dict(masks_data["masks"].item())
+        print(f"Loaded mask cache from {mask_cache_file}: Masks count: {len(masks)}", flush=True)
+
+        # load the primary data type for self.img_load
+        primary_cache_file = self.cache_files[self.img_load]
+        if not os.path.exists(primary_cache_file):
+            self._precompute_and_cache()
+        
+        data = np.load(primary_cache_file, allow_pickle=True)
+        # Extract the primary data based on the file naming convention.
+        data_type = self.img_load.split('_')[-1]  # e.g., "skeletons", "heatmaps", "components", or "masks"
+        cache = {data_type: dict(data[data_type].item())}
+        
+        count = len(cache[data_type])
+        print(f"Loaded primary cache from {primary_cache_file}: {data_type.capitalize()}: {count}", flush=True)
+        
+        # Always include masks from the mask npz.
+        cache["masks"] = masks
+        return cache
+
+    def _precompute_and_cache(self, mask=False):
+        """Precompute and save only the data type required by img_load, as well as the masks."""
+        p_type = "bbox_mask" if mask else self.img_load
+        # temp_dir = Path(self.cache_dir) / f"temp_precompute_{p_type}"
+        # temp_dir.mkdir(exist_ok=True)
+        # try:
+        print(f"Starting precomputation for {p_type} ({len(self.metadata)} images)...", flush=True)
+        data_type = p_type.split('_')[-1]  # e.g., "skeletons", "heatmaps", etc.
+        all_masks = {}
+        all_data = {}
+
+        for idx in range(len(self.metadata)):
+            print(f"Processing image {idx + 1}/{len(self.metadata)}", flush=True)
+            data = self.metadata.iloc[idx]
+            img_path = os.path.join(self.root, data[self.col_path])
+            filename = os.path.splitext(os.path.basename(img_path))[0]
+
+            # Enforce that segmentation must exist for these modes.
+            if "segmentation" not in data or not data["segmentation"]:
+                raise ValueError(f"{p_type} selected but no segmentation found for image {filename}.")
+            # For skeleton, heatmaps, or components, also require keypoints.
+            if p_type in ["bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
+                if "keypoints" not in data or not data["keypoints"]:
+                    raise ValueError(f"{p_type} selected but no keypoints found for image {filename}.")
+
+            img = Image.open(img_path)
+            bbox = self._parse_bbox(data)
+            segmentation = self._parse_segmentation(data)
+            keypoints = self._parse_keypoints(data)
+
+            # Always compute masks since they're used in __getitem__
+            # all_masks[filename] = self._compute_mask(segmentation, img.size[1], img.size[0], bbox)
+            all_masks[filename] = self._compute_mask(segmentation, img.size[1], img.size[0], bbox)
+
+            # Compute only the requested data type (if not 'masks' itself)
+            if data_type == "mask":
+                pass  # Only masks are needed.
+            elif data_type == "skeleton":
+                all_data[filename] = self._compute_skeleton(keypoints, bbox, img.size[1], img.size[0])
+            elif data_type == "heatmaps":
+                all_data[filename] = self._compute_heatmaps(keypoints, bbox, img.size[1], img.size[0])
+            elif data_type == "components":
+                all_data[filename] = self._compute_components(img, bbox, keypoints, segmentation)
+
+        #     # Optionally, save individual temporary files.
+        #     np.save(temp_dir / f"{filename}_mask.npy", all_masks[filename])
+        #     if data_type != "mask":
+        #         np.save(temp_dir / f"{filename}_{data_type}.npy", all_data[filename])
+
+        # print(f"Combining temporary files into {self.cache_files[p_type]}...", flush=True)
+        # # Combine masks from temp directory.
+        # all_masks = {f.stem.replace('_mask', ''): np.load(f) for f in temp_dir.glob("*_mask.npy")}
+        
+        if data_type == "mask":
+            np.savez_compressed(self.cache_files[p_type], masks=all_masks)
+        else:
+            # all_data = {f.stem.replace(f'_{data_type}', ''): np.load(f, allow_pickle=True) 
+            #             for f in temp_dir.glob(f"*_{data_type}.npy")}
+            np.savez_compressed(self.cache_files[p_type], masks=all_masks, **{data_type: all_data})
+
+    # finally:
+    #     shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def __len__(self):
+        return len(self.metadata)
+    
+    def get_image(self, path):
+        """
+        Custom image loader, customized based on preprocessing level for raptor images.
+        """
+        img = cv2.imread(path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = Image.fromarray(img)
+        return img
+
+    def __getitem__(self, idx):
+        """
+        Get image from saved cache rather than recomputing it.
+        """
+
+        data = self.metadata.iloc[idx]
+        if self.root:
+            img_path = os.path.join(self.root, data[self.col_path])
+        else:
+            img_path = data[self.col_path]
+        filename = os.path.splitext(os.path.basename(img_path))[0]
+        img = self.get_image(img_path)
+        
+        # First crop the image, bc saved seg and keypoint is relative to crop
+        if not ("bbox" in data):
+            raise ValueError(f"{self.img_load} selected but no bbox found.")
+        bbox = self._parse_bbox(data)
+        img = img.crop((bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]))
+
+        # Apply mask always
+        mask = self.data_cache['masks'].get(filename)
+        if mask is None:
+            raise ValueError(f"No mask found for {filename} in cache")
+        img_array = np.array(img)
+
+        if mask.shape[:2] != img_array.shape[:2]:
+            print(f"Idx {idx}: Shape mismatch! img_array {img_array.shape[:2]} vs mask {mask.shape[:2]}")
+            segmentation = self._parse_segmentation(data)
+            mask = self._compute_mask(segmentation, img.size[1], img.size[0])
+
+        img_array = img_array * mask[..., None] if mask.ndim == 2 else img_array * mask
+        img = Image.fromarray(img_array.astype('uint8'))
+
+
+        # Apply transforms based on img_load type
+        if self.img_load == "bbox_mask_skeleton":
+            skeleton = self.data_cache['skeleton'].get(filename)
+        elif self.img_load == "bbox_mask_heatmaps":
+            heatmaps = self.data_cache['heatmaps'].get(filename)
+        elif self.img_load == "bbox_mask_components":
+            components = self.data_cache['components'].get(filename)
+        if self.transform:
+            if self.img_load == "bbox_mask_skeleton" and skeleton is not None:
+                img, skeleton_channel = self.transform[0](img, skeleton)
+                img = self.transform[1](img, skeleton_channel)  # concatenated
+            elif self.img_load == "bbox_mask_heatmaps" and heatmaps is not None:
+                img, heatmap_channels = self.transform[0](img, np.stack(heatmaps) if isinstance(heatmaps, list) else heatmaps)
+                # img, heatmap_channels = self.transform[0](img, np.stack(heatmaps))
+                img = self.transform[1](img, heatmap_channels)  # concatenated
+            elif self.img_load == "bbox_mask_components" and components is not None:
+                img = self.transform[0](img)
+                img = self.transform[1](img, components)  # concatenated
+            else:
+                # Standard image transform
+                for t in self.transform:
+                    img = t(img)
+
+        # Return image and label
+        if self.load_label:
+            return img, self.labels[idx]
+        return img
+
+    def _parse_bbox(self, data):
+        # if type(data["bbox"]) == str:
+        #     bbox = json.loads(data["bbox"])
+        # else:
+        #     bbox = data["bbox"]
+        # return (bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3])
+    
+        bbox = data['bbox']
+        raw_bbox = bbox
+        bbox = eval(bbox) if isinstance(bbox, str) else bbox
+        parsed_bbox = [int(round(coord)) for coord in bbox]
+        return parsed_bbox
+    
+    def _parse_segmentation(self, data):
+        seg = data['segmentation']
+        return eval(seg) if isinstance(seg, str) else seg
+
+    def _parse_keypoints(self, data):
+        kp = data['keypoints']
+        return eval(kp) if isinstance(kp, str) else kp
+    
+    def _compute_mask(self, segmentation, height, width, bbox=None):
+        if isinstance(segmentation, list):
+            rle = mask_coco.frPyObjects(segmentation, height, width)
+            segmentation = mask_coco.merge(rle)
+        mask = mask_coco.decode(segmentation).astype(bool)
+        if bbox:
+            # Convert bbox coordinates to integers
+            x, y, w, h = [int(round(coord)) for coord in bbox]
+            # Ensure we don't go out of bounds
+            y_start = max(0, y)
+            y_end = min(mask.shape[0], y + h)
+            x_start = max(0, x)
+            x_end = min(mask.shape[1], x + w)
+            mask = mask[y_start:y_end, x_start:x_end]
+            if mask.shape != (h, w):
+                print(f"Mask crop mismatch! Expected {(h, w)}, got {mask.shape}")
+        return mask
+
+    # def _compute_skeleton(self, keypoints, bbox, height, width):
+    #     connections = get_skeleton_info()
+    #     skeleton = create_skeleton_channel(keypoints, connections, height, width)
+    #     x, y, w, h = bbox
+    #     return skeleton[y:y+h, x:x+w]
+
+    def _compute_skeleton(self, keypoints, bbox, height, width, crop_to_bbox=False):
+        """
+        Compute the skeleton channel, optionally cropped to bbox.
+        
+        Args:
+            keypoints (list): List of keypoints.
+            bbox (list): Bounding box [x, y, w, h].
+            height (int): Full image height.
+            width (int): Full image width.
+            crop_to_bbox (bool): If True, compute on cropped region; if False, full image and crop after.
+        
+        Returns:
+            np.array: Cropped skeleton channel.
+        """
+        if not keypoints or len(keypoints) < 2:
+            x, y, w, h = [int(round(coord)) for coord in bbox]
+            return np.zeros((h, w), dtype=np.float32)
+
+        connections = get_skeleton_info()
+        if crop_to_bbox:
+            # Pass bbox to create_skeleton_channel for direct cropping
+            skeleton = create_skeleton_channel(keypoints, connections, height, width, crop_to_bbox=bbox)
+        else:
+            # Compute on full image and crop afterward
+            skeleton = create_skeleton_channel(keypoints, connections, height, width, crop_to_bbox=None)
+            x, y, w, h = [int(round(coord)) for coord in bbox]
+            skeleton = skeleton[y:y+h, x:x+w]
+        
+        return skeleton
+
+    def _compute_heatmaps(self, keypoints, bbox, height, width):
+        x, y, w, h = bbox
+        heatmaps = create_multichannel_heatmaps(keypoints, height, width, w, h, 25)
+        return [heatmap[y:y+h, x:x+w] for heatmap in heatmaps]
+
+    def _compute_components(self, img, bbox, keypoints, segmentation):
+        img_array = np.array(img.convert("RGB"))
+        keypoint_labels = get_keypoints_info()
+        return component_generation_module(
+            img_array, bbox, keypoints, keypoint_labels, True, segmentation
+        )

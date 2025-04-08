@@ -8,15 +8,16 @@ animal_cat: bird
 outdir: results
 dataset: /proj/nobackup/aiforeagles/raptor_individuals_cropped/
 cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv
-splitter: closed
+splitter: custom_closed
 split_ratio: 0.8
 
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
+precompute: True
 
-model_architecture: FusionModel # TripletModel, FusionModel, EfficientNet, TransformerModel
+model_architecture: ResNetPlusModel # TripletModel, FusionModel, EfficientNet, TransformerModel
 backbone_name: resnet50 # efficientnet_b0, resnet50, swin_tiny_patch4_window7_224
 checkpoint: 
-preprocess_lvl: 0 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
+preprocess_lvl: 3 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
 
 batch_size: 64 # 32, 64, 128 (Larger can provide more diverse triplets in each batch -> impprove quality of mined triplets)
 img_size: 224 # 224, 256, 384, 512
@@ -32,8 +33,9 @@ use_gradcam: False
 transforms:
   mean: [0.485, 0.456, 0.406]
   std: [0.229, 0.224, 0.225]
+classic_transform: False
 
-embedding_size: 128 # choose between: 128, 256, 512, 768, 2048
+embedding_size: 512 # choose between: 128, 256, 512, 768, 2048
 
 triplet_loss:
   margin: 0.5 # choose between: 0.2, 0,5, 0.7 (higher encourages harder triplet mining and stronger gradients)

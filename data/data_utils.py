@@ -240,7 +240,7 @@ class CustomClosedSetSplit(splits.ClosedSetSplit):
             shuffled_indices = df_individual.index[lcg.random_permutation(n)].tolist()
 
             if n == 1:
-                idx_train.extend(shuffled_indices)
+                idx_test.extend(shuffled_indices) # cannot be used for triplet mining
             elif n == 2:
                 idx_train.extend(shuffled_indices)
             elif n == 3:

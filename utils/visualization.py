@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
+import json
 import pandas as pd
 import numpy as np
 import ast, math, os
@@ -74,85 +75,151 @@ def query_prediction_results_similarity(
         axes[i, 2].set_title(f'Ground Truth:\n{gt_title}', fontsize=10)
         axes[i, 2].axis('off')
     
-        # # Display query image
-        # axes[i, 0].imshow(query_img)
-        # axes[i, 0].set_title(f'Query: {query_metadata.iloc[idx]["identity"]}')
-        # axes[i, 0].axis('off')
-        
-        # # Display predicted image (exact match)
-        # predicted_label = db_metadata.iloc[closest_db_idx]['identity']
-        # is_correct = (predicted_label == ground_truth_label)
-        # axes[i, 1].imshow(predicted_img)
-        # axes[i, 1].set_title(f'Predicted: {predicted_label}', color='green' if is_correct else 'red')
-        # axes[i, 1].axis('off')
-        
-        # # Display ground truth image
-        # axes[i, 2].imshow(ground_truth_img)
-        # axes[i, 2].set_title(f'Ground Truth: {ground_truth_label}')
-        # axes[i, 2].axis('off')
-    
     plt.show()  
 
-def query_prediction_results(root, query_metadata, db_metadata, query_start, predictions, num_images=10):
-    fig, axes = plt.subplots(num_images, 3, figsize=(10, 3 * num_images))
+
+def query_prediction_results_similarity_preprocessed(
+        root,
+        query_metadata,
+        db_metadata,
+        query_start,
+        similarity_scores, 
+        num_images=10,
+        preprocess_option: int = None  # if 2, show preprocessed (masked) image in extra column
+    ):
+    """
+    Visualizes query, predicted, and ground truth images side-by-side.
+    
+    - With 3 columns by default (Query, Predicted, Ground Truth).
+    - If preprocess_option == 2, a fourth column shows the preprocessed (masked) image.
+    - If preprocess_option >= 3, a fourth column shows keypoints drawn on the query image.
+    """
+    # Determine the number of columns.
+    num_columns = 4 if preprocess_option in [2] or (preprocess_option is not None and preprocess_option >= 3) else 3
+    
+    fig, axes = plt.subplots(num_images, num_columns, figsize=(3 * num_columns, 3 * num_images))
     fig.tight_layout(pad=0.5)
+    
+    # If only one row, convert axes to 2D array for consistent indexing.
+    if num_images == 1:
+        axes = np.expand_dims(axes, axis=0)
     
     for i in range(num_images):
         idx = query_start + i
+        query_row = query_metadata.iloc[idx]
         
-        # Query image
-        query_img_path = query_metadata.iloc[idx]['path']
-        # print("query img path:", query_img_path)
-        query_img = load_image(os.path.join(root, query_img_path))
+        # Load query image.
+        query_img = load_image(os.path.join(root, query_row['path']))
         
-        # Predicted image
-        predicted_label = predictions[idx]
-        # print("predicted label:", predicted_label)
+        # Predicted image (exact match).
+        closest_db_idx = np.argmax(similarity_scores[idx])
+        predicted_img_path = db_metadata.iloc[closest_db_idx]['path']
+        predicted_img = load_image(os.path.join(root, predicted_img_path))
         
-        filtered_id_pred = db_metadata[db_metadata['identity'] == predicted_label] #predicted IDENTITY (NOT image necessarily)
-        # print("filtered id pred:", filtered_id_pred)
-
-        predicted_img_path = filtered_id_pred['path'].values[0]
-        # print("predicted img path:", predicted_img_path)
-        if 'species' in filtered_id_pred.columns:
-            predicted_img_species = filtered_id_pred['species'].values[0]
-        else:
-            predicted_img_species = ''
-        # print("predicted img species:", predicted_img_species)
-        predicted_img = load_image(os.path.join(root,predicted_img_path))
+        # Ground truth image (first match from db_metadata with matching identity).
+        ground_truth_label = query_row['identity']
+        filtered_truth = db_metadata[db_metadata['identity'] == ground_truth_label]
+        ground_truth_img_path = filtered_truth['path'].values[0]
+        ground_truth_img = load_image(os.path.join(root, ground_truth_img_path))
         
-        # Ground truth image
-        ground_truth_label = query_metadata.iloc[idx]['identity'] # identity of the query image
-        # print ("ground truth label:", ground_truth_label)
-        filtered_id_truth = db_metadata[db_metadata['identity'] == ground_truth_label] # get that from db
-        # print("filtered id truth:", filtered_id_truth)
-        print
-
-        ground_truth_img_path = filtered_id_truth['path'].values[0] #ERROR
-        if 'species' in filtered_id_truth.columns:
-            truth_img_species = filtered_id_truth['species'].values[0]
-        else:
-            truth_img_species = ''
-        ground_truth_img = load_image(os.path.join(root,ground_truth_img_path))
+        # Titles with wrapped text.
+        query_title = textwrap.fill(query_row["identity"], width=20)
+        predicted_label = db_metadata.iloc[closest_db_idx]['identity']
+        predicted_title = textwrap.fill(predicted_label, width=20)
+        gt_title = textwrap.fill(ground_truth_label, width=20)
         
-        # Display query image
+        # --- Plotting ---
+        # Query image.
         axes[i, 0].imshow(query_img)
-        axes[i, 0].set_title(f'Query Image: {query_metadata.iloc[idx]['identity']}')
+        axes[i, 0].set_title(f'Query:\n{query_title}', fontsize=10)
         axes[i, 0].axis('off')
-
-        predicted_color = 'green' if (predicted_label == ground_truth_label) else 'red'
         
-        # Display predicted image
+        # Predicted image.
+        is_correct = (predicted_label == ground_truth_label)
         axes[i, 1].imshow(predicted_img)
-        axes[i, 1].set_title(f'Predicted: {predicted_img_species}, {predicted_label}', color=predicted_color)
+        axes[i, 1].set_title(f'Predicted:\n{predicted_title}', fontsize=10,
+                               color='green' if is_correct else 'red')
         axes[i, 1].axis('off')
         
-        # Display ground truth image
+        # Ground truth image.
         axes[i, 2].imshow(ground_truth_img)
-        axes[i, 2].set_title(f'Ground Truth: {truth_img_species}, {ground_truth_label}')
+        axes[i, 2].set_title(f'Ground Truth:\n{gt_title}', fontsize=10)
         axes[i, 2].axis('off')
-
+        
+        # Extra column based on preprocess_option.
+        if preprocess_option == 2:
+            # Show masked (preprocessed) image.
+            masked_img_arr = get_masked_image(root, query_row)
+            axes[i, 3].imshow(masked_img_arr)
+            axes[i, 3].set_title("Masked Image", fontsize=10)
+            axes[i, 3].axis('off')
+        elif preprocess_option is not None and preprocess_option >= 3:
+            # Show keypoints on image.
+            # Open the query image with PIL for drawing.
+            image = Image.open(os.path.join(root, query_row['path']))
+            ax = axes[i, 3]
+            ax.imshow(image)
+            
+            # Draw the bounding box.
+            bbox = query_row['bbox']
+            if type(bbox) == str:
+                bbox = json.loads(bbox)
+            rect = patches.Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3],
+                                     linewidth=2, edgecolor='r', facecolor='none')
+            ax.add_patch(rect)
+            
+            # Draw keypoints.
+            keypoints = query_row.get('keypoints', [])
+            # Convert keypoints from strings to floats if necessary.
+            if keypoints and isinstance(keypoints[0], str):
+                keypoints = [float(k) for k in keypoints]
+            keypoint_names = get_keypoints_info()
+            # Expecting keypoints as a list of numbers: [x, y, v, ...]
+            for j in range(0, len(keypoints), 3):
+                x, y, v = keypoints[j], keypoints[j+1], keypoints[j+2]
+                if v > 0:  # Visible keypoint.
+                    ax.plot(x, y, 'bo')
+                    try:
+                        kp_name = keypoint_names[j//3]
+                    except IndexError:
+                        kp_name = ''
+                    ax.text(x, y, kp_name, fontsize=6, color='white')
+            
+            ax.set_title("Keypoints", fontsize=10)
+            ax.axis('off')
+    
     plt.show()
+
+def get_masked_image(root, df_row):
+    """
+    Process the image using the same logic as masked_img but return
+    the resulting image array instead of plotting it.
+    """
+    # Get values from the DataFrame row
+    image_path = os.path.join(root, df_row['path'])
+    bbox = df_row['bbox']
+    segmentation = df_row['segmentation']
+    label = df_row['identity']
+    
+    # Open image
+    image = Image.open(image_path)
+    
+    # Compute bounding box coordinates
+    if type(bbox) == str:
+        bbox = json.loads(bbox)
+    x_min = math.floor(bbox[0])
+    y_min = math.floor(bbox[1])
+    w = math.ceil(bbox[2])
+    h = math.ceil(bbox[3])
+    
+    # Create mask and apply it
+    mask = create_mask(image.size, segmentation)
+    masked_image = np.array(image) * np.expand_dims(mask, axis=2)
+    masked_image = Image.fromarray(masked_image.astype('uint8'))
+    
+    # Crop to bounding box
+    masked_image = masked_image.crop((x_min, y_min, x_min + w, y_min + h))
+    return np.array(masked_image)
 
 
 def masked_img(root, df_row=None, image_path=None, bbox=None, segmentation=None, normalized=False):
@@ -265,3 +332,4 @@ def keypoint_names_on_img(root, df_row=None, image_path=None, bbox=None, keypoin
     # Show the image with keypoints, skeleton, and joint names
     cv2.imwrite(f'results/output_image-{label}.jpg', img)
     #end visualization
+
