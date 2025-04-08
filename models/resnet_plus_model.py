@@ -72,38 +72,43 @@ class ResNetPlusModel(pl.LightningModule):
             pretrained=pretrained,
             num_classes=0,  # disable final classification layer
             features_only=True  # This returns multiple feature maps
-        )
-        print(self.backbone.feature_info)  # Check the feature info to see what each output corresponds to
+        )        
         
-        old_conv = self.backbone.conv1
-        # print(f"Original conv1 weight shape: {old_conv.weight.shape}")  # Should be [64, 3, 7, 7]
-        new_conv = nn.Conv2d(
-            in_channels=total_channels, 
-            out_channels=old_conv.out_channels,  # 64
-            kernel_size=old_conv.kernel_size,  # (7, 7)
-            stride=old_conv.stride,  # Usually (2, 2) for ResNet
-            padding=old_conv.padding,  # Usually (3, 3)
-            bias=old_conv.bias is not None  # Usually False for conv1 followed by BN
-        )
-        # print(f"New conv weight shape: {new_conv.weight.shape}")  # Should be [64, total_channels, 7, 7]
-        if pretrained and total_channels >= 3:
-            nn.init.kaiming_normal_(new_conv.weight, mode='fan_out', nonlinearity='relu')
-            with torch.no_grad():
-                # Copy the pretrained weights for the first 3 channels
-                new_conv.weight.data[:, :3, :, :] = old_conv.weight.data.clone()
-                # Initialize the additional channels
-                if total_channels > 3:
-                    nn.init.kaiming_normal_(new_conv.weight.data[:, 3:, :, :], mode='fan_out', nonlinearity='relu')
-        else:
-            # If not pretrained, initialize all weights
-            nn.init.kaiming_normal_(new_conv.weight, mode='fan_out', nonlinearity='relu')
-        self.backbone.conv1 = new_conv
+        if preprocess_lvl > 2:
+            old_conv = self.backbone.conv1
+            # print(f"Original conv1 weight shape: {old_conv.weight.shape}")  # Should be [64, 3, 7, 7]
+            new_conv = nn.Conv2d(
+                in_channels=total_channels, 
+                out_channels=old_conv.out_channels,  # 64
+                kernel_size=old_conv.kernel_size,  # (7, 7)
+                stride=old_conv.stride,  # Usually (2, 2) for ResNet
+                padding=old_conv.padding,  # Usually (3, 3)
+                bias=old_conv.bias is not None  # Usually False for conv1 followed by BN
+            )
+            # print(f"New conv weight shape: {new_conv.weight.shape}")  # Should be [64, total_channels, 7, 7]
+            if pretrained and total_channels >= 3:
+                nn.init.kaiming_normal_(new_conv.weight, mode='fan_out', nonlinearity='relu')
+                with torch.no_grad():
+                    # Copy the pretrained weights for the first 3 channels
+                    new_conv.weight.data[:, :3, :, :] = old_conv.weight.data.clone()
+                    # Initialize the additional channels
+                    if total_channels > 3:
+                        nn.init.kaiming_normal_(new_conv.weight.data[:, 3:, :, :], mode='fan_out', nonlinearity='relu')
+            else:
+                # If not pretrained, initialize all weights
+                nn.init.kaiming_normal_(new_conv.weight, mode='fan_out', nonlinearity='relu')
+            self.backbone.conv1 = new_conv
        
         # Feature processing (Pooling)
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
         # self.fc = nn.Linear(2048, embedding_size)
-        self.embedding = nn.Linear(self.backbone.feature_info[-1]['num_chs'], 
-                                   self.embedding_size)
+        # self.embedding = nn.Linear(self.backbone.feature_info[-1]['num_chs'], 
+        #                            self.embedding_size)
+        self.embedding = nn.Sequential(
+            nn.Linear(self.backbone.feature_info[-1]['num_chs'], self.embedding_size),
+            nn.BatchNorm1d(self.embedding_size),
+            nn.Dropout(p=0.3)  # Regularization
+        )
         
         # Loss and mining
         self.loss_fn = losses.TripletMarginLoss(margin=margin)

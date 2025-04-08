@@ -576,7 +576,6 @@ class PrecomputedWildlife(WildlifeDataset):
         all_data = {}
 
         for idx in range(len(self.metadata)):
-            print(f"Processing image {idx + 1}/{len(self.metadata)}", flush=True)
             data = self.metadata.iloc[idx]
             img_path = os.path.join(self.root, data[self.col_path])
             filename = os.path.splitext(os.path.basename(img_path))[0]

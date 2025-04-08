@@ -56,10 +56,10 @@ early_stopping:
   mode: min
 
 solver:
-  OPT: adam  # adam, SGD
+  OPT: SGD  # adam, SGD
   WEIGHT_DECAY: 0.0001 # 0.001, 0.0001 (small dataset)
   MOMENTUM: 0.9  # only when OPT is sgd
-  BASE_LR: 0.001
+  BASE_LR: 0.01 # if SGD use 0.01 / if Adam use 0.001
   LR_SCHEDULER: reduce_on_plateau  # step, multistep, reduce_on_plateau
   LR_DECAY_RATE: 0.1
   LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
