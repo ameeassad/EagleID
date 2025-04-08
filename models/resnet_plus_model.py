@@ -74,7 +74,7 @@ class ResNetPlusModel(pl.LightningModule):
             features_only=True  # This returns multiple feature maps
         )        
         
-        if preprocess_lvl > 2:
+        if self.preprocess_lvl > 2:
             old_conv = self.backbone.conv1
             # print(f"Original conv1 weight shape: {old_conv.weight.shape}")  # Should be [64, 3, 7, 7]
             new_conv = nn.Conv2d(
