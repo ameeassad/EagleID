@@ -11,7 +11,7 @@ parameters:
   batch_size:
     values: [64, 128]
   embedding_size:
-    values: [128, 768]
+    values: 
   triplet_loss:
     parameters:
       margin:
