@@ -39,6 +39,8 @@ def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
         filename='epoch{epoch:03d}',
         auto_insert_metric_name=False,
         save_top_k=1,
+        monitor='val_loss',
+        mode='min',
         every_n_epochs=checkpoint_interval,
         save_last=True,
     )
