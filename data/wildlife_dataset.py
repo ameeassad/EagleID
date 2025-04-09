@@ -369,13 +369,26 @@ class WildlifeDataModule(pl.LightningDataModule):
                 analyze_split(df_all, idx_train, idx_test)
             df_train, df_test = df_all.loc[idx_train], df_all.loc[idx_test]
 
-            # Save back to cache
+            # Also handle query / gallery in dataframe (only if metadata_split NOT selected)
+            if 'query' not in df_all.columns:
+                # Split query set and gallery set for evaluation via SplitQueryDatabase
+                self.val_split = SplitQueryDatabase()
+                df_test = self.val_split(df_test)
+                df_test['query'] = df_test['query'].astype(bool)
+                df_all['query'] = df_test['query']  # save it to original
+
+            # Save train/test split back to cache (only if metadata_split NOT selected)
             df_all['metadata_split'] = ''
             df_all.loc[idx_train, 'metadata_split'] = 'train'
             df_all.loc[idx_test, 'metadata_split'] = 'test'
             original_path = Path(self.cache_path)
             df_all.to_csv(original_path.with_name(original_path.stem + '_split.csv'), index=False)
-        
+
+        # Happens for all split options, assuming 'query' column is present
+        df_test['query'] = df_test['query'].astype(bool)
+        df_query = df_test[df_test['query']]
+        df_gallery = df_test[~df_test['query']]
+
         # Reset indices
         df_train.reset_index(drop=True, inplace=True)
         df_test.reset_index(drop=True, inplace=True)
@@ -396,15 +409,6 @@ class WildlifeDataModule(pl.LightningDataModule):
         print(f"Mean images per individual: {df_test['identity'].value_counts().mean()}")
         print(f"Min images per individual: {df_test['identity'].value_counts().min()}")
         print(f"Max images per individual: {df_test['identity'].value_counts().max()}")
-
-        # Split query set and gallery set for evaluation via SplitQueryDatabase
-        if not self.splitter == 'metadata_split':
-            self.val_split = SplitQueryDatabase()
-            df_test = self.val_split(df_test)
-        # or via metadata values (if 'query' column is already present)
-        df_test['query'] = df_test['query'].astype(bool)
-        df_query = df_test[df_test['query']]
-        df_gallery = df_test[~df_test['query']]
 
         # Handle for Wildlife class parameter
         if self.preprocess_lvl == 0:
