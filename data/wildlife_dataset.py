@@ -528,8 +528,8 @@ class PrecomputedWildlife(WildlifeDataset):
             raise ValueError(f"Invalid img_load argument: {img_load}. This class is only for preprocessed images.")
 
         self.cache_files = {
-            "bbox_mask": os.path.join(self.cache_dir, category + "_masks.npz"),
-            "bbox_mask_skeleton": os.path.join(self.cache_dir, category +"_skeletons.npz"),
+            "bbox_mask": os.path.join(self.cache_dir, category + "_mask.npz"),
+            "bbox_mask_skeleton": os.path.join(self.cache_dir, category +"_skeleton.npz"),
             "bbox_mask_heatmaps": os.path.join(self.cache_dir, category +"_heatmaps.npz"),
             "bbox_mask_components": os.path.join(self.cache_dir, category +"_components.npz")
         }
@@ -544,7 +544,7 @@ class PrecomputedWildlife(WildlifeDataset):
         if not os.path.exists(mask_cache_file):
             self._precompute_and_cache(mask = True)
         masks_data = np.load(mask_cache_file, allow_pickle=True)
-        masks = dict(masks_data["masks"].item())
+        masks = dict(masks_data["mask"].item())
         print(f"Loaded mask cache from {mask_cache_file}: Masks count: {len(masks)}", flush=True)
 
         # load the primary data type for self.img_load
@@ -554,24 +554,21 @@ class PrecomputedWildlife(WildlifeDataset):
         
         data = np.load(primary_cache_file, allow_pickle=True)
         # Extract the primary data based on the file naming convention.
-        data_type = self.img_load.split('_')[-1]  # e.g., "skeletons", "heatmaps", "components", or "masks"
+        data_type = self.img_load.split('_')[-1]  # "skeleton", "heatmaps", "components", or "mask"
         cache = {data_type: dict(data[data_type].item())}
         
         count = len(cache[data_type])
         print(f"Loaded primary cache from {primary_cache_file}: {data_type.capitalize()}: {count}", flush=True)
         
         # Always include masks from the mask npz.
-        cache["masks"] = masks
+        cache["mask"] = masks
         return cache
 
     def _precompute_and_cache(self, mask=False):
         """Precompute and save only the data type required by img_load, as well as the masks."""
         p_type = "bbox_mask" if mask else self.img_load
-        # temp_dir = Path(self.cache_dir) / f"temp_precompute_{p_type}"
-        # temp_dir.mkdir(exist_ok=True)
-        # try:
         print(f"Starting precomputation for {p_type} ({len(self.metadata)} images)...", flush=True)
-        data_type = p_type.split('_')[-1]  # e.g., "skeletons", "heatmaps", etc.
+        data_type = p_type.split('_')[-1]  # "mask", "skeleton", "heatmaps", "components"
         all_masks = {}
         all_data = {}
 
@@ -607,24 +604,12 @@ class PrecomputedWildlife(WildlifeDataset):
             elif data_type == "components":
                 all_data[filename] = self._compute_components(img, bbox, keypoints, segmentation)
 
-        #     # Optionally, save individual temporary files.
-        #     np.save(temp_dir / f"{filename}_mask.npy", all_masks[filename])
-        #     if data_type != "mask":
-        #         np.save(temp_dir / f"{filename}_{data_type}.npy", all_data[filename])
-
-        # print(f"Combining temporary files into {self.cache_files[p_type]}...", flush=True)
-        # # Combine masks from temp directory.
-        # all_masks = {f.stem.replace('_mask', ''): np.load(f) for f in temp_dir.glob("*_mask.npy")}
-        
         if data_type == "mask":
-            np.savez_compressed(self.cache_files[p_type], masks=all_masks)
+            np.savez_compressed(self.cache_files[p_type], mask=all_masks)
         else:
             # all_data = {f.stem.replace(f'_{data_type}', ''): np.load(f, allow_pickle=True) 
             #             for f in temp_dir.glob(f"*_{data_type}.npy")}
             np.savez_compressed(self.cache_files[p_type], masks=all_masks, **{data_type: all_data})
-
-    # finally:
-    #     shutil.rmtree(temp_dir, ignore_errors=True)
 
     def __len__(self):
         return len(self.metadata)
@@ -658,7 +643,7 @@ class PrecomputedWildlife(WildlifeDataset):
         img = img.crop((bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]))
 
         # Apply mask always
-        mask = self.data_cache['masks'].get(filename)
+        mask = self.data_cache['mask'].get(filename)
         if mask is None:
             raise ValueError(f"No mask found for {filename} in cache")
         img_array = np.array(img)
