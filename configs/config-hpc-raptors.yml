@@ -1,4 +1,4 @@
-project_name: eagleID-raptors
+project_name: eagleID-raptors_resnet
 notes: 
 use_wandb: True
 wandb_entity: winniethepooh
@@ -7,8 +7,8 @@ wildlife_name: raptors
 animal_cat: bird
 outdir: results
 dataset: /proj/nobackup/aiforeagles/raptor_individuals_cropped/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors_split.csv
-splitter: metadata_split # custom_closed / metadata_split 
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv
+splitter: custom_closed # custom_closed / metadata_split 
 split_ratio: 0.8
 
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
@@ -21,7 +21,7 @@ preprocess_lvl: 1 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: componen
 
 batch_size: 64 # 32, 64, 128 (Larger can provide more diverse triplets in each batch -> impprove quality of mined triplets)
 img_size: 224 # 224, 256, 384, 512
-epochs: 100
+epochs: 50
 save_interval: 10
 n_gpu: 1
 num_workers: 8
