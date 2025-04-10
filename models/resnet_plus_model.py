@@ -173,7 +173,7 @@ class ResNetPlusModel(pl.LightningModule):
             gallery_labels = torch.cat(self.gallery_labels)
 
             # Use a suitable distance metric for mAP calculation
-            distmat = compute_distance_matrix('euclidean', query_embeddings, gallery_embeddings)
+            distmat = compute_distance_matrix(self.distance_matrix, query_embeddings, gallery_embeddings)
             random_mAP = evaluate_map(distmat, query_labels, gallery_labels)
             
             # Log the random baseline mAP
