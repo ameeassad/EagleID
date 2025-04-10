@@ -175,7 +175,7 @@ def sweep_iteration():
     for k, v in wandb.config.items():
         config[k] = v
 
-    data =  get_dataset(config)
+    data =  get_dataset(config, sweep=True)
     model = get_model(config)
 
     # setup Trainer

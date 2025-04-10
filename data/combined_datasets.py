@@ -6,7 +6,7 @@ import sys
 import wandb
 import pandas as pd
 
-def get_dataset(config, hardcode=None):
+def get_dataset(config, hardcode=None, sweep=False):
     if hardcode is not None:
         config['wildlife_name'] = hardcode['wildlife_name']
         # config['dataset']= hardcode['dataset']
@@ -21,12 +21,12 @@ def get_dataset(config, hardcode=None):
     # single datasets
     if type(config['wildlife_name']) != list and len(wildlife_names) == 1:
         if config['wildlife_name'] == 'raptors':
-            if config['use_wandb'] == True:
+            if sweep and config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": "bird", 
                                     "dataset": '/proj/nobackup/aiforeagles/raptor_individuals_cropped/',
                                     "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors_split.csv' # _split.csv USED
                                     }, allow_val_change=True)
-            else:
+            elif sweep and not config['dataset'].startswith('/Users'):
                 config['animal_cat'] = 'bird'
                 config['dataset']= '/proj/nobackup/aiforeagles/raptor_individuals_cropped/'
                 config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors_split.csv' # _split.csv USED
@@ -35,12 +35,12 @@ def get_dataset(config, hardcode=None):
             data = WildlifeDataModule(metadata=dataset.df, config = config)
 
         elif config['wildlife_name'] == 'goleag':
-            if config['use_wandb'] == True:
+            if sweep and config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": "bird", 
                                     "dataset": '/proj/nobackup/aiforeagles/raptor_individuals_cropped/',
                                     "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/goleag_cache.csv'
                                     }, allow_val_change=True)
-            else:
+            elif sweep and not config['dataset'].startswith('/Users'):
                 config['animal_cat'] = 'bird'
                 config['dataset']= '/proj/nobackup/aiforeagles/raptor_individuals_cropped/'
                 config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/goleag_cache.csv'
@@ -49,12 +49,12 @@ def get_dataset(config, hardcode=None):
             data = WildlifeDataModule(metadata=dataset.df, config = config)
         
         elif config['wildlife_name'] == 'whaleshark':
-            if config['use_wandb'] == True:
+            if sweep and config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": "fish", 
                                     "dataset": '/proj/nobackup/aiforeagles/EDA-whaleshark/',
                                     "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_whaleshark.csv'
                                     }, allow_val_change=True)
-            elif not config['dataset'].startswith('/Users'):
+            elif sweep and not config['dataset'].startswith('/Users'):
                 config['animal_cat'] = 'fish'
                 config['dataset']= '/proj/nobackup/aiforeagles/EDA-whaleshark/'
                 config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_EDAwhaleshark.csv'
@@ -64,12 +64,12 @@ def get_dataset(config, hardcode=None):
         
         elif config['wildlife_name'] == 'ATRW':
             # datasets.ATRW.get_data(config['dataset'])
-            if config['use_wandb'] == True:
+            if sweep and config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": "mammal", 
                                     "dataset": '/proj/nobackup/aiforeagles/ATRW/',
                                     "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv'
                                     }, allow_val_change=True)
-            elif not config['dataset'].startswith('/Users'):
+            elif sweep and not config['dataset'].startswith('/Users'):
                 config['animal_cat'] = 'mammal'
                 config['dataset']= '/proj/nobackup/aiforeagles/ATRW/'
                 config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv'
@@ -78,41 +78,30 @@ def get_dataset(config, hardcode=None):
             data = WildlifeDataModule(metadata=dataset.df, config=config)
         
         elif config['wildlife_name'] == 'BirdIndividualID':
-            if config['use_wandb'] == True:
+            if sweep and config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": "bird", 
                                     "dataset": '/proj/nobackup/aiforeagles/BirdIndividualID/',
                                     "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_BirdIndividualID.csv'
                                     }, allow_val_change=True)
-            elif not config['dataset'].startswith('/Users'):
+            elif sweep and not config['dataset'].startswith('/Users'):
                 config['animal_cat'] = 'bird'
                 config['dataset']= '/proj/nobackup/aiforeagles/BirdIndividualID/'
                 config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_BirdIndividualID.csv'
             dataset = datasets.BirdIndividualID(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
-            
-        elif config['wildlife_name'] == 'GiraffeZebraID':
-            # try to get zebras only because giraffes is really close up
-            dataset = datasets.GiraffeZebraID(config['dataset'])
+
+        elif config['wildlife_name'] == 'SealIDSegmented':
+            dataset = datasets.SealIDSegmented(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
-            config['animal_cat'] = 'mammal'
-        elif config['wildlife_name'] == 'HyenaID2022':
-            dataset = datasets.HyenaID2022(config['dataset'])
+        elif config['wildlife_name'] == 'NDD20':
+            dataset = datasets.NDD20(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
-            config['animal_cat'] = 'mammal'
-        elif config['wildlife_name'] == 'IPanda50':
-            dataset = datasets.IPanda50(config['dataset'])
-            data = WildlifeDataModule(metadata=dataset.df, config=config)
-            config['animal_cat'] = 'mammal'
-        elif config['wildlife_name'] == 'LeopardID2022':
-            dataset = datasets.LeopardID2022(config['dataset'])
-            data = WildlifeDataModule(metadata=dataset.df, config=config)
-            config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'NyalaData':
             dataset = datasets.NyalaData(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
-        elif config['wildlife_name'] == 'PolarBearVidID':
-            dataset = datasets.PolarBearVidID(config['dataset'])
+        elif config['wildlife_name'] == 'PolarELPephantBearVidID':
+            dataset = datasets.ELPephant(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'SealIDSegmented':
@@ -120,10 +109,10 @@ def get_dataset(config, hardcode=None):
             data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'SeaTurtleID2022':
-            # don't use bbox (it is only face)
             dataset = datasets.SeaTurtleID2022(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'reptile'
+            config['bbox'] = '' # don't use bbox (it is only face)
         else:
             raise ValueError(f"Unknown dataset {config['wildlife_name']}")
     else:  # combined datasets -- only works with cache
