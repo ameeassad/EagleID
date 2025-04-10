@@ -24,12 +24,12 @@ def get_dataset(config, hardcode=None):
             if config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": "bird", 
                                     "dataset": '/proj/nobackup/aiforeagles/raptor_individuals_cropped/',
-                                    "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv'
+                                    # "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv'
                                     }, allow_val_change=True)
             else:
                 config['animal_cat'] = 'bird'
                 config['dataset']= '/proj/nobackup/aiforeagles/raptor_individuals_cropped/'
-                config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv'
+                # config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv'
 
             dataset = Raptors(root=config['dataset'], include_video=False)
             data = WildlifeDataModule(metadata=dataset.df, config = config)
