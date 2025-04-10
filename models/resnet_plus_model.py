@@ -145,7 +145,7 @@ class ResNetPlusModel(pl.LightningModule):
             loss = self.loss_fn(embeddings, labels, mined_triplets)
         else: # ArcFaceLoss
             loss = self.loss_fn(embeddings, labels)
-        self.log("train/loss", loss,  on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log("train/loss", loss,  on_step=False, on_epoch=True, prog_bar=True, logger=True)
         return loss
     
     def on_train_start(self): # to run only once: on_train_start / for every val: on_validation_start
