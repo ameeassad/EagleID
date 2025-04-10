@@ -12,6 +12,6 @@ parameters:
       activate:
         values: [True] 
       margin:
-        values: 0.32
+        values: [0.32]
       scale:
-        values: 50
+        values: [50]
