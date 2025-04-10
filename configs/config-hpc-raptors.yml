@@ -23,7 +23,7 @@ preprocess_lvl: 2 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: componen
 
 batch_size: 64 # 32, 64, 128 (Larger can provide more diverse triplets in each batch -> impprove quality of mined triplets)
 img_size: 224 # 224, 256, 384, 512
-epochs: 50
+epochs: 22
 save_interval: 10
 n_gpu: 1
 num_workers: 8
@@ -44,9 +44,9 @@ triplet_loss:
   mining_type: semihard # choose between: semihard, hard (more challenging triplets)
   distance_matrix: cosine
 arcface_loss:
-  activate: True # Set to False if using triplet loss
-  margin: 0.5 # [0.50] or [0.406, 42]
-  scale: 32 # [0.50] or [0.406, 42]
+  activate: False # Set to False if using triplet loss
+  margin: 0.406 # [0.5, 32] or [0.406, 42]
+  scale: 42 # [0.50, 32] or [0.406, 42]
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
   n_classes:
 
