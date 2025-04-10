@@ -24,12 +24,12 @@ def get_dataset(config, hardcode=None):
             if config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": "bird", 
                                     "dataset": '/proj/nobackup/aiforeagles/raptor_individuals_cropped/',
-                                    # "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv'
+                                    "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors_split.csv' # _split.csv USED
                                     }, allow_val_change=True)
             else:
                 config['animal_cat'] = 'bird'
                 config['dataset']= '/proj/nobackup/aiforeagles/raptor_individuals_cropped/'
-                # config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv'
+                config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors_split.csv' # _split.csv USED
 
             dataset = Raptors(root=config['dataset'], include_video=False)
             data = WildlifeDataModule(metadata=dataset.df, config = config)
@@ -107,14 +107,6 @@ def get_dataset(config, hardcode=None):
             dataset = datasets.LeopardID2022(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
-        elif config['wildlife_name'] == 'LionData':
-            dataset = datasets.LionData(config['dataset'])
-            data = WildlifeDataModule(metadata=dataset.df, config=config)
-            config['animal_cat'] = 'mammal'
-        elif config['wildlife_name'] == 'MPDD':
-            dataset = datasets.MPDD(config['dataset'])
-            data = WildlifeDataModule(metadata=dataset.df, config=config)
-            config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'NyalaData':
             dataset = datasets.NyalaData(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
@@ -132,11 +124,6 @@ def get_dataset(config, hardcode=None):
             dataset = datasets.SeaTurtleID2022(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'reptile'
-        elif config['wildlife_name'] == 'StripeSpotter': 
-            # don't use bbox
-            dataset = datasets.StripeSpotter(config['dataset'])
-            data = WildlifeDataModule(metadata=dataset.df, config=config)
-            config['animal_cat'] = 'mammal'
         else:
             raise ValueError(f"Unknown dataset {config['wildlife_name']}")
     else:  # combined datasets -- only works with cache
