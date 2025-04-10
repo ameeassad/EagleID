@@ -40,7 +40,7 @@ embedding_size: 512 # choose between: 128, 256, 512, 768, 2048
 triplet_loss:
   margin: 0.5 # choose between: 0.2, 0,5, 0.7 (higher encourages harder triplet mining and stronger gradients)
   mining_type: semihard # choose between: semihard, hard (more challenging triplets)
-  distance_matrix: euclidean
+  distance_matrix: cosine
 arcface_loss:
   activate: True
   margin: 0.5
