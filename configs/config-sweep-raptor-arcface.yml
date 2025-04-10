@@ -1,14 +1,17 @@
 name: sweeping-arcface
-method: grid
+method: bayes
 metric:
-  name: train/loss_epoch
-  goal: minimize
+  name: val/mAP5
+  goal: maximize
+early_terminate:
+  type: hyperband
+  min_iter: 5
 parameters:
   arcface_loss:
     parameters:
-      activate:
-        values: [True]  
       margin:
-        values: [0.3, 0.5]
+        min: 0.3
+        max: 0.6
       scale:
-        values: [32,50,64]
+        min: 32
+        max: 128

@@ -110,6 +110,8 @@ def get_gpu_settings(
         strategy = None
 
     torch.set_float32_matmul_precision('high')
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False  # Disable auto-tuning
 
     return "gpu", devices, strategy
 
@@ -202,14 +204,14 @@ if __name__ == '__main__':
     seed_everything(config_yml['seed'], workers=True)
 
     # override epochs
-    config_yml['epochs'] = 30
+    config_yml['epochs'] = 22
 
     # Update sweep config to include base parameters from config.yaml
     sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters'] and 
                                        key not in ['animal_cat', 'dataset', 'cache_path']})
 
 
-    sweep_id = wandb.sweep(sweep_config, project="sweep-test")
+    sweep_id = wandb.sweep(sweep_config, project="sweep-arcface")
 
     # agent that will iterate over the sweep parameters with specified search method
     wandb.agent(sweep_id, function=sweep_iteration)
