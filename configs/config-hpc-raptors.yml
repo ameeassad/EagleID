@@ -43,8 +43,8 @@ triplet_loss:
   distance_matrix: euclidean
 arcface_loss:
   activate: True
-  margin: 0.328
-  scale: 49.326
+  margin: 0.5
+  scale: 50
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
   n_classes:
 
