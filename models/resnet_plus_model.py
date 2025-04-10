@@ -44,8 +44,14 @@ class ResNetPlusModel(pl.LightningModule):
         if config:
             backbone_model_name=config['backbone_name'] if config['backbone_name'] else backbone_model_name
             self.embedding_size=int(config['embedding_size'])
-            margin=config['triplet_loss']['margin']
-            mining_type=config['triplet_loss']['mining_type']
+            if config['arcface_loss']['activate']:
+                self.n_classes=config['arcface_loss']['n_classes']
+                margin=config['arcface_loss']['margin']
+                scale=config['arcface_loss']['scale']
+                self.arcface_loss = True
+            else:
+                margin=config['triplet_loss']['margin']
+                mining_type=config['triplet_loss']['mining_type']
             self.preprocess_lvl=int(config['preprocess_lvl'])
             self.re_ranking=config['re_ranking']
             self.distance_matrix = config['triplet_loss']['distance_matrix']
@@ -112,6 +118,8 @@ class ResNetPlusModel(pl.LightningModule):
         
         # Loss and mining
         self.loss_fn = losses.TripletMarginLoss(margin=margin)
+        if self.arcface_loss:
+            self.loss_fn = losses.ArcFaceLoss(num_classes=self.n_classes, embedding_size=self.embedding_size, margin=margin, scale=scale)
         self.miner = miners.TripletMarginMiner(margin=margin, type_of_triplets=mining_type)
 
     def forward(self, x):
@@ -131,8 +139,11 @@ class ResNetPlusModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         images, labels = batch
         embeddings = self(images)
-        mined_triplets = self.miner(embeddings, labels)
-        loss = self.loss_fn(embeddings, labels, mined_triplets)
+        if not self.arcface_loss: # TripletLoss
+            mined_triplets = self.miner(embeddings, labels)
+            loss = self.loss_fn(embeddings, labels, mined_triplets)
+        else: # ArcFaceLoss
+            loss = self.loss_fn(embeddings, labels)
         self.log("train/loss", loss,  on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
     

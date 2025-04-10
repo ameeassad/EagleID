@@ -1,4 +1,4 @@
-project_name: eagleID-raptors_resnet
+project_name: eagleID-raptors_resnet_arcface
 notes: 
 use_wandb: True
 wandb_entity: winniethepooh
@@ -17,7 +17,7 @@ precompute: True
 model_architecture: ResNetPlusModel # ResNetPlusModel, TripletModel, FusionModel, EfficientNet, TransformerModel
 backbone_name: resnet50 # efficientnet_b0, resnet50, swin_tiny_patch4_window7_224
 checkpoint: 
-preprocess_lvl: 1 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
+preprocess_lvl: 2 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
 
 batch_size: 64 # 32, 64, 128 (Larger can provide more diverse triplets in each batch -> impprove quality of mined triplets)
 img_size: 224 # 224, 256, 384, 512
@@ -42,6 +42,7 @@ triplet_loss:
   mining_type: semihard # choose between: semihard, hard (more challenging triplets)
   distance_matrix: euclidean
 arcface_loss:
+  activate: True
   margin: 0.328
   scale: 49.326
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
