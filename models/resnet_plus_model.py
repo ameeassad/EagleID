@@ -52,6 +52,7 @@ class ResNetPlusModel(pl.LightningModule):
             else:
                 margin=config['triplet_loss']['margin']
                 mining_type=config['triplet_loss']['mining_type']
+                self.arcface_loss = False
             self.preprocess_lvl=int(config['preprocess_lvl'])
             self.re_ranking=config['re_ranking']
             self.distance_matrix = config['triplet_loss']['distance_matrix']
