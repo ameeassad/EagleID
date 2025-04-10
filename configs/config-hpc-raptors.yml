@@ -59,7 +59,7 @@ early_stopping:
   mode: min
 
 solver:
-  OPT: sgd  # adam, SGD
+  OPT: adam  # adam, SGD
   WEIGHT_DECAY: 0.0001 # 0.001, 0.0001 (small dataset)
   MOMENTUM: 0.9  # only when OPT is sgd
   BASE_LR: 0.01 # if SGD use 0.01 / if Adam use 0.001
