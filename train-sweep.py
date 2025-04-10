@@ -167,8 +167,13 @@ def get_model(config):
 
 def sweep_iteration():
     wandb.init()
-    config=wandb.config
-    print(config)
+    # config=wandb.config
+    # print(config)
+    config = config_yml.copy()
+
+    # Overlay sweep parameters
+    for k, v in wandb.config.items():
+        config[k] = v
 
     data =  get_dataset(config)
     model = get_model(config)
