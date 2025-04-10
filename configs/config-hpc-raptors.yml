@@ -45,8 +45,8 @@ triplet_loss:
   distance_matrix: cosine
 arcface_loss:
   activate: True # Set to False if using triplet loss
-  margin: 0.5 # 0.5 does best
-  scale: 32 # 32 does best
+  margin: 0.5 # [0.50] or [0.406, 42]
+  scale: 32 # [0.50] or [0.406, 42]
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
   n_classes:
 

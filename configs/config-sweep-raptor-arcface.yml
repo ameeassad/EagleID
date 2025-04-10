@@ -1,5 +1,5 @@
 name: sweeping-arcface
-method: bayes
+method: grid
 metric:
   name: val/mAP5
   goal: maximize
@@ -12,8 +12,6 @@ parameters:
       activate:
         values: [True] 
       margin:
-        min: 0.3
-        max: 0.6
+        values: 0.32
       scale:
-        min: 32
-        max: 128
+        values: 50
