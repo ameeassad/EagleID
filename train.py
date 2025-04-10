@@ -98,7 +98,10 @@ def get_gpu_settings(
         devices = 1
         strategy = None
 
-    torch.set_float32_matmul_precision('high')
+    torch.set_float32_matmul_precision('high') # prioritizes speed over reproducibility
+    # torch.set_float32_matmul_precision('highest') #slower but more deterministic
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False  # Disable auto-tuning
 
     return "gpu", devices, strategy
 
@@ -141,6 +144,7 @@ def get_trainer(config) -> Trainer:
         'deterministic': True,
         'profiler': 'simple',
         'num_sanity_val_steps': -1, # -1 to check all validation data, 0 to turn off
+        'precision': "32-true",
     }
 
     if strategy is not None:
