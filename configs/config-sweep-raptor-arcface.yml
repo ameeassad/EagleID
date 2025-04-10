@@ -9,6 +9,8 @@ early_terminate:
 parameters:
   arcface_loss:
     parameters:
+      activate:
+        values: [True] 
       margin:
         min: 0.3
         max: 0.6
