@@ -439,7 +439,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.val_query_dataset = PrecomputedWildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, category="query_"+self.wildlife_names, load_metadata=self.load_metadata)
             self.val_gallery_dataset = PrecomputedWildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, category="gallery_"+self.wildlife_names, load_metadata=self.load_metadata)
         else:
-            self.train_dataset = Wildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, col_label = 'identity', img_load=self.method, load_metadata=self.load_metadata, load_metadata=self.load_metadata)
+            self.train_dataset = Wildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, col_label = 'identity', img_load=self.method, load_metadata=self.load_metadata)
             self.val_query_dataset = Wildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, load_metadata=self.load_metadata)
             self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, load_metadata=self.load_metadata)
 
