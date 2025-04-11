@@ -43,6 +43,7 @@ class Wildlife(WildlifeDataset):
         col_path: str = "path",
         col_label: str = "identity", 
         load_label: bool = True,
+        load_metadata: bool = False,
     ):    
         super().__init__(
             metadata=metadata,
@@ -54,6 +55,8 @@ class Wildlife(WildlifeDataset):
             col_label=col_label,
             load_label=load_label
         )
+        # New Child Variables
+        self.load_metadata = load_metadata
 
     def get_image(self, path):
         """
@@ -256,6 +259,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.wildlife_names = config['wildlife_name']
             self.classic_transform = config.get("custom_transform", False)
             self.precompute = config.get("precompute", False)
+            self.load_metadata = config.get("load_metadata", False)
         else:
             self.data_dir = data_dir
             self.num_workers = num_workers
@@ -272,6 +276,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.wildlife_names = wildlife_names
             self.classic_transform = classic_transform
             self.precompute = precompute
+            self.load_metadata = False
 
         # Handle transforms
         if self.preprocess_lvl == 3:
@@ -430,13 +435,13 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.method = "bbox_mask_heatmaps"
 
         if self.precompute:
-            self.train_dataset = PrecomputedWildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, col_label = 'identity', img_load=self.method, category="train_"+self.wildlife_names)
-            self.val_query_dataset = PrecomputedWildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, category="query_"+self.wildlife_names)
-            self.val_gallery_dataset = PrecomputedWildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, category="gallery_"+self.wildlife_names)
+            self.train_dataset = PrecomputedWildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, col_label = 'identity', img_load=self.method, category="train_"+self.wildlife_names, load_metadata=self.load_metadata)
+            self.val_query_dataset = PrecomputedWildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, category="query_"+self.wildlife_names, load_metadata=self.load_metadata)
+            self.val_gallery_dataset = PrecomputedWildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, category="gallery_"+self.wildlife_names, load_metadata=self.load_metadata)
         else:
-            self.train_dataset = Wildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, col_label = 'identity', img_load=self.method)
-            self.val_query_dataset = Wildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method)
-            self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method)
+            self.train_dataset = Wildlife(metadata=df_train, root=self.data_dir, transform=self.train_transforms, col_label = 'identity', img_load=self.method, load_metadata=self.load_metadata, load_metadata=self.load_metadata)
+            self.val_query_dataset = Wildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, load_metadata=self.load_metadata)
+            self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, load_metadata=self.load_metadata)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
