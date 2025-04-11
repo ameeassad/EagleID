@@ -60,6 +60,7 @@ class ResNetPlusModel(pl.LightningModule):
             outdir=config['outdir']
             if not config['use_wandb']:
                 self.save_hyperparameters()
+            self.val_viz = config.get('val_viz', False)
         else:
             backbone_model_name=backbone_model_name
             self.embedding_size=embedding_size
@@ -227,6 +228,11 @@ class ResNetPlusModel(pl.LightningModule):
 
         accuracy = wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels)
         self.log(f'val/accuracy', accuracy)
+
+        if self.val_viz:
+            self.distmat = distmat
+            self.query_metadata_epoch = self.query_metadata  # set externally by DataModule or Trainer
+            self.gallery_metadata_epoch = self.gallery_metadata  # set externally as well
 
     def configure_optimizers(self):
         if self.config:

@@ -332,4 +332,3 @@ def keypoint_names_on_img(root, df_row=None, image_path=None, bbox=None, keypoin
     # Show the image with keypoints, skeleton, and joint names
     cv2.imwrite(f'results/output_image-{label}.jpg', img)
     #end visualization
-
