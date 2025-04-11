@@ -259,7 +259,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.wildlife_names = config['wildlife_name']
             self.classic_transform = config.get("custom_transform", False)
             self.precompute = config.get("precompute", False)
-            self.load_metadata = config.get("load_metadata", False)
+            self.load_metadata = config.get("val_viz", False)
         else:
             self.data_dir = data_dir
             self.num_workers = num_workers
