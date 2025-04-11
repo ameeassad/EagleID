@@ -211,7 +211,7 @@ class Wildlife(WildlifeDataset):
         # if self.split:
         #     return img, self.labels[idx], bool(data['query'])
         if self.load_metadata:
-            return img, self.labels[idx], data
+            return img, self.labels[idx], data.to_dict()
         elif self.load_label: # default is True
             return img, self.labels[idx]
         else:
@@ -698,7 +698,7 @@ class PrecomputedWildlife(WildlifeDataset):
 
         # Return image and label
         if self.load_metadata:
-            return img, self.labels[idx], data
+            return img, self.labels[idx], data.to_dict()
         elif self.load_label: # default is True
             return img, self.labels[idx]
         else:
