@@ -189,17 +189,28 @@ class ResNetPlusModel(pl.LightningModule):
         self.gallery_embeddings = []
         self.gallery_labels = []
 
+        if self.val_viz:
+            self.query_metadata = []
+            self.gallery_metadata = []
+
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        x, target = batch
+        if self.val_viz:
+            x, target, metadata = batch
+        else:
+            x, target = batch
         embeddings = self(x)
         if dataloader_idx == 0:
             # Query data
             self.query_embeddings.append(embeddings)
             self.query_labels.append(target)
+            if self.val_viz:
+                self.query_metadata.append(metadata)
         else:
             # Gallery data
             self.gallery_embeddings.append(embeddings)
             self.gallery_labels.append(target)
+            if self.val_viz:
+                self.gallery_metadata.append(metadata)
 
     def on_validation_epoch_end(self):
         # Concatenate all embeddings and labels
