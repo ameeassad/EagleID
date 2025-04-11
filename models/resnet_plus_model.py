@@ -139,7 +139,10 @@ class ResNetPlusModel(pl.LightningModule):
         return embeddings
     
     def training_step(self, batch, batch_idx):
-        images, labels = batch
+        if self.val_viz:
+            images, labels = batch['img'], batch['label']
+        else:
+            images, labels = batch
         embeddings = self(images)
         if not self.arcface_loss: # TripletLoss
             mined_triplets = self.miner(embeddings, labels)
@@ -154,7 +157,10 @@ class ResNetPlusModel(pl.LightningModule):
         self.on_validation_epoch_start()  # Initialize query/gallery embeddings and labels
         with torch.no_grad():
             for batch_idx, batch in enumerate(self.trainer.val_dataloaders[0]):
-                x, target = batch
+                if self.val_viz:
+                    x, target = batch['img'], batch['label']
+                else:
+                    x, target = batch
                 # Generate random embeddings for the query set
                 random_embeddings = torch.randn(x.size(0), self.embedding_size, device=x.device)
                 self.query_embeddings.append(random_embeddings)
@@ -195,7 +201,7 @@ class ResNetPlusModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if self.val_viz:
-            x, target, metadata = batch
+            x, target, metadata = batch['img'], batch['label'], batch['metadata']
         else:
             x, target = batch
         embeddings = self(x)
