@@ -520,6 +520,7 @@ class PrecomputedWildlife(WildlifeDataset):
         col_path: str = "path",
         col_label: str = "identity",
         load_label: bool = True,
+        load_metadata: bool = False,
         cache_dir: str = "../dataset/data_cache",
         category: str = "example_wildlife",
     ):
@@ -535,6 +536,7 @@ class PrecomputedWildlife(WildlifeDataset):
         )
         
         os.makedirs(cache_dir, exist_ok=True)
+        self.load_metadata = load_metadata
         self.cache_dir = cache_dir 
         self.category = category
 
@@ -695,9 +697,12 @@ class PrecomputedWildlife(WildlifeDataset):
                     img = t(img)
 
         # Return image and label
-        if self.load_label:
+        if self.load_label: # default is True
             return img, self.labels[idx]
-        return img
+        elif self.load_metadata:
+            return img, self.labels[idx], data
+        else:
+            return img
 
     def _parse_bbox(self, data):
         # if type(data["bbox"]) == str:
