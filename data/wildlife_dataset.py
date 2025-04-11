@@ -210,10 +210,10 @@ class Wildlife(WildlifeDataset):
 
         # if self.split:
         #     return img, self.labels[idx], bool(data['query'])
-        if self.load_label: # default is True
-            return img, self.labels[idx]
-        elif self.load_metadata:
+        if self.load_metadata:
             return img, self.labels[idx], data
+        elif self.load_label: # default is True
+            return img, self.labels[idx]
         else:
             return img
 
@@ -697,10 +697,10 @@ class PrecomputedWildlife(WildlifeDataset):
                     img = t(img)
 
         # Return image and label
-        if self.load_label: # default is True
-            return img, self.labels[idx]
-        elif self.load_metadata:
+        if self.load_metadata:
             return img, self.labels[idx], data
+        elif self.load_label: # default is True
+            return img, self.labels[idx]
         else:
             return img
 
