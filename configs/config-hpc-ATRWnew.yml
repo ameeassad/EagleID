@@ -9,8 +9,8 @@ wildlife_name: ATRW
 animal_cat: mammal
 outdir: results
 dataset: /proj/nobackup/aiforeagles/ATRW/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv # _split.csv if using metadata_split
-splitter: custom_closed # custom_closed / metadata_split 
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW_split.csv # _split.csv if using metadata_split
+splitter: metadata_split # custom_closed / metadata_split 
 split_ratio: 0.8
 
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
@@ -60,7 +60,7 @@ early_stopping:
   mode: min
 
 solver:
-  OPT: adam  # adam, SGD
+  OPT: sgd  # adam, sgd
   WEIGHT_DECAY: 0.0001 # 0.001, 0.0001 (small dataset)
   MOMENTUM: 0.9  # only when OPT is sgd
   BASE_LR: 0.01 # if SGD use 0.01 / if Adam use 0.001
