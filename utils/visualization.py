@@ -27,7 +27,8 @@ def query_prediction_results_similarity(
         db_metadata,
         query_start,
         similarity_scores, 
-        num_images=10
+        num_images=10,
+        to_save = False
     ):
     fig, axes = plt.subplots(num_images, 3, figsize=(10, 3 * num_images))
     fig.tight_layout(pad=0.5)
@@ -74,9 +75,10 @@ def query_prediction_results_similarity(
         axes[i, 2].imshow(ground_truth_img)
         axes[i, 2].set_title(f'Ground Truth:\n{gt_title}', fontsize=10)
         axes[i, 2].axis('off')
-    
-    plt.show()  
-
+    if to_save:
+        return fig
+    else:
+        plt.show()  
 
 def query_prediction_results_similarity_preprocessed(
         root,

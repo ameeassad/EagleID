@@ -117,12 +117,12 @@ def get_dataset(config, hardcode=None, sweep=False):
             raise ValueError(f"Unknown dataset {config['wildlife_name']}")
     else:  # combined datasets -- only works with cache
         if 'raptors' in wildlife_names and 'BirdIndividualID' in wildlife_names and len(wildlife_names) == 2:
-            if config['use_wandb'] == True:
+            if sweep and config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": ['bird','bird'], 
                                     "dataset": '/proj/nobackup/aiforeagles/',
                                     "cache_path": '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_birds.csv',
                                     "cache_only": True, }, allow_val_change=True)
-            else:
+            elif sweep and not config['dataset'].startswith('/Users'):
                 config['animal_cat'] = ['bird', 'bird']
                 config['dataset']= '/proj/nobackup/aiforeagles/'
                 config['cache_path']= '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_birds.csv'

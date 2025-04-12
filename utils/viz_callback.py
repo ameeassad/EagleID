@@ -42,8 +42,7 @@ class SimilarityVizCallback(Callback):
             query_start=0,
             similarity_scores=-distmat,  # negate distance for similarity
             num_images=10,
-            preprocess_option=self.config['preprocess_lvl']
-        )
+            to_save=True)
 
         if self.config.get('use_wandb', False):
             wandb_img = wandb.Image(fig, caption=f"Val retrieval epoch {trainer.current_epoch + 1}")
