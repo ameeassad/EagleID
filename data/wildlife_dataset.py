@@ -214,7 +214,8 @@ class Wildlife(WildlifeDataset):
             return {
                 'img': img,
                 'label': self.labels[idx],
-                'metadata': data.to_dict()
+                'path': data['path'],
+                'identity' : data['identity'],
             }
         elif self.load_label: # default is True
             return img, self.labels[idx]
@@ -359,9 +360,6 @@ class WildlifeDataModule(pl.LightningDataModule):
             df_test = df_all[df_all['original_split'] == 'test']
             analyze_split(df_all, df_train.index, df_test.index)
         elif self.splitter == 'metadata_split':
-            print("DF columns:", df_all.columns.tolist())
-            print("DF head:", df_all.head())
-            print("Using metadata split columns are: ", df_all.columns)
             df_train = df_all[df_all['metadata_split'] == 'train']
             df_test = df_all[df_all['metadata_split'] == 'test']
             analyze_split(df_all, df_train.index, df_test.index)
@@ -705,7 +703,8 @@ class PrecomputedWildlife(WildlifeDataset):
             return {
                 'img': img,
                 'label': self.labels[idx],
-                'metadata': data.to_dict()
+                'path': data['path'],
+                'identity' : data['identity'],
             }
         elif self.load_label: # default is True
             return img, self.labels[idx]

@@ -1,7 +1,8 @@
 from pytorch_lightning.callbacks import Callback
 import os
 import wandb
-from utils.visualization import query_prediction_results_similarity_preprocessed
+from utils.visualization import query_prediction_results_similarity_preprocessed, query_prediction_results_similarity
+import pandas as pd
 
 
 class SimilarityVizCallback(Callback):
@@ -14,14 +15,27 @@ class SimilarityVizCallback(Callback):
         epoch = trainer.current_epoch
         if epoch % self.log_every_n_epochs != 0:
             return
+        if pl_module.distmat is None:
+            return  # or log a warning
 
-        distmat = pl_module.distmat.detach().cpu().numpy()
-        query_metadata = pl_module.query_metadata_epoch
-        gallery_metadata = pl_module.gallery_metadata_epoch
-        root = self.config['root']
+        
+        root = self.config['dataset']
+
+        distmat = pl_module.distmat
+        query_metadata = pd.DataFrame([
+            {'path': path, 'identity': id}
+            for paths, ids in zip(pl_module.query_path_epoch, pl_module.query_identity_epoch)
+            for path, id in zip(paths, ids)
+        ])
+
+        gallery_metadata = pd.DataFrame([
+            {'path': path, 'identity': id}
+            for paths, ids in zip(pl_module.gallery_path_epoch, pl_module.gallery_identity_epoch)
+            for path, id in zip(paths, ids)
+        ])
 
         # Generate and log the visualization
-        fig = query_prediction_results_similarity_preprocessed(
+        fig = query_prediction_results_similarity(
             root=root,
             query_metadata=query_metadata,
             db_metadata=gallery_metadata,

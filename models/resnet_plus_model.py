@@ -62,6 +62,7 @@ class ResNetPlusModel(pl.LightningModule):
                 self.save_hyperparameters()
             self.val_viz = config.get('val_viz', False)
         else:
+            # Hardcode any changes
             backbone_model_name=backbone_model_name
             self.embedding_size=embedding_size
             margin=margin
@@ -71,7 +72,11 @@ class ResNetPlusModel(pl.LightningModule):
             self.distance_matrix = 'euclidean'
             self.lr = lr
             outdir=outdir
+            self.val_viz = False
 
+        if self.val_viz:
+            self.distmat = None
+            
         total_channels = calculate_num_channels(self.preprocess_lvl)
 
 
@@ -79,7 +84,7 @@ class ResNetPlusModel(pl.LightningModule):
             model_name=backbone_model_name, 
             pretrained=pretrained,
             num_classes=0,  # disable final classification layer
-            features_only=True  # This returns multiple feature maps
+            features_only=True  # returns multiple feature maps
         )        
         
         if self.preprocess_lvl > 2:
@@ -128,7 +133,7 @@ class ResNetPlusModel(pl.LightningModule):
         """Input shape: (B, 3+N, H, W)"""
         # print(f"Input shape: {x.shape}")  # Debug: Should be [batch_size, in_channels, 224, 224]
         features = self.backbone(x)  # Returns a tuple of feature maps
-        # Select the last feature map (assuming you want the deepest features)
+        # Select the last feature map (for the deepest features)
         features = features[-1]  # Take the last element of the tuple
         # print(f"Features shape before pooling: {features.shape}")  # Should be [B, C, H, W]
         
@@ -166,7 +171,10 @@ class ResNetPlusModel(pl.LightningModule):
                 self.query_embeddings.append(random_embeddings)
                 self.query_labels.append(target)
             for batch_idx, batch in enumerate(self.trainer.val_dataloaders[1]):
-                x, target = batch
+                if self.val_viz:
+                    x, target = batch['img'], batch['label']
+                else:
+                    x, target = batch
                 # Generate random embeddings for the gallery set
                 random_embeddings = torch.randn(x.size(0), self.embedding_size, device=x.device)
                 self.gallery_embeddings.append(random_embeddings)
@@ -196,12 +204,14 @@ class ResNetPlusModel(pl.LightningModule):
         self.gallery_labels = []
 
         if self.val_viz:
-            self.query_metadata = []
-            self.gallery_metadata = []
+            self.query_path = []
+            self.query_identity = []
+            self.gallery_path = []
+            self.gallery_identity = []
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if self.val_viz:
-            x, target, metadata = batch['img'], batch['label'], batch['metadata']
+            x, target, img_path, identity = batch['img'], batch['label'], batch['path'], batch['identity']
         else:
             x, target = batch
         embeddings = self(x)
@@ -210,13 +220,15 @@ class ResNetPlusModel(pl.LightningModule):
             self.query_embeddings.append(embeddings)
             self.query_labels.append(target)
             if self.val_viz:
-                self.query_metadata.append(metadata)
+                self.query_path.append(img_path)
+                self.query_identity.append(identity)
         else:
             # Gallery data
             self.gallery_embeddings.append(embeddings)
             self.gallery_labels.append(target)
             if self.val_viz:
-                self.gallery_metadata.append(metadata)
+                self.gallery_path.append(img_path)
+                self.gallery_identity.append(identity)
 
     def on_validation_epoch_end(self):
         # Concatenate all embeddings and labels
@@ -248,8 +260,10 @@ class ResNetPlusModel(pl.LightningModule):
 
         if self.val_viz:
             self.distmat = distmat
-            self.query_metadata_epoch = self.query_metadata  # set externally by DataModule or Trainer
-            self.gallery_metadata_epoch = self.gallery_metadata  # set externally as well
+            self.query_path_epoch = self.query_path  # set externally by DataModule or Trainer
+            self.query_identity_epoch = self.query_identity
+            self.gallery_path_epoch = self.gallery_path 
+            self.gallery_identity_epoch = self.gallery_identity
 
     def configure_optimizers(self):
         if self.config:
