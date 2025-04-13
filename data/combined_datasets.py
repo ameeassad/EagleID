@@ -90,7 +90,7 @@ def get_dataset(config, hardcode=None, sweep=False):
             dataset = datasets.BirdIndividualID(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
 
-        elif config['wildlife_name'] == 'SealIDSegmented':
+        elif config['wildlife_name'] == 'seal':
             dataset = datasets.SealIDSegmented(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
         elif config['wildlife_name'] == 'NDD20':
@@ -100,7 +100,7 @@ def get_dataset(config, hardcode=None, sweep=False):
             dataset = datasets.NyalaData(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
-        elif config['wildlife_name'] == 'PolarELPephantBearVidID':
+        elif config['wildlife_name'] == 'elephant':
             dataset = datasets.ELPephant(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'

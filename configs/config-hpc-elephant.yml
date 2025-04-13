@@ -5,12 +5,12 @@ notes:
 use_wandb: True
 wandb_entity: winniethepooh
 
-wildlife_name: ATRW
+wildlife_name: elephant
 animal_cat: mammal
 outdir: results
-dataset: /proj/nobackup/aiforeagles/ATRW/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW_split.csv # _split.csv if using metadata_split
-splitter: metadata_split # custom_closed / metadata_split 
+dataset: /proj/nobackup/aiforeagles/ELPephant/
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_elephant.csv # _split.csv if using metadata_split
+splitter: custom_closed # custom_closed / metadata_split 
 split_ratio: 0.8
 
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
@@ -23,7 +23,7 @@ preprocess_lvl: 3 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: componen
 
 batch_size: 64 # 32, 64, 128 (Larger can provide more diverse triplets in each batch -> impprove quality of mined triplets)
 img_size: 224 # 224, 256, 384, 512
-epochs: 30
+epochs: 0
 save_interval: 10
 n_gpu: 1
 num_workers: 8
@@ -45,7 +45,7 @@ triplet_loss:
   mining_type: semihard # choose between: semihard, hard (more challenging triplets)
   distance_matrix: cosine
 arcface_loss:
-  activate: True # Set to False if using triplet loss
+  activate: False # Set to False if using triplet loss
   margin: 0.406 # [0.5, 32] or [0.406, 42]
   scale: 42 # [0.50, 32] or [0.406, 42]
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss

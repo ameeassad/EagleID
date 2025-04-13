@@ -387,7 +387,8 @@ class WildlifeDataModule(pl.LightningDataModule):
                 self.val_split = SplitQueryDatabase()
                 df_test = self.val_split(df_test)
                 df_test['query'] = df_test['query'].astype(bool)
-                df_all['query'] = df_test['query']  # save it to original
+                # df_all['query'] = df_test['query']  # save it to original
+                df_all.loc[df_test.index, 'query'] = df_test['query'] # save it to original
 
             # Save train/test split back to cache (only if metadata_split NOT selected)
             df_all['metadata_split'] = ''
