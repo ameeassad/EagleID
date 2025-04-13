@@ -19,12 +19,15 @@ import pytorch_lightning as pl
 from pytorch_metric_learning import losses, miners
 from torch import nn
 
-from wildlife_tools.similarity.cosine import CosineSimilarity
-from utils.metrics import evaluate_map, compute_average_precision
+# from wildlife_tools.similarity.cosine import CosineSimilarity
+from wildlife_tools.similarity import CosineSimilarity
+from utils.triplet_loss_utils import KnnClassifier
 
+from utils.metrics import evaluate_map, compute_average_precision
 from utils.re_ranking import re_ranking
 from data.data_utils import calculate_num_channels
 from utils.metrics import compute_distance_matrix, evaluate_recall_at_k, wildlife_accuracy
+
 
 
 class ResNetPlusModel(pl.LightningModule):
@@ -76,7 +79,7 @@ class ResNetPlusModel(pl.LightningModule):
 
         if self.val_viz:
             self.distmat = None
-            
+
         total_channels = calculate_num_channels(self.preprocess_lvl)
 
 
@@ -237,6 +240,9 @@ class ResNetPlusModel(pl.LightningModule):
         gallery_embeddings = torch.cat(self.gallery_embeddings)
         gallery_labels = torch.cat(self.gallery_labels)
 
+        accuracy = wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels)
+        self.log(f'val/accuracy', accuracy)
+
         # Compute distance matrix
         if self.re_ranking:
             distmat = re_ranking(query_embeddings, gallery_embeddings, k1=20, k2=6, lambda_value=0.3)
@@ -246,17 +252,12 @@ class ResNetPlusModel(pl.LightningModule):
         # Compute mAP
         # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
         mAP = evaluate_map(distmat, query_labels, gallery_labels)
-        mAP1 = evaluate_map(distmat, query_labels, gallery_labels, top_k=1)
         mAP5 = evaluate_map(distmat, query_labels, gallery_labels, top_k=5)
         self.log('val/mAP', mAP)
-        self.log('val/mAP1', mAP1)
         self.log('val/mAP5', mAP5)
 
         recall_at_k = evaluate_recall_at_k(distmat, query_labels, gallery_labels, k=5)
         self.log(f'val/Recall@5', recall_at_k)
-
-        accuracy = wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels)
-        self.log(f'val/accuracy', accuracy)
 
         if self.val_viz:
             self.distmat = distmat

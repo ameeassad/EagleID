@@ -207,11 +207,14 @@ if __name__ == '__main__':
     config_yml['epochs'] = 22
 
     # Update sweep config to include base parameters from config.yaml
-    sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters'] and 
-                                       key not in ['animal_cat', 'dataset', 'cache_path']})
+    if len(config_yml['animal_cat'].split(',')) > 1:
+        sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters'] and 
+                                        key not in ['animal_cat', 'dataset', 'cache_path']})
+    else: # only one animal, don't change cache and dataset
+        sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters']})
 
 
-    sweep_id = wandb.sweep(sweep_config, project="sweep-arcface")
+    sweep_id = wandb.sweep(sweep_config, project="sweepy-sweep")
 
     # agent that will iterate over the sweep parameters with specified search method
     wandb.agent(sweep_id, function=sweep_iteration)

@@ -31,7 +31,7 @@ gpu_ids:
 seed: 42
 
 use_gradcam: False
-val_viz: True
+val_viz: False
 
 transforms:
   mean: [0.485, 0.456, 0.406]

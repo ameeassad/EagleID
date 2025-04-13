@@ -17,7 +17,6 @@ class SimilarityVizCallback(Callback):
             return
         if pl_module.distmat is None:
             return  # or log a warning
-
         
         root = self.config['dataset']
 
