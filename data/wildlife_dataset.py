@@ -555,6 +555,11 @@ class PrecomputedWildlife(WildlifeDataset):
         self.data_cache = self._load_cache()
         print(f"Precomputed data loaded from {img_load} for {category}. Only to be used for processing lvl 2-5")
 
+        print("Precomputed data loaded:")
+        print(f"length of metadata: {len(self.metadata)}")
+        print("first 5 rows of metadata:")
+        print(self.metadata.head())
+
 
     def _load_cache(self):
         """Load all precomputed data into memory as dictionaries"""
