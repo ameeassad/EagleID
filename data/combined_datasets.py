@@ -91,7 +91,7 @@ def get_dataset(config, hardcode=None, sweep=False):
             data = WildlifeDataModule(metadata=dataset.df, config=config)
 
         elif config['wildlife_name'] == 'seal':
-            dataset = datasets.SealIDSegmented(config['dataset'])
+            dataset = datasets.SealID(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
         elif config['wildlife_name'] == 'NDD20':
             dataset = datasets.NDD20(config['dataset'])
