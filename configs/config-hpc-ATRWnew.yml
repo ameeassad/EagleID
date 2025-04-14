@@ -45,7 +45,7 @@ triplet_loss:
   mining_type: semihard # choose between: semihard, hard (more challenging triplets)
   distance_matrix: cosine
 arcface_loss:
-  activate: False # Set to False if using triplet loss
+  activate: True # Set to False if using triplet loss
   margin: 0.406 # [0.5, 32] or [0.406, 42]
   scale: 42 # [0.50, 32] or [0.406, 42]
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
