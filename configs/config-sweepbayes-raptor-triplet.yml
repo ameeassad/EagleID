@@ -13,10 +13,36 @@ parameters:
         max: 0.7
       mining_type:
         values: ['semihard', 'hard']
+      distance_matrix:
+        values: ['cosine']
+  # arcface_loss:
+  #   parameters:
+  #     margin:
+  #       distribution: uniform
+  #       min: 0.2
+  #       max: 0.5
+  #     scale:
+  #       distribution: uniform
+  #       min: 20
+  #       max: 40
   solver:
     parameters:
+      OPT:
+        values: ['adam']
+      MOMENTUM:
+        values: [0.9]
+      BASE_LR:
+        values: [0.001]
       LR_SCHEDULER:
         values: ['reduce_on_plateau', 'cosine_annealing']
+      LR_DECAY_RATE:
+        values: [0.1]
+      use_swa:
+        values: [False]
+      swa_lr:
+        values: [0.035]
+      swa_start:
+        values: [24]
       lr_max:
         distribution: log_uniform_values
         min: 1e-5
@@ -31,11 +57,20 @@ parameters:
         distribution: log_uniform_values
         min: 1e-4
         max: 1e-2
-      lr_min:  # Only for cosine_annealing
-        distribution: log_uniform_values
-        min: 1e-6
-        max: 1e-5
 early_terminate:
   type: hyperband
   min_iter: 5
   eta: 3
+
+#   LR_SCHEDULER: reduce_on_plateau  # step, multistep, reduce_on_plateau
+#   LR_DECAY_RATE: 0.1
+#   LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
+#   LR_STEP_MILESTONES: [20, 30]  # only when LR_SCHEDULER is multistep
+  
+#   use_swa: False #Stochastic Weight Averaging (SWA) to help improve generalization
+#   swa_lr: 0.035
+#   swa_start: 24
+#   lr_max: 0.0001
+#   lr_start: 1e-05
+#   lr_ramp_ep: 8
+#   lr_decay: 0.8
