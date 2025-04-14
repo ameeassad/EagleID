@@ -13,16 +13,6 @@ parameters:
         max: 0.7
       mining_type:
         values: ['semihard', 'hard']
-  arcface_loss:
-    parameters:
-      margin:
-        distribution: uniform
-        min: 0.2
-        max: 0.5
-      scale:
-        distribution: uniform
-        min: 20
-        max: 40
   solver:
     parameters:
       LR_SCHEDULER:
