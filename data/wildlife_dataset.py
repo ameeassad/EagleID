@@ -363,7 +363,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             df_train = df_all[df_all['metadata_split'] == 'train']
             df_test = df_all[df_all['metadata_split'] == 'test']
             analyze_split(df_all, df_train.index, df_test.index)
-        else:
+        else: # Will create new metadata split values and save to file _split.csv!
             if self.splitter == 'closed':
                 # Closed-set split x(same individuals in train/test)
                 splitter = splits.ClosedSetSplit(self.split_ratio)
@@ -381,14 +381,17 @@ class WildlifeDataModule(pl.LightningDataModule):
                 analyze_split(df_all, idx_train, idx_test)
             df_train, df_test = df_all.loc[idx_train], df_all.loc[idx_test]
 
+            assert all(idx in df_all.index for idx in idx_test), "Test indices do not match df_all indices"
+
             # Also handle query / gallery in dataframe (only if metadata_split NOT selected)
-            if 'query' not in df_all.columns:
-                # Split query set and gallery set for evaluation via SplitQueryDatabase
-                self.val_split = SplitQueryDatabase()
-                df_test = self.val_split(df_test)
-                df_test['query'] = df_test['query'].astype(bool)
-                # df_all['query'] = df_test['query']  # save it to original
-                df_all.loc[df_test.index, 'query'] = df_test['query'] # save it to original
+            # if 'query' not in df_all.columns: # want to overwrite even if exists....
+            df_all['query'] = 0 # Reset
+            # Split query set and gallery set for evaluation via SplitQueryDatabase
+            self.val_split = SplitQueryDatabase()
+            df_test = self.val_split(df_test)
+            df_test['query'] = df_test['query'].astype(int) # Ensure integer before boolean
+            # df_all['query'] = df_test['query']  # save it to original
+            df_all.loc[df_test.index, 'query'] = df_test['query'] # save it to original; must ensure that df_test.index matches exactly with df_all.index!
 
             # Save train/test split back to cache (only if metadata_split NOT selected)
             df_all['metadata_split'] = ''
@@ -398,6 +401,9 @@ class WildlifeDataModule(pl.LightningDataModule):
             df_all.to_csv(original_path.with_name(original_path.stem + '_split.csv'), index=False)
 
         # Happens for all split options, assuming 'query' column is present
+        if df_all['query'].isna().any():
+            print("Warning: 'query' column contains NaN values. Filling with False.")
+            df_all['query'] = df_all['query'].fillna(False)
         df_test['query'] = df_test['query'].astype(bool)
         df_query = df_test[df_test['query']]
         df_gallery = df_test[~df_test['query']]
@@ -453,6 +459,11 @@ class WildlifeDataModule(pl.LightningDataModule):
         # return DataLoader(self.train_dataset, batch_size=self.batch_size, sampler=sampler, num_workers=self.num_workers)
     
     def val_dataloader(self):
+        print("Query dataset length:", len(self.val_query_dataset))
+        print("Gallery dataset length:", len(self.val_gallery_dataset))
+        print("Query labels:", self.val_query_dataset.labels[:5])
+        print("Gallery labels:", self.val_gallery_dataset.labels[:5])
+
         query_loader = DataLoader(self.val_query_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
         gallery_loader = DataLoader(self.val_gallery_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
         return [query_loader, gallery_loader]
