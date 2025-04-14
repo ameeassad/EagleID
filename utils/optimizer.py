@@ -42,6 +42,21 @@ def get_lr_scheduler_config(config, optimizer: torch.optim.Optimizer) -> dict:
             'interval': 'epoch',
             'frequency': 1,
         }
+    elif config['solver']['LR_SCHEDULER'] == 'cosine_annealing':
+        # Number of epochs for cosine decay (after ramp-up)
+        total_epochs = config.get('epochs', 20)  # Default to 20 if not specified
+        ramp_up_epochs = config['solver'].get('lr_ramp_ep', 0)
+        T_max = total_epochs - ramp_up_epochs  # Decay over remaining epochs
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=T_max,
+            eta_min=config['solver'].get('lr_min', 1e-06)  # Minimum LR
+        )
+        lr_scheduler_config = {
+            'scheduler': scheduler,
+            'interval': 'epoch',
+            'frequency': 1,
+        }
     else:
         raise NotImplementedError
 

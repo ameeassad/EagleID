@@ -177,7 +177,7 @@ def sweep_iteration():
     for k, v in wandb.config.items():
         config[k] = v
 
-    data =  get_dataset(config, sweep=True)
+    data =  get_dataset(config, sweep=sweep_multi)
     model = get_model(config)
 
     # setup Trainer
@@ -208,13 +208,15 @@ if __name__ == '__main__':
 
     # Update sweep config to include base parameters from config.yaml
     if len(config_yml['animal_cat'].split(',')) > 1:
+        sweep_multi = True
         sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters'] and 
                                         key not in ['animal_cat', 'dataset', 'cache_path']})
     else: # only one animal, don't change cache and dataset
+        sweep_multi = False
         sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters']})
 
 
-    sweep_id = wandb.sweep(sweep_config, project="sweepy-sweep")
+    sweep_id = wandb.sweep(sweep_config, project="sweepy-all-raptor")
 
     # agent that will iterate over the sweep parameters with specified search method
     wandb.agent(sweep_id, function=sweep_iteration)
