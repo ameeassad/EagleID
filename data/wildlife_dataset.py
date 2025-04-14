@@ -452,6 +452,11 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.val_query_dataset = Wildlife(metadata=df_query, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, load_metadata=self.load_metadata)
             self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, load_metadata=self.load_metadata)
 
+
+        
+        print("Round 1 Query image_ids:", df_query['image_id'].tolist())
+        print("Round 1 Gallery image_ids:", df_gallery['image_id'].tolist())
+
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
         # If using Triplet loss need an anchor and a positive in same identity class: // handled by triplet loss function
@@ -538,6 +543,9 @@ class PrecomputedWildlife(WildlifeDataset):
         cache_dir: str = "../dataset/data_cache",
         category: str = "example_wildlife",
     ):
+        
+        metadata = metadata.sort_values(by=['identity', 'image_id']).reset_index(drop=True)  # Sort for consistency
+
         super().__init__(
             metadata=metadata,
             root=root,

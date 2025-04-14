@@ -156,7 +156,9 @@ class SplitQueryDatabase(Split):
         identities = metadata['identity'].unique()
 
         for identity in identities:
-            identity_indices = metadata[metadata['identity'] == identity].index.tolist()
+            # identity_indices = metadata[metadata['identity'] == identity].index.tolist()
+            identity_df = metadata[metadata['identity'] == identity].sort_values(by=['image_id'])  # Sort by image_id
+            identity_indices = identity_df.index.tolist()
             if len(identity_indices) > 1:
                 # Set the first image as query (value 1)
                 metadata.at[identity_indices[0], 'query'] = 1
