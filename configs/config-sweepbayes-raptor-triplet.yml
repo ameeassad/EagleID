@@ -46,7 +46,7 @@ parameters:
       lr_max:
         distribution: log_uniform_values
         min: 1e-5
-        max: 1e-3
+        max: 2e-4
       lr_start:
         distribution: log_uniform_values
         min: 1e-6

@@ -1,6 +1,6 @@
 # BEFORE RUN, CHECK: cache_path, splitter, precompute, arcface_loss.activate, epochs
 
-project_name: eagleID-testing-new
+project_name: eagleID-ATRW-test
 notes: 
 use_wandb: True
 wandb_entity: winniethepooh
@@ -9,8 +9,8 @@ wildlife_name: ATRW
 animal_cat: mammal
 outdir: results
 dataset: /proj/nobackup/aiforeagles/ATRW/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW_split.csv # _split.csv if using metadata_split
-splitter: metadata_split # custom_closed / metadata_split 
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv # _split.csv if using metadata_split
+splitter: custom_closed # custom_closed / metadata_split 
 split_ratio: 0.8
 
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
@@ -45,7 +45,7 @@ triplet_loss:
   mining_type: semihard # choose between: semihard, hard (more challenging triplets)
   distance_matrix: cosine
 arcface_loss:
-  activate: True # Set to False if using triplet loss
+  activate: False # Set to False if using triplet loss
   margin: 0.406 # [0.5, 32] or [0.406, 42]
   scale: 42 # [0.50, 32] or [0.406, 42]
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
@@ -63,7 +63,7 @@ solver:
   OPT: adam  # adam, sgd
   WEIGHT_DECAY: 0.0001 # 0.001, 0.0001 (small dataset)
   MOMENTUM: 0.9  # only when OPT is sgd
-  BASE_LR: 0.01 # if SGD use 0.01 / if Adam use 0.001
+  BASE_LR: 0.001 # if SGD use 0.01 / if Adam use 0.001
   LR_SCHEDULER: reduce_on_plateau  # step, multistep, reduce_on_plateau
   LR_DECAY_RATE: 0.1
   LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
