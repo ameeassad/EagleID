@@ -9,8 +9,8 @@ wildlife_name: ATRW
 animal_cat: mammal
 outdir: results
 dataset: /proj/nobackup/aiforeagles/ATRW/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW.csv # _split.csv if using metadata_split
-splitter: custom_closed # custom_closed / metadata_split 
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_ATRW_split.csv # _split.csv if using metadata_split
+splitter: metadata_split # custom_closed / metadata_split 
 split_ratio: 0.8
 
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
