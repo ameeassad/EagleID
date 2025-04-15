@@ -45,7 +45,7 @@ class GradCAMCallback(Callback):
             print("Validation dataloaders not found or empty.")
             return  # Exit if no validation dataloader is available
 
-        target_layer = self.get_resnet50_layer4(self.model)
+        target_layer = self.get_resnet50_layer4(pl_module)
         if target_layer is None:
             print("ResNet50 layer4 not found.")
             return
@@ -65,26 +65,26 @@ class GradCAMCallback(Callback):
                 x = x[:, :3, :, :] # only take rgb channels
                 # then run through forward with only rgb
 
-            # GradCAM logic (same as before)
+
+            # For the visualization, denormalize
+            x_np = x[idx].cpu().numpy()  # Convert from PyTorch tensor to numpy array
+            unnormalized_x = denormalize(x_np, self.config['transforms']['mean'], self.config['transforms']['std'])
+            unnormalized_x = unnormalized_x[:3]  # RGB only: (3, 224, 224)
+            # Reformat unnormalized_x back to (224, 224, 3) for visualization
+            unnormalized_x = np.transpose(unnormalized_x, (1, 2, 0))  # Shape is now (224, 224, 3)
+            # x_debug = unnormalized_x #debug
+            unnormalized_x = (unnormalized_x-np.min(unnormalized_x))/(np.max(unnormalized_x)-np.min(unnormalized_x))
+            unnormalized_x = np.clip(unnormalized_x, 0, 1)
+
             with torch.enable_grad():
-                x_np = x[idx].cpu().numpy()  # Convert from PyTorch tensor to numpy array
-                unnormalized_x = denormalize(x_np, self.config['transforms']['mean'], self.config['transforms']['std'])
-
-                unnormalized_x = unnormalized_x[:3]  # RGB only: (3, 224, 224)
-
-                # Reformat unnormalized_x back to (224, 224, 3) for visualization
-                unnormalized_x = np.transpose(unnormalized_x, (1, 2, 0))  # Shape is now (224, 224, 3)
-                # x_debug = unnormalized_x #debug
-                unnormalized_x = (unnormalized_x-np.min(unnormalized_x))/(np.max(unnormalized_x)-np.min(unnormalized_x))
-                unnormalized_x = np.clip(unnormalized_x, 0, 1)
-
                 # cam = GradCAM(model=self.model, target_layers=[self.model.layer4[-1]])
                 cam = GradCAM(model=pl_module, target_layers=[target_layer])
                 # Following targets fails if self.model outputs embeddings of size 128, and class indices higher
                 # targets = [ClassifierOutputTarget(class_idx) for class_idx in target] # only works for class logits, NOT embedding models
                 # 
                 # alternative for embedding model:
-                embeddings = self.model(x)
+                print(f"Batch {batch_idx} x.shape: {x.shape}")
+                embeddings = pl_module(x)
                 if self.arcface:
                     # ArcFace target for the query image
                     query_label = target[idx].item()
@@ -132,28 +132,42 @@ class GradCAMCallback(Callback):
 
         pl_module.train()  # Set the model back to training mode
 
+    # def get_resnet50_layer4(self, model):
+    #     """
+    #     Retrieve the layer4 of a ResNet50 model.
+    #     """
+    #     try:
+    #         backbone = model.backbone
+
+    #         if hasattr(backbone, 'layer4'):
+    #             return backbone.layer4[-1]  # Return the last block of layer4 for GradCAM
+    #     except:
+    #         print('model has no backbone')
+            
+    #     if hasattr(model, 'layer4'):
+    #         return model.layer4[-1]  # Use the last block of layer4 for GradCAM
+    #     elif hasattr(model, 'backbone') and hasattr(model.backbone, 'layer4'):
+    #         # In case the backbone is wrapped inside another model
+    #         return model.backbone.layer4[-1]
+    #     elif hasattr(model, 'model') and hasattr(model.model, 'layer4'):
+    #         # If wrapped inside a SimpleModel or another object
+    #         return model.model.layer4[-1]
+    #     else:
+    #         print("layer4 not found in the model.")
+    #         return None
+
+
     def get_resnet50_layer4(self, model):
         """
         Retrieve the layer4 of a ResNet50 model.
         """
         try:
-            backbone = model.backbone
-
-            if hasattr(backbone, 'layer4'):
-                return backbone.layer4[-1]  # Return the last block of layer4 for GradCAM
-        except:
-            print('model has no backbone')
-            
-        if hasattr(model, 'layer4'):
-            return model.layer4[-1]  # Use the last block of layer4 for GradCAM
-        elif hasattr(model, 'backbone') and hasattr(model.backbone, 'layer4'):
-            # In case the backbone is wrapped inside another model
-            return model.backbone.layer4[-1]
-        elif hasattr(model, 'model') and hasattr(model.model, 'layer4'):
-            # If wrapped inside a SimpleModel or another object
-            return model.model.layer4[-1]
-        else:
-            print("layer4 not found in the model.")
+            if hasattr(model, "backbone") and hasattr(model.backbone, "layer4"):
+                return model.backbone.layer4[-1]
+            print("layer4 not found.")
+            return None
+        except Exception as e:
+            print(f"Error accessing layer4: {e}")
             return None
         
 
