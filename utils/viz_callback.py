@@ -48,4 +48,4 @@ class SimilarityVizCallback(Callback):
             pl_module.logger.experiment.log({"Val Retrieval": wandb_img})
         else:
             os.makedirs(self.outdir, exist_ok=True)
-            fig.save(os.path.join(self.outdir, f'val_retrieval_epoch{trainer.current_epoch + 1}_fig.png'))  
+            fig.savefig(os.path.join(self.outdir, f'val_retrieval_epoch{trainer.current_epoch + 1}_fig.png'))
