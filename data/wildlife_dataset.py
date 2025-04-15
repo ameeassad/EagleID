@@ -45,6 +45,8 @@ class Wildlife(WildlifeDataset):
         load_label: bool = True,
         load_metadata: bool = False,
     ):    
+        metadata = metadata.sort_values(by=['identity', 'image_id']).reset_index(drop=True)  # Sort for consistency
+
         super().__init__(
             metadata=metadata,
             root=root,

@@ -14,7 +14,7 @@ splitter: metadata_split # custom_closed / metadata_split
 split_ratio: 0.8
 
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
-precompute: True
+precompute: False
 
 model_architecture: ResNetPlusModel # ResNetPlusModel, TripletModel, FusionModel, EfficientNet, TransformerModel
 backbone_name: resnet50 # efficientnet_b0, resnet50, swin_tiny_patch4_window7_224
@@ -52,12 +52,12 @@ arcface_loss:
   n_classes:
 
 early_stopping:
-  enabled: False
+  enabled: True
   monitor: val/mAP
-  min_delta: 0.0005
-  patience: 50
+  min_delta: 0.01
+  patience: 15
   verbose: true
-  mode: min
+  mode: max
 
 solver:
   OPT: adam  # adam, sgd
