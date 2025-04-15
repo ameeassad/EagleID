@@ -62,7 +62,7 @@ class GradCAMCallback(Callback):
             if self.kp_included:
                 # TODO: Implement GradCAM for higher dimension inputs
                 pass
-                x = x[:, :3, :, :] # only take rgb channels
+                # x = x[:, :3, :, :] # only take rgb channels
                 # then run through forward with only rgb
 
 
@@ -83,7 +83,6 @@ class GradCAMCallback(Callback):
                 # targets = [ClassifierOutputTarget(class_idx) for class_idx in target] # only works for class logits, NOT embedding models
                 # 
                 # alternative for embedding model:
-                print(f"Batch {batch_idx} x.shape: {x.shape}")
                 embeddings = pl_module(x)
                 if self.arcface:
                     # ArcFace target for the query image
