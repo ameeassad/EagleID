@@ -35,7 +35,7 @@ def get_args() -> argparse.Namespace:
 def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
     lr_callback = LearningRateMonitor(logging_interval='epoch')
     ckpt_callback = ModelCheckpoint(
-        dirpath=f'checkpoints-{config['project_name']}',
+        dirpath=f"checkpoints-{config['project_name']}",
         filename='epoch{epoch:03d}',
         auto_insert_metric_name=False,
         save_top_k=1,
