@@ -7,6 +7,7 @@ from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 import wandb
+import random
 
 from data.transforms import denormalize
 
@@ -53,7 +54,7 @@ class GradCAMCallback(Callback):
         pl_module.eval()  # Ensure model is in evaluation mode
         for batch_idx, batch in enumerate(trainer.val_dataloaders[0]): # first dataloader is the query images & labels
             x, target, *rest = batch
-            idx = 0
+            idx = random.randint(0, x.shape[0] - 1)  # Random idx
             # Move inputs and targets to the device
             x = x.to(pl_module.device)
             target = target.to(pl_module.device)
