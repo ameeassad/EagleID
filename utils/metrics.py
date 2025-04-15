@@ -119,7 +119,9 @@ class CosineSimilarity(Similarity):
         similarity = torch.matmul(F.normalize(a), F.normalize(b).T)
 
         # Move similarity to CPU if needed before converting to NumPy
-        return similarity.cpu().numpy() if similarity.is_cuda else similarity.numpy()
+        # return similarity.cpu().numpy() if similarity.is_cuda else similarity.numpy()
+        return similarity.cpu().numpy() if similarity.device.type != 'cpu' else similarity.numpy()
+
 
 
 """

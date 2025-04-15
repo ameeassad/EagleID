@@ -35,12 +35,12 @@ def get_args() -> argparse.Namespace:
 def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
     lr_callback = LearningRateMonitor(logging_interval='epoch')
     ckpt_callback = ModelCheckpoint(
-        dirpath='checkpoints',
+        dirpath=f'checkpoints-{config['project_name']}',
         filename='epoch{epoch:03d}',
         auto_insert_metric_name=False,
         save_top_k=1,
-        monitor='val/mAP5', # returned metrics: ['random_val/mAP', 'lr-SGD', 'train/loss', 'train/loss_step', 'val/mAP', 'val/mAP1', 'val/mAP5', 'val/Recall@5', 'val/accuracy', 'train/loss_epoch', 'epoch', 'step']
-        mode='min',
+        monitor='val/mAP', # returned metrics: ['random_val/mAP', 'lr-SGD', 'train/loss', 'train/loss_step', 'val/mAP', 'val/mAP1', 'val/mAP5', 'val/Recall@5', 'val/accuracy', 'train/loss_epoch', 'epoch', 'step']
+        mode='max',
         every_n_epochs=checkpoint_interval,
         save_last=True,
     )
