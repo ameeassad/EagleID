@@ -76,6 +76,8 @@ class GradCAMCallback(Callback):
             unnormalized_x = (unnormalized_x-np.min(unnormalized_x))/(np.max(unnormalized_x)-np.min(unnormalized_x))
             unnormalized_x = np.clip(unnormalized_x, 0, 1)
 
+            with torch.no_grad():
+                embeddings = pl_module(x)
             with torch.enable_grad():
                 # cam = GradCAM(model=self.model, target_layers=[self.model.layer4[-1]])
                 cam = GradCAM(model=pl_module, target_layers=[target_layer])
@@ -129,6 +131,7 @@ class GradCAMCallback(Callback):
             if batch_idx >= 2:
                 break
 
+        pl_module.eval()  # Reset to eval mode
         pl_module.train()  # Set the model back to training mode
 
     # def get_resnet50_layer4(self, model):
