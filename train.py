@@ -20,6 +20,7 @@ from models.efficientnet import EfficientNet
 from models.resnet_plus_model import ResNetPlusModel
 from models.triplet_loss_model import TripletModel
 from utils.gradcam_callback import GradCAMCallback
+from utils.viz_callback import SimilarityVizCallback
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Train classifier.')
@@ -64,6 +65,15 @@ def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
             log_every_n_epochs=10 
         )
         callbacks.append(gradcam_callback)
+
+    if config['val_viz']:
+        viz_callback = SimilarityVizCallback(
+                    config=config, 
+                    outdir=config['outdir'], 
+                    log_every_n_epochs=1 
+                )
+        callbacks.append(viz_callback)
+
 
     return callbacks
 

@@ -39,6 +39,7 @@ def query_prediction_results_similarity(
         # Query image
         query_img_path = query_metadata.iloc[idx]['path']
         query_img = load_image(os.path.join(root, query_img_path))
+        print(f"Query image path: {query_img_path}")
         
         # Predicted image (EXACT MATCH)
         # Get index of most similar database image

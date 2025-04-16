@@ -260,11 +260,55 @@ class ResNetPlusModel(pl.LightningModule):
         self.log(f'val/Recall@5', recall_at_k)
 
         if self.val_viz:
+            self.raptor_metrics(gallery_embeddings, gallery_labels, query_embeddings, query_labels)
+            
             self.distmat = distmat
             self.query_path_epoch = self.query_path  # set externally by DataModule or Trainer
             self.query_identity_epoch = self.query_identity
             self.gallery_path_epoch = self.gallery_path 
             self.gallery_identity_epoch = self.gallery_identity
+
+    def raptor_metrics(self, gallery_embeddings, gallery_labels, query_embeddings, query_labels):
+        # Flatten gallery_identity (list of lists -> list)
+        gallery_path_flat = [item for sublist in self.gallery_path for item in sublist]
+        # Filter indices where identity starts with goleag, whteag, osprey
+        target_prefixes = ['goleag', 'whteag', 'osprey', 'baleag']
+        valid_indices = [
+            i for i, identity in enumerate(gallery_path_flat)
+            if any(identity.lower().startswith(prefix.lower()) for prefix in target_prefixes)
+        ]
+        
+        if valid_indices:
+            # Subset gallery embeddings and labels
+            gallery_embeddings_subset = gallery_embeddings[valid_indices]
+            gallery_labels_subset = gallery_labels[valid_indices]
+            
+            # Filter query embeddings/labels to match valid gallery identities
+            valid_labels = gallery_labels_subset.unique()
+            query_mask = torch.isin(query_labels, valid_labels)
+            query_embeddings_subset = query_embeddings[query_mask]
+            query_labels_subset = query_labels[query_mask]
+
+            if len(query_embeddings_subset) > 0 and len(gallery_embeddings_subset) > 0:
+                # Compute distance matrix for subset
+                if self.re_ranking:
+                    distmat_subset = re_ranking(
+                        query_embeddings_subset, gallery_embeddings_subset, k1=20, k2=6, lambda_value=0.3
+                    )
+                else:
+                    distmat_subset = compute_distance_matrix(
+                        self.distance_matrix, query_embeddings_subset, gallery_embeddings_subset, wildlife=True
+                    )
+                
+                # Compute mAP for subset
+                mAP_subset = evaluate_map(distmat_subset, query_labels_subset, gallery_labels_subset)
+                self.log('val/mAP_raptors', mAP_subset, prog_bar=True)
+            else:
+                print("No valid query-gallery pairs after filtering. Skipping mAP_raptors.")
+                self.log('val/mAP_raptors', 0.0)
+        else:
+            print("No gallery identities match 'goleag', 'whteag', or 'osprey'. Skipping mAP_raptors.")
+            self.log('val/mAPeraptors', 0.0)
 
     def configure_optimizers(self):
         if self.config:
