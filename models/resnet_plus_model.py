@@ -261,7 +261,7 @@ class ResNetPlusModel(pl.LightningModule):
 
         if self.val_viz:
             self.raptor_metrics(gallery_embeddings, gallery_labels, query_embeddings, query_labels)
-            
+
             self.distmat = distmat
             self.query_path_epoch = self.query_path  # set externally by DataModule or Trainer
             self.query_identity_epoch = self.query_identity
@@ -272,10 +272,10 @@ class ResNetPlusModel(pl.LightningModule):
         # Flatten gallery_identity (list of lists -> list)
         gallery_path_flat = [item for sublist in self.gallery_path for item in sublist]
         # Filter indices where identity starts with goleag, whteag, osprey
-        target_prefixes = ['goleag', 'whteag', 'osprey', 'baleag']
+        target_prefix = 'raptor_individuals_cropped'
         valid_indices = [
             i for i, identity in enumerate(gallery_path_flat)
-            if any(identity.lower().startswith(prefix.lower()) for prefix in target_prefixes)
+            if identity.lower().startswith(target_prefix.lower())
         ]
         
         if valid_indices:
@@ -308,7 +308,7 @@ class ResNetPlusModel(pl.LightningModule):
                 self.log('val/mAP_raptors', 0.0)
         else:
             print("No gallery identities match 'goleag', 'whteag', or 'osprey'. Skipping mAP_raptors.")
-            self.log('val/mAPeraptors', 0.0)
+            self.log('val/mAP_raptors', 0.0)
 
     def configure_optimizers(self):
         if self.config:

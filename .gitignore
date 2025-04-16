@@ -19,4 +19,4 @@ dataset/dataframe/
 dataset/data_cache/
 dataset/raptor_data_cache/
 scripts/
-scripts/run_train.sh
+notebooks/train_trial_results/
