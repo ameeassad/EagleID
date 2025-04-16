@@ -101,7 +101,7 @@ def get_dataset(config, hardcode=None, sweep=False):
             data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'elephant':
-            dataset = datasets.ELPephant(config['dataset'])
+            dataset = datasets.ELPephants(config['dataset'])
             data = WildlifeDataModule(metadata=dataset.df, config=config)
             config['animal_cat'] = 'mammal'
         elif config['wildlife_name'] == 'SealIDSegmented':

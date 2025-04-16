@@ -285,6 +285,10 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.precompute = precompute
             self.load_metadata = False
 
+        if len(self.wildlife_names.split(',')) > 1:
+            multispecies = True
+            self.wildlife_names = self.wildlife_names.replace(',', '_').replace(' ', '_')
+
         # Handle transforms
         if self.preprocess_lvl == 3:
             resize_and_pad = t.ResizeAndPadBoth(self.size, skeleton=True)
@@ -567,19 +571,48 @@ class PrecomputedWildlife(WildlifeDataset):
         if img_load not in ["bbox_mask", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
             raise ValueError(f"Invalid img_load argument: {img_load}. This class is only for preprocessed images.")
 
-        self.cache_files = {
-            "bbox_mask": os.path.join(self.cache_dir, category + "_mask.npz"),
-            "bbox_mask_skeleton": os.path.join(self.cache_dir, category +"_skeleton.npz"),
-            "bbox_mask_heatmaps": os.path.join(self.cache_dir, category +"_heatmaps.npz"),
-            "bbox_mask_components": os.path.join(self.cache_dir, category +"_components.npz")
-        }
-        self.data_cache = self._load_cache()
+        input_category = category.split('_')
+        if len(input_category) > 2: # ex. "train_raptors_BirdIndividualID"
+            split = input_category[0]
+            self.multispecies = True
+            if 'wildlife_name' in self.metadata.columns:
+                self.wildlife_names = self.metadata['wildlife_name'].unique()
+            else:
+                self.wildlife_names = np.array([input_category[i] for i in range(1, len(input_category))])
+
+            self.cache_files = {
+                name: {
+                    "bbox_mask": os.path.join(self.cache_dir, split + "_" + name + "_mask.npz"),
+                } for name in self.wildlife_names
+            }
+            self.data_cache = self._load_cache_multispecies()
+        else:
+            self.multispecies = False
+            self.cache_files = {
+                "bbox_mask": os.path.join(self.cache_dir, category + "_mask.npz"),
+                "bbox_mask_skeleton": os.path.join(self.cache_dir, category +"_skeleton.npz"),
+                "bbox_mask_heatmaps": os.path.join(self.cache_dir, category +"_heatmaps.npz"),
+                "bbox_mask_components": os.path.join(self.cache_dir, category +"_components.npz")
+            }
+            self.data_cache = self._load_cache()
         print(f"Precomputed data loaded from {img_load} for {category}. Only to be used for processing lvl 2-5")
 
         print("Precomputed data loaded:")
         print(f"length of metadata: {len(self.metadata)}")
         print("first 5 rows of metadata:")
         print(self.metadata.head())
+
+    def _load_cache_multispecies(self):
+        """Load and combine mask NPZ files for all species in metadata."""
+        data_cache = {'mask': {}}
+        for name in self.wildlife_names:
+            mask_cache_file = self.cache_files[name]["bbox_mask"]
+            if not os.path.exists(mask_cache_file):
+                raise FileNotFoundError(f"Mask cache file for category {name} not found: {mask_cache_file}")
+            masks_data = np.load(mask_cache_file, allow_pickle=True)
+            wname_masks = dict(masks_data["mask"].item())
+            data_cache['mask'].update(wname_masks)
+        return data_cache
 
 
     def _load_cache(self):
@@ -620,15 +653,15 @@ class PrecomputedWildlife(WildlifeDataset):
         for idx in range(len(self.metadata)):
             data = self.metadata.iloc[idx]
             img_path = os.path.join(self.root, data[self.col_path])
-            filename = os.path.splitext(os.path.basename(img_path))[0]
+            img_key = data[self.col_path] # chose this bc definitely indexable
 
             # Enforce that segmentation must exist for these modes.
             if "segmentation" not in data or not data["segmentation"]:
-                raise ValueError(f"{p_type} selected but no segmentation found for image {filename}.")
+                raise ValueError(f"{p_type} selected but no segmentation found for image {img_path}.")
             # For skeleton, heatmaps, or components, also require keypoints.
             if p_type in ["bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
                 if "keypoints" not in data or not data["keypoints"]:
-                    raise ValueError(f"{p_type} selected but no keypoints found for image {filename}.")
+                    raise ValueError(f"{p_type} selected but no keypoints found for image {img_path}.")
 
             img = Image.open(img_path)
             bbox = self._parse_bbox(data)
@@ -637,17 +670,17 @@ class PrecomputedWildlife(WildlifeDataset):
 
             # Always compute masks since they're used in __getitem__
             # all_masks[filename] = self._compute_mask(segmentation, img.size[1], img.size[0], bbox)
-            all_masks[filename] = self._compute_mask(segmentation, img.size[1], img.size[0], bbox)
+            all_masks[img_key] = self._compute_mask(segmentation, img.size[1], img.size[0], bbox)
 
             # Compute only the requested data type (if not 'masks' itself)
             if data_type == "mask":
                 pass  # Only masks are needed.
             elif data_type == "skeleton":
-                all_data[filename] = self._compute_skeleton(keypoints, bbox, img.size[1], img.size[0])
+                all_data[img_key] = self._compute_skeleton(keypoints, bbox, img.size[1], img.size[0])
             elif data_type == "heatmaps":
-                all_data[filename] = self._compute_heatmaps(keypoints, bbox, img.size[1], img.size[0])
+                all_data[img_key] = self._compute_heatmaps(keypoints, bbox, img.size[1], img.size[0])
             elif data_type == "components":
-                all_data[filename] = self._compute_components(img, bbox, keypoints, segmentation)
+                all_data[img_key] = self._compute_components(img, bbox, keypoints, segmentation)
 
         if data_type == "mask":
             np.savez_compressed(self.cache_files[p_type], mask=all_masks)
@@ -678,7 +711,7 @@ class PrecomputedWildlife(WildlifeDataset):
             img_path = os.path.join(self.root, data[self.col_path])
         else:
             img_path = data[self.col_path]
-        filename = os.path.splitext(os.path.basename(img_path))[0]
+        img_key = data[self.col_path]
         img = self.get_image(img_path)
         
         # First crop the image, bc saved seg and keypoint is relative to crop
@@ -688,9 +721,9 @@ class PrecomputedWildlife(WildlifeDataset):
         img = img.crop((bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]))
 
         # Apply mask always
-        mask = self.data_cache['mask'].get(filename)
+        mask = self.data_cache['mask'].get(img_key)
         if mask is None:
-            raise ValueError(f"No mask found for {filename} in cache")
+            raise ValueError(f"No mask found for {img_key} in cache")
         img_array = np.array(img)
 
         if mask.shape[:2] != img_array.shape[:2]:
@@ -704,11 +737,11 @@ class PrecomputedWildlife(WildlifeDataset):
 
         # Apply transforms based on img_load type
         if self.img_load == "bbox_mask_skeleton":
-            skeleton = self.data_cache['skeleton'].get(filename)
+            skeleton = self.data_cache['skeleton'].get(img_key)
         elif self.img_load == "bbox_mask_heatmaps":
-            heatmaps = self.data_cache['heatmaps'].get(filename)
+            heatmaps = self.data_cache['heatmaps'].get(img_key)
         elif self.img_load == "bbox_mask_components":
-            components = self.data_cache['components'].get(filename)
+            components = self.data_cache['components'].get(img_key)
         if self.transform:
             if self.img_load == "bbox_mask_skeleton" and skeleton is not None:
                 img, skeleton_channel = self.transform[0](img, skeleton)
