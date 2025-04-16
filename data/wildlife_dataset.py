@@ -784,7 +784,6 @@ class PrecomputedWildlife(WildlifeDataset):
         # return (bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3])
     
         bbox = data['bbox']
-        raw_bbox = bbox
         bbox = eval(bbox) if isinstance(bbox, str) else bbox
         parsed_bbox = [int(round(coord)) for coord in bbox]
         return parsed_bbox
