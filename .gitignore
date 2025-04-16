@@ -16,5 +16,7 @@ __pycache__/
 __pycache__/dataset.cpython-312.pyc
 __pycache__/model.cpython-312.pyc
 dataset/dataframe/
+dataset/data_cache/
+dataset/raptor_data_cache/
 scripts/
 scripts/run_train.sh

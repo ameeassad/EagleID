@@ -654,6 +654,7 @@ class PrecomputedWildlife(WildlifeDataset):
             data = self.metadata.iloc[idx]
             img_path = os.path.join(self.root, data[self.col_path])
             img_key = data[self.col_path] # chose this bc definitely indexable
+            # img_key = os.path.splitext(os.path.basename(img_path))[0]
 
             # Enforce that segmentation must exist for these modes.
             if "segmentation" not in data or not data["segmentation"]:
@@ -712,6 +713,10 @@ class PrecomputedWildlife(WildlifeDataset):
         else:
             img_path = data[self.col_path]
         img_key = data[self.col_path]
+        if self.multispecies:
+            # remove the first part of the path that gets added in the cache
+            img_key = '/'.join(img_key.split('/')[1:]) if '/' in img_key else img_key
+        # img_key = os.path.splitext(os.path.basename(img_path))[0]
         img = self.get_image(img_path)
         
         # First crop the image, bc saved seg and keypoint is relative to crop
