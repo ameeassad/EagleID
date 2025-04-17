@@ -302,7 +302,7 @@ class ResNetPlusModel(pl.LightningModule):
                 
                 # Compute mAP for subset
                 mAP_subset = evaluate_map(distmat_subset, query_labels_subset, gallery_labels_subset)
-                self.log('val/mAP_raptors', mAP_subset, prog_bar=True)
+                self.log('val/mAP_raptors', mAP_subset)
             else:
                 print("No valid query-gallery pairs after filtering. Skipping mAP_raptors.")
                 self.log('val/mAP_raptors', 0.0)

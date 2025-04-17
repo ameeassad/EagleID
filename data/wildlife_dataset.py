@@ -336,7 +336,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             print(f"Dataset size before pre-processing and cleaning: {len(cache_df)}")
             df_all = cache_df.copy()
             df_all = self.clean_segmentation(df_all)
-            if self.only_cache[1]:
+            if self.only_cache[1] and self.preprocess_lvl>2:
                 df_all = df_all[df_all['keypoints'].apply(lambda x: not isinstance(x, float))]
         else:
             df_all = metadata.copy()
@@ -667,7 +667,6 @@ class PrecomputedWildlife(WildlifeDataset):
             img = Image.open(img_path)
             bbox = self._parse_bbox(data)
             segmentation = self._parse_segmentation(data)
-            keypoints = self._parse_keypoints(data)
 
             # Always compute masks since they're used in __getitem__
             # all_masks[filename] = self._compute_mask(segmentation, img.size[1], img.size[0], bbox)
@@ -676,12 +675,14 @@ class PrecomputedWildlife(WildlifeDataset):
             # Compute only the requested data type (if not 'masks' itself)
             if data_type == "mask":
                 pass  # Only masks are needed.
-            elif data_type == "skeleton":
-                all_data[img_key] = self._compute_skeleton(keypoints, bbox, img.size[1], img.size[0])
-            elif data_type == "heatmaps":
-                all_data[img_key] = self._compute_heatmaps(keypoints, bbox, img.size[1], img.size[0])
-            elif data_type == "components":
-                all_data[img_key] = self._compute_components(img, bbox, keypoints, segmentation)
+            else:
+                keypoints = self._parse_keypoints(data)
+                if data_type == "skeleton":
+                    all_data[img_key] = self._compute_skeleton(keypoints, bbox, img.size[1], img.size[0])
+                elif data_type == "heatmaps":
+                    all_data[img_key] = self._compute_heatmaps(keypoints, bbox, img.size[1], img.size[0])
+                elif data_type == "components":
+                    all_data[img_key] = self._compute_components(img, bbox, keypoints, segmentation)
 
         if data_type == "mask":
             np.savez_compressed(self.cache_files[p_type], mask=all_masks)
