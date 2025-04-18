@@ -157,7 +157,7 @@ class ResNetPlusModel(pl.LightningModule):
             loss = self.loss_fn(embeddings, labels, mined_triplets)
         else: # ArcFaceLoss
             loss = self.loss_fn(embeddings, labels)
-        self.log("train/loss", loss,  on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log("train/loss", loss, batch_size=images.size(0), on_step=False, on_epoch=True, prog_bar=True, logger=True)
         return loss
     
     def on_train_start(self): # to run only once: on_train_start / for every val: on_validation_start
@@ -307,7 +307,7 @@ class ResNetPlusModel(pl.LightningModule):
                 print("No valid query-gallery pairs after filtering. Skipping mAP_raptors.")
                 self.log('val/mAP_raptors', 0.0)
         else:
-            print("No gallery identities match 'goleag', 'whteag', or 'osprey'. Skipping mAP_raptors.")
+            print("No gallery identities match raptor_individuals_cropped. Skipping mAP_raptors.")
             self.log('val/mAP_raptors', 0.0)
 
     def configure_optimizers(self):
