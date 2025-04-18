@@ -459,7 +459,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.val_gallery_dataset = Wildlife(metadata=df_gallery, root=self.data_dir, transform=self.val_transforms, col_label = 'identity', img_load=self.method, load_metadata=self.load_metadata)
 
 
-        
+        pd.set_option('display.max_columns', 25)
         print("Round 1 Query image_ids:", df_query['image_id'].tolist())
         print("Round 1 Gallery image_ids:", df_gallery['image_id'].tolist())
 
