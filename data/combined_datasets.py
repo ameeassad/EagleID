@@ -115,7 +115,10 @@ def get_dataset(config, hardcode=None, sweep=False):
             config['bbox'] = '' # don't use bbox (it is only face)
         else:
             raise ValueError(f"Unknown dataset {config['wildlife_name']}")
-    else:  # combined datasets -- only works with cache
+        
+    # Combined datasets -- only works with cache
+    else:
+        # All birds
         if 'raptors' in wildlife_names and 'BirdIndividualID' in wildlife_names and len(wildlife_names) == 2:
             if sweep and config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": ['bird','bird'], 
@@ -148,6 +151,21 @@ def get_dataset(config, hardcode=None, sweep=False):
 
 
             data = WildlifeDataModule(metadata=dataset_df, config = config)
+
+            # Fliers
+        if 'raptors' in wildlife_names and 'BirdIndividualID' in wildlife_names and \
+                    'NDD20' in wildlife_names and 'whaleshark' in wildlife_names and len(wildlife_names) == 4:
+            if all(config['only_cache']):
+            # Faster, no need for the dataset classes
+                dataset_df = pd.read_csv(config['cache_path'])
+            else:
+                raise ValueError(f"no metadata provided for {config['wildlife_name']}")
+
+            data = WildlifeDataModule(metadata=dataset_df, config = config)
+            
+        # Another combination
+
+
         # elif 'raptors' and 'ATRW' in config['wildlife_name'] and len(config['wildlife_name']) == 2:
         #     if config['use_wandb'] == True:
         #         wandb.config.update({"animal_cat": ['bird','bird'], 
