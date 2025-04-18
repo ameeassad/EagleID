@@ -285,6 +285,10 @@ class ResNetPlusModel(pl.LightningModule):
             
             # Filter query embeddings/labels to match valid gallery identities
             valid_labels = gallery_labels_subset.unique()
+            print("▶ gallery raptor labels:", valid_labels.tolist())
+            print("▶ all query labels:     ", torch.unique(query_labels).tolist())
+            print("▶ intersection:         ",
+                list(set(query_labels.tolist()) & set(valid_labels.tolist())))
             query_mask = torch.isin(query_labels, valid_labels)
             query_embeddings_subset = query_embeddings[query_mask]
             query_labels_subset = query_labels[query_mask]
