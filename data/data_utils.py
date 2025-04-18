@@ -2,12 +2,43 @@ import torch
 from preprocess.mmpose_fill import get_keypoints_info
 import pandas as pd
 from wildlife_tools.data.split import Split
-
+from wildlife_datasets import splits
 from torch.utils.data import Sampler
 import numpy as np
+import random
 
+class PaddedBatchSampler(Sampler):
+    def __init__(self, data_source, batch_size, shuffle=True):
+        self.data_source = data_source
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.n_samples = len(data_source)
 
-from wildlife_datasets import splits
+    def __iter__(self):
+        # Create list of indices (same as default DataLoader)
+        indices = list(range(self.n_samples))
+        if self.shuffle:
+            random.shuffle(indices)  # Controlled by seed_everything
+        
+        # Generate batches (same as default DataLoader)
+        batches = []
+        for start_idx in range(0, self.n_samples, self.batch_size):
+            batch_indices = indices[start_idx:start_idx + self.batch_size]
+            batches.append(batch_indices)
+        
+        # Check the last batch
+        if batches and len(batches[-1]) == 1:
+            # Pad last batch with 1 random sample to reach 2
+            batches[-1].append(random.choice(indices))
+            print(f"Padded last batch from 1 to 2 samples")
+        
+        # Yield batches
+        for batch_indices in batches:
+            yield batch_indices
+
+    def __len__(self):
+        # Number of batches, rounding up
+        return (self.n_samples + self.batch_size - 1) // self.batch_size
 
 class RandomIdentitySampler(Sampler):
     """

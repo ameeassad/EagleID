@@ -24,7 +24,7 @@ from wildlife_tools.data.dataset import WildlifeDataset
 
 import data. transforms as t
 from data.transforms import RGBTransforms, ResizeAndPadRGB, ValTransforms, SynchTransforms, resize_and_pad, rotate_image
-from data.data_utils import CustomClosedSetSplit, StratifiedSpeciesSplit, SplitQueryDatabase, analyze_split, RandomIdentitySampler
+from data.data_utils import CustomClosedSetSplit, StratifiedSpeciesSplit, SplitQueryDatabase, analyze_split, RandomIdentitySampler, PaddedBatchSampler
 from data.raptors_wildlife import RaptorsWildlife
 
 from preprocess.preprocess_utils import create_mask, create_skeleton_channel, create_multichannel_heatmaps
@@ -464,7 +464,8 @@ class WildlifeDataModule(pl.LightningDataModule):
         print("Round 1 Gallery image_ids:", df_gallery['image_id'].tolist())
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+        # return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+        return DataLoader(self.train_dataset, batch_sampler=PaddedBatchSampler(data_source=self.train_dataset,batch_size=self.batch_size,shuffle=True),num_workers=self.num_workers)
         # If using Triplet loss need an anchor and a positive in same identity class: // handled by triplet loss function
         # sampler = RandomIdentitySampler(dataset=self.train_dataset, batch_size=self.batch_size)
         # return DataLoader(self.train_dataset, batch_size=self.batch_size, sampler=sampler, num_workers=self.num_workers)
