@@ -152,7 +152,7 @@ def get_dataset(config, hardcode=None, sweep=False):
 
             data = WildlifeDataModule(metadata=dataset_df, config = config)
 
-            # Fliers
+        # Fliers
         if 'raptors' in wildlife_names and 'BirdIndividualID' in wildlife_names and \
                     'NDD20' in wildlife_names and 'whaleshark' in wildlife_names and len(wildlife_names) == 4:
             if all(config['only_cache']):
@@ -163,7 +163,27 @@ def get_dataset(config, hardcode=None, sweep=False):
 
             data = WildlifeDataModule(metadata=dataset_df, config = config)
             
-        # Another combination
+        # Mixed
+        if 'raptors' in wildlife_names and 'SealID' in wildlife_names and \
+                    'hyenas' in wildlife_names and 'ELPephant' in wildlife_names and len(wildlife_names) == 4:
+            if all(config['only_cache']):
+            # Faster, no need for the dataset classes
+                dataset_df = pd.read_csv(config['cache_path'])
+            else:
+                raise ValueError(f"no metadata provided for {config['wildlife_name']}")
+
+            data = WildlifeDataModule(metadata=dataset_df, config = config)
+
+        # Two
+        if 'raptors' in wildlife_names and 'ELPephant' in wildlife_names and len(wildlife_names) == 2:
+            if all(config['only_cache']):
+            # Faster, no need for the dataset classes
+                dataset_df = pd.read_csv(config['cache_path'])
+            else:
+                raise ValueError(f"no metadata provided for {config['wildlife_name']}")
+
+            data = WildlifeDataModule(metadata=dataset_df, config = config)
+            
 
 
         # elif 'raptors' and 'ATRW' in config['wildlife_name'] and len(config['wildlife_name']) == 2:

@@ -473,8 +473,8 @@ class WildlifeDataModule(pl.LightningDataModule):
     def val_dataloader(self):
         print("Query dataset length:", len(self.val_query_dataset))
         print("Gallery dataset length:", len(self.val_gallery_dataset))
-        print("Query labels:", self.val_query_dataset.labels[:5])
-        print("Gallery labels:", self.val_gallery_dataset.labels[:5])
+        print("Query labels (first 5):", self.val_query_dataset.labels[:5])
+        print("Gallery labels (first 5):", self.val_gallery_dataset.labels[:5])
 
         query_loader = DataLoader(self.val_query_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
         gallery_loader = DataLoader(self.val_gallery_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
