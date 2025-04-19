@@ -54,28 +54,27 @@ def evaluate_map(distmat, query_identities=None, gallery_identities=None, query_
           aps.append(ap)
       mAP = np.mean(aps)
       return mAP
-
-  
-    num_queries = query_labels.size(0)
-    aps = []
-    for i in range(num_queries):
-        # Get query details
-        q_label = query_labels[i].item()
-        q_dist = distmat[i]
-        # Sort distances and get indices
-        indices = np.argsort(q_dist)
-        # Compare gallery labels with query label
-        matches = (gallery_labels[indices] == q_label).cpu().numpy()
-        # Limit matches to top_k
-        if top_k is not None:
-            matches = matches[:top_k]
-        # Compute Average Precision
-        ap = compute_average_precision(matches)
-        # print(f"Query {i} - Label: {q_label}, AP: {ap}, Matches: {matches}")
-        aps.append(ap)
-    mAP = np.mean(aps)
-    # print(f"Calculated mAP: {mAP}")
-    return mAP
+    else:
+      num_queries = query_labels.size(0)
+      aps = []
+      for i in range(num_queries):
+          # Get query details
+          q_label = query_labels[i].item()
+          q_dist = distmat[i]
+          # Sort distances and get indices
+          indices = np.argsort(q_dist)
+          # Compare gallery labels with query label
+          matches = (gallery_labels[indices] == q_label).cpu().numpy()
+          # Limit matches to top_k
+          if top_k is not None:
+              matches = matches[:top_k]
+          # Compute Average Precision
+          ap = compute_average_precision(matches)
+          # print(f"Query {i} - Label: {q_label}, AP: {ap}, Matches: {matches}")
+          aps.append(ap)
+      mAP = np.mean(aps)
+      # print(f"Calculated mAP: {mAP}")
+      return mAP
 
 def compute_average_precision(matches):
     # Calculate AP for a single query
