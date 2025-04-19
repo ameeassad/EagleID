@@ -17,9 +17,11 @@ def get_dataset(config, hardcode=None, sweep=False):
 
     if isinstance(config['wildlife_name'], str):
         wildlife_names = config['wildlife_name'].split(', ')
+    else:
+        wildlife_names = config['wildlife_name']
 
     # single datasets
-    if type(config['wildlife_name']) != list and len(wildlife_names) == 1:
+    if len(wildlife_names) == 1:
         if config['wildlife_name'] == 'raptors':
             if sweep and config['use_wandb'] == True:
                 wandb.config.update({"animal_cat": "bird", 
@@ -114,7 +116,7 @@ def get_dataset(config, hardcode=None, sweep=False):
             config['animal_cat'] = 'reptile'
             config['bbox'] = '' # don't use bbox (it is only face)
         else:
-            raise ValueError(f"Unknown dataset {config['wildlife_name']}")
+            raise ValueError(f"Unknown single dataset {config['wildlife_name']}")
         
     # Combined datasets -- only works with cache
     else:
@@ -247,6 +249,6 @@ def get_dataset(config, hardcode=None, sweep=False):
 
             data = WildlifeDataModule(metadata=dataset_df, config = config)
         else:
-            raise ValueError(f"Unknown dataset {config['wildlife_name']}")
+            raise ValueError(f"Unknown multi dataset {config['wildlife_name']}, or {wildlife_names}")
     
     return data
