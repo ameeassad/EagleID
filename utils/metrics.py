@@ -12,7 +12,16 @@ from utils.triplet_loss_utils import KnnClassifier
 
 """
 
-def wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, gallery_labels):
+def wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=None, gallery_identities=None, query_labels=None, gallery_labels=None):
+  similarity_function = CosineSimilarity()
+  similarity = similarity_function(query_embeddings, gallery_embeddings)
+
+  if query_identities:
+    classifier = KnnClassifier(k=1, database_labels=gallery_identities)
+    predictions = classifier(similarity['cosine'])
+    accuracy = np.mean(query_identities == predictions)
+
+  else:
     similarity_function = CosineSimilarity()
     similarity = similarity_function(query_embeddings, gallery_embeddings)["cosine"]
 
@@ -27,7 +36,25 @@ def wildlife_accuracy(query_embeddings, gallery_embeddings, query_labels, galler
     accuracy = (preds == query_labels.cpu().numpy()).mean()
     return accuracy
 
-def evaluate_map(distmat, query_labels, gallery_labels, top_k=None):
+def evaluate_map(distmat, query_identities=None, gallery_identities=None, query_labels=None, gallery_labels=None, top_k=None):
+
+    if query_identities:
+      num_queries = len(query_identities)
+      aps = []
+      distmat = distmat.cpu().numpy() if isinstance(distmat, torch.Tensor) else distmat
+      for i in range(num_queries):
+          q_identity = query_identities[i]
+          q_dist = distmat[i]
+          indices = np.argsort(q_dist)
+          matches = [gallery_identities[idx] == q_identity for idx in indices]
+          if top_k is not None:
+              matches = matches[:top_k]
+          ap = compute_average_precision(np.array(matches))
+          aps.append(ap)
+      mAP = np.mean(aps)
+      return mAP
+
+  
     num_queries = query_labels.size(0)
     aps = []
     for i in range(num_queries):
@@ -60,7 +87,22 @@ def compute_average_precision(matches):
     return ap
 
 
-def evaluate_recall_at_k(distmat, query_labels, gallery_labels, k):
+def evaluate_recall_at_k(distmat, query_identities=None, gallery_identities=None, query_labels=None, gallery_labels=None, k=5):
+    if query_identities:
+      num_queries = len(query_identities)
+      correct = 0
+      distmat = distmat.cpu().numpy() if isinstance(distmat, torch.Tensor) else distmat
+      for i in range(num_queries):
+          q_identity = query_identities[i]
+          q_dist = distmat[i]
+          indices = np.argsort(q_dist)[:k]
+          matches = [gallery_identities[idx] == q_identity for idx in indices]
+          if any(matches):
+              correct += 1
+      recall = correct / num_queries
+      return recall
+
+    # If query_identities and gallery_identities are not provided, use query_labels and gallery_labels
     if isinstance(distmat, np.ndarray):
         distmat = torch.tensor(distmat)
 
