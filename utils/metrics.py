@@ -4,13 +4,6 @@ from wildlife_tools.similarity.base import Similarity
 import torch.nn.functional as F
 from utils.triplet_loss_utils import KnnClassifier
 
-"""
-  a = torch.tensor(a).to(device=b.device if isinstance(b, torch.Tensor) else 'cpu')
-/pfs/proj/nobackup/fs/projnb10/aiforeagles/EagleID/utils/metrics.py:109: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  b = torch.tensor(b).to(device=a.device)
-/pfs/proj/nobackup/fs/projnb10/aiforeagles/EagleID/utils/metrics.py:108: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-
-"""
 
 def wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=None, gallery_identities=None, query_labels=None, gallery_labels=None):
   similarity_function = CosineSimilarity()
@@ -50,7 +43,7 @@ def evaluate_map(distmat, query_identities=None, gallery_identities=None, query_
           matches = [gallery_identities[idx] == q_identity for idx in indices]
           if top_k is not None:
               matches = matches[:top_k]
-          ap = compute_average_precision(np.array(matches.detach().cpu()))
+          ap = compute_average_precision(matches.detach().cpu().numpy())
           aps.append(ap)
       mAP = np.mean(aps)
       return mAP
@@ -154,8 +147,15 @@ class CosineSimilarity(Similarity):
 
     def cosine_similarity(self, a, b):
         # Ensure `a` and `b` are tensors and move to the same device if they are not already
-        a = torch.tensor(a).to(device=b.device if isinstance(b, torch.Tensor) else 'cpu')
-        b = torch.tensor(b).to(device=a.device)
+        # a = torch.tensor(a).to(device=b.device if isinstance(b, torch.Tensor) else 'cpu')
+        # b = torch.tensor(b).to(device=a.device)
+        if not isinstance(a, torch.Tensor):
+            a = torch.tensor(a)
+        if not isinstance(b, torch.Tensor):
+            b = torch.tensor(b)
+
+        a = a.to(device=b.device if isinstance(b, torch.Tensor) else 'cpu')
+        b = b.to(device=a.device)
 
         # Calculate cosine similarity
         similarity = torch.matmul(F.normalize(a), F.normalize(b).T)
