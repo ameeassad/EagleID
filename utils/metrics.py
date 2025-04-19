@@ -42,7 +42,7 @@ def evaluate_map(distmat, query_identities=None, gallery_identities=None, query_
     if query_identities is not None:
       num_queries = len(query_identities)
       aps = []
-      distmat = distmat.to('cpu').numpy() if isinstance(distmat, torch.Tensor) else distmat
+      distmat = distmat.cpu().numpy() if isinstance(distmat, torch.Tensor) else distmat
       for i in range(num_queries):
           q_identity = query_identities[i]
           q_dist = distmat[i]
@@ -50,7 +50,7 @@ def evaluate_map(distmat, query_identities=None, gallery_identities=None, query_
           matches = [gallery_identities[idx] == q_identity for idx in indices]
           if top_k is not None:
               matches = matches[:top_k]
-          ap = compute_average_precision(np.array(matches))
+          ap = compute_average_precision(np.array(matches.detach().cpu()))
           aps.append(ap)
       mAP = np.mean(aps)
       return mAP
