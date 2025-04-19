@@ -270,12 +270,20 @@ class ResNetPlusModel(pl.LightningModule):
 
     def raptor_metrics(self, gallery_embeddings, gallery_labels, query_embeddings, query_labels):
         # Flatten gallery_identity (list of lists -> list)
-        gallery_path_flat = [item for sublist in self.gallery_path for item in sublist]
-        # Filter indices where identity starts with goleag, whteag, osprey
-        target_prefix = 'raptor_individuals_cropped'
+        # gallery_path_flat = [item for sublist in self.gallery_path for item in sublist]
+        # # Filter indices where identity starts with goleag, whteag, osprey
+        # target_prefix = 'raptor_individuals_cropped'
+        # valid_indices = [
+        #     i for i, identity in enumerate(gallery_path_flat)
+        #     if identity.lower().startswith(target_prefix.lower())
+        # ]
+
+        gallery_identity_flat = [item for sublist in self.gallery_identity for item in sublist]
+        query_identity_flat = [item for sublist in self.query_identity for item in sublist]
+        target_prefix = 'raptors'
         valid_indices = [
-            i for i, identity in enumerate(gallery_path_flat)
-            if identity.lower().startswith(target_prefix.lower())
+             i for i, identity in enumerate(gallery_identity_flat)
+            if identity.startswith(target_prefix)
         ]
         
         if valid_indices:
@@ -284,32 +292,24 @@ class ResNetPlusModel(pl.LightningModule):
             gallery_labels_subset = gallery_labels[valid_indices]
             
             # Filter query embeddings/labels to match valid gallery identities
-            valid_labels = gallery_labels_subset.unique()
-            print("▶ gallery raptor labels:", valid_labels.tolist())
-            print("▶ all query labels:     ", torch.unique(query_labels).tolist())
-            print("▶ intersection:         ",
-                list(set(query_labels.tolist()) & set(valid_labels.tolist())))
-            query_mask = torch.isin(query_labels, valid_labels)
-            query_embeddings_subset = query_embeddings[query_mask]
-            query_labels_subset = query_labels[query_mask]
-
-            if len(query_embeddings_subset) > 0 and len(gallery_embeddings_subset) > 0:
-                # Compute distance matrix for subset
-                if self.re_ranking:
-                    distmat_subset = re_ranking(
-                        query_embeddings_subset, gallery_embeddings_subset, k1=20, k2=6, lambda_value=0.3
-                    )
+            valid_identities = [gallery_identity_flat[i] for i in valid_indices]
+            valid_query_indices = [
+                i for i, identity in enumerate(query_identity_flat)
+                if isinstance(identity, str) and identity in valid_identities
+            ]
+            if valid_query_indices:
+                query_embeddings_subset = query_embeddings[valid_query_indices]
+                query_labels_subset = query_labels[valid_query_indices]
+                print("▶ Valid gallery identities:", valid_identities[:5])
+                print("▶ Valid query identities:  ", [query_identity_flat[i] for i in valid_query_indices][:5])
+                print("▶ Label intersection:      ", list(set(query_labels_subset.tolist()) & set(gallery_labels_subset.tolist())))
+                if len(query_embeddings_subset) > 0 and len(gallery_embeddings_subset) > 0:
+                    distmat_subset = compute_distance_matrix(self.distance_matrix, query_embeddings_subset, gallery_embeddings_subset, wildlife=True)
+                    mAP_subset = evaluate_map(distmat_subset, query_labels_subset, gallery_labels_subset)
+                    self.log('val/mAP_raptors', mAP_subset)
                 else:
-                    distmat_subset = compute_distance_matrix(
-                        self.distance_matrix, query_embeddings_subset, gallery_embeddings_subset, wildlife=True
-                    )
-                
-                # Compute mAP for subset
-                mAP_subset = evaluate_map(distmat_subset, query_labels_subset, gallery_labels_subset)
-                self.log('val/mAP_raptors', mAP_subset)
-            else:
-                print("No valid query-gallery pairs after filtering. Skipping mAP_raptors.")
-                self.log('val/mAP_raptors', 0.0)
+                    print("No valid query-gallery pairs after filtering. Skipping mAP_raptors.")
+                    self.log('val/mAP_raptors', 0.0)
         else:
             print("No gallery identities match raptor_individuals_cropped. Skipping mAP_raptors.")
             self.log('val/mAP_raptors', 0.0)
