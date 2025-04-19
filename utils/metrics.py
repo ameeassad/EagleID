@@ -19,7 +19,7 @@ def wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=Non
   # Convert similarity to NumPy for KnnClassifier
   similarity_np = similarity.cpu().numpy() if isinstance(similarity, torch.Tensor) else similarity
 
-  if query_identities:
+  if query_identities is not None:
       classifier = KnnClassifier(k=1, database_labels=np.array(gallery_identities))
       predictions = classifier(similarity_np)
       accuracy = np.mean(np.array(query_identities) == predictions) 
@@ -39,7 +39,7 @@ def wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=Non
 
 def evaluate_map(distmat, query_identities=None, gallery_identities=None, query_labels=None, gallery_labels=None, top_k=None):
 
-    if query_identities:
+    if query_identities is not None:
       num_queries = len(query_identities)
       aps = []
       distmat = distmat.cpu().numpy() if isinstance(distmat, torch.Tensor) else distmat
@@ -88,7 +88,7 @@ def compute_average_precision(matches):
 
 
 def evaluate_recall_at_k(distmat, query_identities=None, gallery_identities=None, query_labels=None, gallery_labels=None, k=5):
-    if query_identities:
+    if query_identities is not None:
       num_queries = len(query_identities)
       correct = 0
       distmat = distmat.cpu().numpy() if isinstance(distmat, torch.Tensor) else distmat
