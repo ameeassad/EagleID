@@ -14,17 +14,17 @@ from utils.triplet_loss_utils import KnnClassifier
 
 def wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=None, gallery_identities=None, query_labels=None, gallery_labels=None):
   similarity_function = CosineSimilarity()
-  similarity = similarity_function(query_embeddings, gallery_embeddings)
+  similarity = similarity_function(query_embeddings, gallery_embeddings)["cosine"]
+
+  # Convert similarity to NumPy for KnnClassifier
+  similarity_np = similarity.cpu().numpy() if isinstance(similarity, torch.Tensor) else similarity
 
   if query_identities:
-    classifier = KnnClassifier(k=1, database_labels=gallery_identities)
-    predictions = classifier(similarity['cosine'])
-    accuracy = np.mean(query_identities == predictions)
+      classifier = KnnClassifier(k=1, database_labels=np.array(gallery_identities))
+      predictions = classifier(similarity_np)
+      accuracy = np.mean(np.array(query_identities) == predictions) 
 
   else:
-    similarity_function = CosineSimilarity()
-    similarity = similarity_function(query_embeddings, gallery_embeddings)["cosine"]
-
     # Convert gallery_labels to numpy if necessary
     gallery_labels = gallery_labels.cpu().numpy() if isinstance(gallery_labels, torch.Tensor) else gallery_labels
 
