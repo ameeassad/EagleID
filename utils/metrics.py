@@ -43,7 +43,7 @@ def evaluate_map(distmat, query_identities=None, gallery_identities=None, query_
           matches = [gallery_identities[idx] == q_identity for idx in indices]
           if top_k is not None:
               matches = matches[:top_k]
-          ap = compute_average_precision(matches.detach().cpu().numpy())
+          ap = compute_average_precision(np.array([m.detach().cpu().item() if isinstance(m, torch.Tensor) else m for m in matches]))
           aps.append(ap)
       mAP = np.mean(aps)
       return mAP
