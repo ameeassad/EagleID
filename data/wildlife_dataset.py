@@ -266,7 +266,6 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.wildlife_names = config['wildlife_name']
             self.classic_transform = config.get("custom_transform", False)
             self.precompute = config.get("precompute", False)
-            self.load_metadata = config.get("val_viz", False)
         else:
             self.data_dir = data_dir
             self.num_workers = num_workers
@@ -283,7 +282,8 @@ class WildlifeDataModule(pl.LightningDataModule):
             self.wildlife_names = wildlife_names
             self.classic_transform = classic_transform
             self.precompute = precompute
-            self.load_metadata = False
+            
+        self.load_metadata = True
 
         if len(self.wildlife_names.split(',')) > 1:
             multispecies = True
