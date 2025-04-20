@@ -335,9 +335,6 @@ def keypoint_names_on_img(root, df_row=None, image_path=None, bbox=None, keypoin
     cv2.imwrite(f'results/output_image-{label}.jpg', img)
     #end visualization
 
-
-
-
 def new_query_prediction_results_similarity(
         query_raw_img,
         query_preprocessed_img,
