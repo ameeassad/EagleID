@@ -64,6 +64,7 @@ class ResNetPlusModel(pl.LightningModule):
             if not config['use_wandb']:
                 self.save_hyperparameters()
             self.val_viz = config.get('val_viz', False)
+            self.subset_val = ',' in config['wildlife_name']
         else:
             # Hardcode any changes
             backbone_model_name=backbone_model_name
@@ -76,16 +77,11 @@ class ResNetPlusModel(pl.LightningModule):
             self.lr = lr
             outdir=outdir
             self.val_viz = False
-
-
+            self.subset_val = False
+        self.distmat = None
         self.incl_metadata = True
-        self.subset_val = True
-
-        if self.incl_metadata:
-            self.distmat = None
 
         total_channels = calculate_num_channels(self.preprocess_lvl)
-
 
         self.backbone = timm.create_model(
             model_name=backbone_model_name, 
