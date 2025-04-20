@@ -567,6 +567,7 @@ class PrecomputedWildlife(WildlifeDataset):
         self.load_metadata = load_metadata
         self.cache_dir = cache_dir 
         self.category = category
+        self.multispecies = False
 
         if img_load not in ["bbox_mask", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
             raise ValueError(f"Invalid img_load argument: {img_load}. This class is only for preprocessed images.")
@@ -587,7 +588,6 @@ class PrecomputedWildlife(WildlifeDataset):
             }
             self.data_cache = self._load_cache_multispecies()
         else:
-            self.multispecies = False
             self.cache_files = {
                 "bbox_mask": os.path.join(self.cache_dir, category + "_mask.npz"),
                 "bbox_mask_skeleton": os.path.join(self.cache_dir, category +"_skeleton.npz"),
