@@ -334,3 +334,50 @@ def keypoint_names_on_img(root, df_row=None, image_path=None, bbox=None, keypoin
     # Show the image with keypoints, skeleton, and joint names
     cv2.imwrite(f'results/output_image-{label}.jpg', img)
     #end visualization
+
+
+
+
+def new_query_prediction_results_similarity(
+        query_raw_img,
+        query_preprocessed_img,
+        predicted_raw_img,
+        predicted_preprocessed_img,
+        query_identity,
+        predicted_identity,
+        epoch,
+        to_save=False
+    ):
+    fig, axes = plt.subplots(1, 4, figsize=(16, 4))
+    fig.tight_layout(pad=0.5)
+
+    # Wrap text for titles
+    query_title = textwrap.fill(query_identity, width=20)
+    predicted_title = textwrap.fill(predicted_identity, width=20)
+    is_correct = (query_identity == predicted_identity)
+
+    # Query raw
+    axes[0].imshow(query_raw_img)
+    axes[0].set_title(f'Query Raw:\n{query_title}', fontsize=10)
+    axes[0].axis('off')
+
+    # Query preprocessed
+    axes[1].imshow(query_preprocessed_img)
+    axes[1].set_title(f'Query Preprocessed:\n{query_title}', fontsize=10)
+    axes[1].axis('off')
+
+    # Predicted raw
+    axes[2].imshow(predicted_raw_img)
+    axes[2].set_title(f'Predicted Raw:\n{predicted_title}', fontsize=10, color='green' if is_correct else 'red')
+    axes[2].axis('off')
+
+    # Predicted preprocessed
+    axes[3].imshow(predicted_preprocessed_img)
+    axes[3].set_title(f'Predicted Preprocessed:\n{predicted_title}', fontsize=10, color='green' if is_correct else 'red')
+    axes[3].axis('off')
+
+    plt.suptitle(f'Epoch {epoch}', fontsize=12)
+    if to_save:
+        return fig
+    else:
+        plt.show()
