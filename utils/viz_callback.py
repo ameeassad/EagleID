@@ -22,15 +22,15 @@ class SimilarityVizCallback(Callback):
 
         distmat = pl_module.distmat
         query_metadata = pd.DataFrame([
-            {'path': path, 'identity': id}
+            {'path': path, 'identity': id_}
             for paths, ids in zip(pl_module.query_path_epoch, pl_module.query_identity_epoch)
-            for path, id in zip(paths, ids)
+            for path, id_ in zip(paths, ids)
         ])
 
         gallery_metadata = pd.DataFrame([
-            {'path': path, 'identity': id}
+            {'path': path, 'identity': id_}
             for paths, ids in zip(pl_module.gallery_path_epoch, pl_module.gallery_identity_epoch)
-            for path, id in zip(paths, ids)
+            for path, id_ in zip(paths, ids)
         ])
 
         # Generate and log the visualization
