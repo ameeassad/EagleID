@@ -1,9 +1,0 @@
-name: sweeping-bayes-preprocess-levels
-method: bayes
-metric:
-  name: train/loss_epoch
-  goal: minimize
-parameters:
-  wildlife_name:
-    values: ['whaleshark', 'ATRW', 'BirdIndividualID']
-

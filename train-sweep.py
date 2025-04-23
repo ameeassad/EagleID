@@ -204,7 +204,7 @@ if __name__ == '__main__':
     seed_everything(config_yml['seed'], workers=True)
 
     # override epochs
-    config_yml['epochs'] = 22
+    config_yml['epochs'] = 20
 
     # Update sweep config to include base parameters from config.yaml
     if len(config_yml['animal_cat'].split(',')) > 1:
@@ -216,7 +216,7 @@ if __name__ == '__main__':
         sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters']})
 
 
-    sweep_id = wandb.sweep(sweep_config, project="sweepy-all-raptor")
+    sweep_id = wandb.sweep(sweep_config, project="sweepy-april")
 
     # agent that will iterate over the sweep parameters with specified search method
     wandb.agent(sweep_id, function=sweep_iteration)

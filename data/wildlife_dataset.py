@@ -569,8 +569,8 @@ class PrecomputedWildlife(WildlifeDataset):
         self.category = category
         self.multispecies = False
 
-        if img_load not in ["bbox_mask", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
-            raise ValueError(f"Invalid img_load argument: {img_load}. This class is only for preprocessed images.")
+        if self.img_load not in ["bbox_mask", "bbox_mask_skeleton", "bbox_mask_components", "bbox_mask_heatmaps"]:
+            raise ValueError(f"Invalid img_load argument: {self.img_load}. This class is only for preprocessed images.")
 
         input_category = category.split('_')
         if len(input_category) > 2: # ex. "train_raptors_BirdIndividualID"
@@ -595,7 +595,7 @@ class PrecomputedWildlife(WildlifeDataset):
                 "bbox_mask_components": os.path.join(self.cache_dir, category +"_components.npz")
             }
             self.data_cache = self._load_cache()
-        print(f"Precomputed data loaded from {img_load} for {category}. Only to be used for processing lvl 2-5")
+        print(f"Precomputed data loaded from {self.img_load} for {category}. Only to be used for processing lvl 2-5")
 
         print("Precomputed data loaded:")
         print(f"length of metadata: {len(self.metadata)}")
@@ -707,7 +707,6 @@ class PrecomputedWildlife(WildlifeDataset):
         """
         Get image from saved cache rather than recomputing it.
         """
-
         data = self.metadata.iloc[idx]
         if self.root:
             img_path = os.path.join(self.root, data[self.col_path])

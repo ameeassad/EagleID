@@ -1,0 +1,28 @@
+name: arcface-lite-sweep
+method: bayes  # smarter than grid: adaptively focuses search
+metric:
+  name: val/mAP
+  goal: maximize
+
+early_terminate:
+  type: hyperband
+  min_iter: 5
+
+parameters:
+  preprocess_lvl:
+    values: [2, 3, 4, 5]
+
+  embedding_size:
+    values: [256, 512]
+
+  solver.lr_max:
+    distribution: log_uniform_values
+    min: 1e-5
+    max: 5e-3
+
+
+  arcface_loss.margin:
+    values: [0.3, 0.4, 0.5]
+
+  arcface_loss.scale:
+    values: [30, 50, 64]

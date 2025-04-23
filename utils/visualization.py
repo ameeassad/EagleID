@@ -334,47 +334,141 @@ def keypoint_names_on_img(root, df_row=None, image_path=None, bbox=None, keypoin
     # Show the image with keypoints, skeleton, and joint names
     cv2.imwrite(f'results/output_image-{label}.jpg', img)
     #end visualization
-
 def new_query_prediction_results_similarity(
         query_raw_img,
-        query_preprocessed_img,
+        query_rgb_img,
+        query_task_img,
         predicted_raw_img,
-        predicted_preprocessed_img,
+        predicted_rgb_img,
+        predicted_task_img,
         query_identity,
         predicted_identity,
         epoch,
+        preprocess_lvl,
         to_save=False
     ):
-    fig, axes = plt.subplots(1, 4, figsize=(16, 4))
-    fig.tight_layout(pad=0.5)
+    try:
+        # Convert PIL images to numpy arrays if necessary
+        if isinstance(query_raw_img, Image.Image):
+            query_raw_img = np.array(query_raw_img)
+        if isinstance(predicted_raw_img, Image.Image):
+            predicted_raw_img = np.array(predicted_raw_img)
+        if isinstance(query_rgb_img, Image.Image):
+            query_rgb_img = np.array(query_rgb_img)
+        if isinstance(predicted_rgb_img, Image.Image):
+            predicted_rgb_img = np.array(predicted_rgb_img)
 
-    # Wrap text for titles
-    query_title = textwrap.fill(query_identity, width=20)
-    predicted_title = textwrap.fill(predicted_identity, width=20)
-    is_correct = (query_identity == predicted_identity)
+        # Ensure RGB images are in correct format
+        if query_raw_img.shape[2] != 3:
+            query_raw_img = query_raw_img[:, :, :3]
+        if predicted_raw_img.shape[2] != 3:
+            predicted_raw_img = predicted_raw_img[:, :, :3]
+        if query_rgb_img.shape[2] != 3:
+            query_rgb_img = query_rgb_img[:, :, :3]
+        if predicted_rgb_img.shape[2] != 3:
+            predicted_rgb_img = predicted_rgb_img[:, :, :3]
 
-    # Query raw
-    axes[0].imshow(query_raw_img)
-    axes[0].set_title(f'Query Raw:\n{query_title}', fontsize=10)
-    axes[0].axis('off')
+        # Determine number of columns based on preprocess_lvl
+        if preprocess_lvl == 3 and query_task_img is not None:
+            num_cols = 6  # Query: raw, rgb, skeleton; Predicted: raw, rgb, skeleton
+        elif preprocess_lvl == 4 and query_task_img is not None:
+            num_components = query_task_img.shape[0] // 3  # Each component has 3 channels
+            num_cols = 2 + 2 + (2 * num_components)  # Query: raw, rgb; Predicted: raw, rgb; + components
+        elif preprocess_lvl == 5 and query_task_img is not None:
+            num_heatmaps = query_task_img.shape[0]  # Each heatmap is a single channel
+            num_cols = 2 + 2 + (2 * num_heatmaps)  # Query: raw, rgb; Predicted: raw, rgb; + heatmaps
+        else:
+            num_cols = 4  # Query: raw, rgb; Predicted: raw, rgb
 
-    # Query preprocessed
-    axes[1].imshow(query_preprocessed_img)
-    axes[1].set_title(f'Query Preprocessed:\n{query_title}', fontsize=10)
-    axes[1].axis('off')
+        # Create figure with dynamic number of columns
+        fig, axes = plt.subplots(1, num_cols, figsize=(4 * num_cols, 4))
+        if num_cols == 1:
+            axes = [axes]  # Ensure axes is a list for consistent indexing
+        fig.tight_layout(pad=0.5)
 
-    # Predicted raw
-    axes[2].imshow(predicted_raw_img)
-    axes[2].set_title(f'Predicted Raw:\n{predicted_title}', fontsize=10, color='green' if is_correct else 'red')
-    axes[2].axis('off')
+        query_title = textwrap.fill(str(query_identity), width=20)
+        predicted_title = textwrap.fill(str(predicted_identity), width=20)
+        is_correct = (str(query_identity) == str(predicted_identity))
 
-    # Predicted preprocessed
-    axes[3].imshow(predicted_preprocessed_img)
-    axes[3].set_title(f'Predicted Preprocessed:\n{predicted_title}', fontsize=10, color='green' if is_correct else 'red')
-    axes[3].axis('off')
+        # Plot Query Raw
+        axes[0].imshow(query_raw_img)
+        axes[0].set_title(f'Query Raw:\n{query_title}', fontsize=10)
+        axes[0].axis('off')
 
-    plt.suptitle(f'Epoch {epoch}', fontsize=12)
-    if to_save:
-        return fig
-    else:
-        plt.show()
+        # Plot Query RGB
+        axes[1].imshow(query_rgb_img)
+        axes[1].set_title(f'Query Masked:\n{query_title}', fontsize=10)
+        axes[1].axis('off')
+
+        # Plot Predicted Raw
+        axes[2].imshow(predicted_raw_img)
+        axes[2].set_title(f'Predicted Raw:\n{predicted_title}', fontsize=10, color='green' if is_correct else 'red')
+        axes[2].axis('off')
+
+        # Plot Predicted RGB
+        axes[3].imshow(predicted_rgb_img)
+        axes[3].set_title(f'Predicted Masked:\n{predicted_title}', fontsize=10, color='green' if is_correct else 'red')
+        axes[3].axis('off')
+
+        # Handle task-specific channels based on preprocess_lvl
+        if preprocess_lvl >= 3 and query_task_img is not None:
+            if preprocess_lvl == 3:
+                # Level 3: Single skeleton channel
+                query_skeleton = query_task_img.cpu().numpy() if isinstance(query_task_img, torch.Tensor) else query_task_img
+                predicted_skeleton = predicted_task_img.cpu().numpy() if isinstance(predicted_task_img, torch.Tensor) else predicted_task_img
+
+                axes[4].imshow(query_skeleton, cmap='gray')
+                axes[4].set_title(f'Query Skeleton:\n{query_title}', fontsize=10)
+                axes[4].axis('off')
+
+                axes[5].imshow(predicted_skeleton, cmap='gray')
+                axes[5].set_title(f'Predicted Skeleton:\n{predicted_title}', fontsize=10, color='green' if is_correct else 'red')
+                axes[5].axis('off')
+
+            elif preprocess_lvl == 4:
+                # Level 4: Multiple RGB components
+                num_components = query_task_img.shape[0] // 3
+                for i in range(num_components):
+                    # Query component
+                    query_component = query_task_img[3*i:3*(i+1)].cpu().numpy() if isinstance(query_task_img, torch.Tensor) else query_task_img[3*i:3*(i+1)]
+                    query_component = np.transpose(query_component, (1, 2, 0))  # (C, H, W) to (H, W, C)
+                    axes[4 + 2*i].imshow(query_component.astype(np.uint8))
+                    axes[4 + 2*i].set_title(f'Query Component {i+1}:\n{query_title}', fontsize=10)
+                    axes[4 + 2*i].axis('off')
+
+                    # Predicted component
+                    predicted_component = predicted_task_img[3*i:3*(i+1)].cpu().numpy() if isinstance(predicted_task_img, torch.Tensor) else predicted_task_img[3*i:3*(i+1)]
+                    predicted_component = np.transpose(predicted_component, (1, 2, 0))  # (C, H, W) to (H, W, C)
+                    axes[5 + 2*i].imshow(predicted_component.astype(np.uint8))
+                    axes[5 + 2*i].set_title(f'Predicted Component {i+1}:\n{predicted_title}', fontsize=10, color='green' if is_correct else 'red')
+                    axes[5 + 2*i].axis('off')
+
+            elif preprocess_lvl == 5:
+                # Level 5: Multiple heatmaps
+                num_heatmaps = query_task_img.shape[0]
+                for i in range(num_heatmaps):
+                    # Query heatmap
+                    query_heatmap = query_task_img[i].cpu().numpy() if isinstance(query_task_img, torch.Tensor) else query_task_img[i]
+                    if query_heatmap.max() > 0:
+                        query_heatmap = query_heatmap / query_heatmap.max()  # Normalize to [0, 1]
+                    axes[4 + 2*i].imshow(query_heatmap, cmap='hot')
+                    axes[4 + 2*i].set_title(f'Query Heatmap {i+1}:\n{query_title}', fontsize=10)
+                    axes[4 + 2*i].axis('off')
+
+                    # Predicted heatmap
+                    predicted_heatmap = predicted_task_img[i].cpu().numpy() if isinstance(predicted_task_img, torch.Tensor) else predicted_task_img[i]
+                    if predicted_heatmap.max() > 0:
+                        predicted_heatmap = predicted_heatmap / predicted_heatmap.max()  # Normalize to [0, 1]
+                    axes[5 + 2*i].imshow(predicted_heatmap, cmap='hot')
+                    axes[5 + 2*i].set_title(f'Predicted Heatmap {i+1}:\n{predicted_title}', fontsize=10, color='green' if is_correct else 'red')
+                    axes[5 + 2*i].axis('off')
+
+        plt.suptitle(f'Epoch {epoch}', fontsize=12)
+        if to_save:
+            return fig
+        else:
+            plt.show()
+            return None
+    except Exception as e:
+        print(f"Error in query_prediction_results_similarity: {e}")
+        return None

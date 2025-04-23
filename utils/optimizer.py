@@ -1,4 +1,5 @@
 import torch
+from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR
 
 def get_optimizer(config, parameters) -> torch.optim.Optimizer:
     if config['solver']['OPT'] == 'adam':
@@ -42,16 +43,39 @@ def get_lr_scheduler_config(config, optimizer: torch.optim.Optimizer) -> dict:
             'interval': 'epoch',
             'frequency': 1,
         }
-    elif config['solver']['LR_SCHEDULER'] == 'cosine_annealing':
-        # Number of epochs for cosine decay (after ramp-up)
-        total_epochs = config.get('epochs', 20)  # Default to 20 if not specified
-        ramp_up_epochs = config['solver'].get('lr_ramp_ep', 0)
-        T_max = total_epochs - ramp_up_epochs  # Decay over remaining epochs
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+    if config['solver']['LR_SCHEDULER'] == 'cosine_annealing':
+        total_epochs = config.get('epochs', 60)
+        ramp_up_epochs = config['solver'].get('lr_ramp_ep', 8)
+        lr_max = config['solver'].get('lr_max', 1e-4)
+        lr_start = config['solver'].get('lr_start', 3e-6)
+        lr_min = config['solver'].get('lr_min', 1e-6)
+
+        # Set optimizer LR to lr_start
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr_start
+
+        # Linear warmup: lr_start → lr_max over ramp_up_epochs
+        warmup_scheduler = LinearLR(
             optimizer,
-            T_max=T_max,
-            eta_min=config['solver'].get('lr_min', 1e-06)  # Minimum LR
+            start_factor=lr_start / lr_max,
+            end_factor=1.0,
+            total_iters=ramp_up_epochs
         )
+
+        # Cosine annealing from lr_max → lr_min over remaining epochs
+        cosine_scheduler = CosineAnnealingLR(
+            optimizer,
+            T_max=total_epochs - ramp_up_epochs,
+            eta_min=lr_min
+        )
+
+        # Chain them
+        scheduler = SequentialLR(
+            optimizer,
+            schedulers=[warmup_scheduler, cosine_scheduler],
+            milestones=[ramp_up_epochs]
+        )
+
         lr_scheduler_config = {
             'scheduler': scheduler,
             'interval': 'epoch',
