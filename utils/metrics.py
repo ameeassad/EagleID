@@ -13,7 +13,7 @@ def wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=Non
   similarity_np = similarity.cpu().numpy() if isinstance(similarity, torch.Tensor) else similarity
 
   if query_identities is not None:
-      classifier = KnnClassifier(k=1, database_labels=np.array(gallery_identities))
+      classifier = KnnClassifier(k=1, database_labels=np.array(gallery_identities.detach().cpu()))
       predictions = classifier(similarity_np)
       accuracy = np.mean(np.array(query_identities) == predictions) 
       return accuracy
