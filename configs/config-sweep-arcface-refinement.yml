@@ -1,0 +1,19 @@
+name: arcface-refinement-large
+method: grid
+metric:
+  name: val/mAP
+  goal: maximize
+early_terminate:
+  type: hyperband
+  min_iter: 4
+parameters:
+  preprocess_lvl:
+    values: [2, 3, 4, 5]
+  embedding_size:
+    values: [256, 512]
+  arcface_loss.margin:
+    values: [0.3, 0.4, 0.5]
+  arcface_loss.scale:
+    values: [30, 50, 64]
+  solver.lr_max:
+    values: [8e-5, 1e-4, 2e-4]
