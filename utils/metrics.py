@@ -1,5 +1,4 @@
 import numpy as np
-# from wildlife_tools.similarity.cosine import CosineSimilarity
 from wildlife_tools.similarity.base import Similarity
 import torch.nn.functional as F
 from utils.triplet_loss_utils import KnnClassifier
@@ -16,7 +15,7 @@ def wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=Non
       gallery_np = np.array([t.detach().cpu().numpy() for t in gallery_identities])
       classifier = KnnClassifier(k=1, database_labels=gallery_np)
       predictions = classifier(similarity_np)
-      accuracy = np.mean(np.array(query_identities) == predictions) 
+      accuracy = np.mean(query_identities.detach().cpu().numpy() == predictions)
       return accuracy
 
   else:
