@@ -13,9 +13,15 @@ def wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=Non
 
   if query_identities is not None:
       gallery_np = np.array([t.detach().cpu().numpy() for t in gallery_identities])
+      query_np   = (
+            np.stack([t.detach().cpu().numpy() for t in query_identities])
+            if isinstance(query_identities, (list, tuple))
+            else query_identities.detach().cpu().numpy()
+        )
+      
       classifier = KnnClassifier(k=1, database_labels=gallery_np)
       predictions = classifier(similarity_np)
-      accuracy = np.mean(query_identities.detach().cpu().numpy() == predictions)
+      accuracy = np.mean(query_np == predictions)
       return accuracy
 
   else:
