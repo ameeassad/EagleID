@@ -5,12 +5,12 @@ metric:
   goal: maximize
 early_terminate:
   type: hyperband
-  min_iter: 4
+  min_iter: 6
 parameters:
   preprocess_lvl:
     values: [2, 3, 4, 5]
   embedding_size:
-    values: [256, 512]
+    values: [512]
   arcface_loss.margin:
     values: [0.3, 0.4, 0.5]
   arcface_loss.scale:
