@@ -13,7 +13,8 @@ def wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=Non
   similarity_np = similarity.cpu().numpy() if isinstance(similarity, torch.Tensor) else similarity
 
   if query_identities is not None:
-      classifier = KnnClassifier(k=1, database_labels=np.array(gallery_identities.detach().cpu()))
+      gallery_np = np.array([t.detach().cpu().numpy() for t in gallery_identities])
+      classifier = KnnClassifier(k=1, database_labels=gallery_np)
       predictions = classifier(similarity_np)
       accuracy = np.mean(np.array(query_identities) == predictions) 
       return accuracy
@@ -114,7 +115,7 @@ def evaluate_recall_at_k(distmat, query_identities=None, gallery_identities=None
     return recall_at_k
 
 
-def compute_distance_matrix(distance_matrix, query_embeddings, gallery_embeddings, wildlife=True):
+def compute_distance_matrix(distance_matrix, query_embeddings, gallery_embeddings, wildlife=False):
     if distance_matrix == "euclidean":
         # Compute Euclidean distance between query and gallery embeddings
         distmat = torch.cdist(query_embeddings, gallery_embeddings)

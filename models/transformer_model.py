@@ -14,7 +14,6 @@ from utils.weights_initializer import weights_init_kaiming, weights_init_classif
 import pytorch_lightning as pl
 from pytorch_metric_learning import losses, miners
 
-from wildlife_tools.similarity.cosine import CosineSimilarity
 from utils.metrics import evaluate_map, compute_average_precision, evaluate_recall_at_k, wildlife_accuracy
 
 from utils.re_ranking import re_ranking

@@ -13,8 +13,7 @@ import pytorch_lightning as pl
 from pytorch_metric_learning import losses, miners
 from torch import nn
 
-from wildlife_tools.similarity.cosine import CosineSimilarity
-from utils.metrics import evaluate_map, compute_average_precision
+from utils.metrics import evaluate_map
 
 from utils.re_ranking import re_ranking
 from data.data_utils import calculate_num_channels
