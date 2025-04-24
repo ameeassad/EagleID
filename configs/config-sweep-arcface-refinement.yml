@@ -1,5 +1,5 @@
 name: arcface-refinement-large
-method: random
+method: bayes
 metric:
   name: val/mAP
   goal: maximize
