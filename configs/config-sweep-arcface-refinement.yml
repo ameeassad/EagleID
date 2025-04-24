@@ -1,5 +1,5 @@
 name: arcface-refinement-large
-method: grid
+method: random
 metric:
   name: val/mAP
   goal: maximize
@@ -10,10 +10,10 @@ parameters:
   preprocess_lvl:
     values: [2, 3, 4, 5]
   embedding_size:
-    values: [512]
+    values: [256, 512]
   arcface_loss.margin:
     values: [0.3, 0.4, 0.5]
   arcface_loss.scale:
     values: [30, 50, 64]
   solver.lr_max:
-    values: [8e-5, 1e-4, 2e-4]
+    values: [0.001, 0.0005]
