@@ -75,7 +75,7 @@ def get_dataset(config, hardcode=None, sweep=False):
         ds = datasets.NyalaData(config['dataset'])
         return WildlifeDataModule(metadata=ds.df, config=config)
     
-    if names == {'elephant'}:
+    if names == {'ELPephant'}:
         ds = datasets.ELPephants(config['dataset'])
         return WildlifeDataModule(metadata=ds.df, config=config)
 
