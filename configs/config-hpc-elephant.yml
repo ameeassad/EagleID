@@ -5,7 +5,7 @@ notes:
 use_wandb: True
 wandb_entity: winniethepooh
 
-wildlife_name: elephant
+wildlife_name: ELPephant
 animal_cat: mammal
 outdir: results
 dataset: /proj/nobackup/aiforeagles/ELPephant/
