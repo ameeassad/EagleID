@@ -8,7 +8,7 @@ early_terminate:
   min_iter: 6
 parameters:
   preprocess_lvl:
-    values: [3, 4, 5]
+    values: [5]
   embedding_size:
     values: [256]
   arcface_loss.margin:

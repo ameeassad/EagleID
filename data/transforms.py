@@ -240,7 +240,7 @@ class ValTransforms:
     
 # Uses albumentations
 class SynchTransforms:
-    def __init__(self, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5), degrees=15, color_and_gaussian=True):
+    def __init__(self, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5), degrees=45, color_and_gaussian=True):
         self.mean = mean
         self.std = std
         self.degrees = degrees

@@ -292,19 +292,19 @@ class WildlifeDataModule(pl.LightningDataModule):
         # Handle transforms
         if self.preprocess_lvl == 3:
             resize_and_pad = t.ResizeAndPadBoth(self.size, skeleton=True)
-            sync_transform = t.SynchTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
+            sync_transform = t.SynchTransforms(mean=self.mean, std=self.std, degrees=45, color_and_gaussian=True)
             sync_val_transform = t.SynchTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
             self.train_transforms =  [resize_and_pad, sync_transform]
             self.val_transforms = [resize_and_pad, sync_val_transform]  # everything except for color / gaussian transforms aka no someOf transforms
         elif self.preprocess_lvl == 4:
             resize_and_pad = t.ResizeAndPadRGB(self.size)
-            sync_transform = t.ComponentGenerationTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
+            sync_transform = t.ComponentGenerationTransforms(mean=self.mean, std=self.std, degrees=45, color_and_gaussian=True)
             sync_val_transform = t.ComponentGenerationTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
             self.train_transforms =  [resize_and_pad, sync_transform]
             self.val_transforms = [resize_and_pad, sync_val_transform]  # everything except for color / gaussian transforms
         elif self.preprocess_lvl == 5:
             resize_and_pad = t.ResizeAndPadBoth(self.size, skeleton=False)
-            sync_transform = t.SynchMultiChannelTransforms(mean=self.mean, std=self.std, degrees=15, color_and_gaussian=True)
+            sync_transform = t.SynchMultiChannelTransforms(mean=self.mean, std=self.std, degrees=45, color_and_gaussian=True)
             sync_val_transform = t.SynchMultiChannelTransforms(mean=self.mean, std=self.std, degrees=0, color_and_gaussian=False)
             self.train_transforms =  [resize_and_pad, sync_transform]
             self.val_transforms = [resize_and_pad, sync_val_transform]
