@@ -136,7 +136,7 @@ def create_skeleton_channel(keypoints, connections, height, width, sigma=2, thic
     skeleton_channel = np.clip(skeleton_channel, 0, 1)
     return skeleton_channel
 
-def create_multichannel_heatmaps(keypoints, height, width, bbox_width, bbox_height, sigma=25):
+def create_multichannel_heatmaps(keypoints, height, width, bbox_width, bbox_height, sigma=25, scale=0.25):
     """
     Create individual heatmaps for each keypoint using Gaussian blobs.
     
@@ -147,12 +147,15 @@ def create_multichannel_heatmaps(keypoints, height, width, bbox_width, bbox_heig
         bbox_width (float): Bounding box width.
         bbox_height (float): Bounding box height.
         sigma (float): Base sigma factor relative to bbox size.
+        scale (float): Scale factor for heatmap size.
     
     Returns:
         List[np.ndarray]: One heatmap per keypoint.
     """
+    height = int(height * scale)
+    width = int(width * scale)
     heatmaps = []
-    sigma = sigma * max(bbox_width, bbox_height) / 1000.0
+    sigma = sigma * max(bbox_width, bbox_height) / 1000.0 * scale  # Adjust sigma too!
     tmp_size = int(3 * sigma)
 
     for i in range(0, len(keypoints), 3):
@@ -163,8 +166,8 @@ def create_multichannel_heatmaps(keypoints, height, width, bbox_width, bbox_heig
             heatmaps.append(heatmap)
             continue
 
-        x_int = int(x)
-        y_int = int(y)
+        x_int = int(x * scale)
+        y_int = int(y * scale)
 
         # Bounding box for the gaussian
         ul = [max(0, x_int - tmp_size), max(0, y_int - tmp_size)]
