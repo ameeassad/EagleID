@@ -12,7 +12,7 @@ parameters:
   embedding_size:
     values: [256]
   arcface_loss.margin:
-    values: [0.3, 0.4, 0.5]
+    values: [0.4, 0.5]
   arcface_loss.scale:
     values: [30, 50, 64]
   solver.lr_max:
