@@ -180,6 +180,7 @@ if __name__ == '__main__':
         wandb.init(project=config['project_name'])
         wandb.config.update(config)
         print(config)
+        wandb.define_metric("val/mAP", summary="max")
         
 
     # setup dataset
@@ -218,5 +219,4 @@ if __name__ == '__main__':
 
     trainer.fit(model, data)
 
-    wandb.define_metric("val/mAP", summary="max")
         
