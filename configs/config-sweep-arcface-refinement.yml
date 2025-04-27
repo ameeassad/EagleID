@@ -8,12 +8,12 @@ early_terminate:
   min_iter: 6
 parameters:
   preprocess_lvl:
-    values: [4]
+    values: [2]
   embedding_size:
     values: [256]
   arcface_loss.margin:
-    values: [0.3, 0.4]
+    values: [0.3, 0.4, 0.5]
   arcface_loss.scale:
-    values: [30, 50, 64]
+    values: [30, 64]
   solver.lr_max:
     values: [0.001]
