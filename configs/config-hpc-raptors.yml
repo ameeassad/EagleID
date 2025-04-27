@@ -28,7 +28,7 @@ save_interval: 10
 n_gpu: 1
 num_workers: 8
 gpu_ids: 
-seed: 1234 #42, 1234, 7, 2025
+seed: 7 #42, 1234, 7, 2025
 
 use_gradcam: False
 val_viz: False
