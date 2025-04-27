@@ -30,7 +30,7 @@ num_workers: 8
 gpu_ids: 
 seed: 42
 
-use_gradcam: False
+use_gradcam: True
 val_viz: False
 
 transforms:
