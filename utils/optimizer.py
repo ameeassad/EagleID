@@ -47,7 +47,7 @@ def get_lr_scheduler_config(config, optimizer: torch.optim.Optimizer) -> dict:
         # Number of epochs for cosine decay (after ramp-up)
         total_epochs = config.get('epochs', 20)  # Default to 20 if not specified
         ramp_up_epochs = config['solver'].get('lr_ramp_ep', 0)
-        T_max = int((total_epochs - ramp_up_epochs)/4)  # Decay over remaining epochs
+        T_max = total_epochs - ramp_up_epochs  # Decay over remaining epochs
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer,
             T_max=T_max,
