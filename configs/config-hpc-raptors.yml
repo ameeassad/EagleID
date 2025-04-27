@@ -46,8 +46,8 @@ triplet_loss:
   distance_matrix: cosine
 arcface_loss:
   activate: True # Set to False if using triplet loss
-  margin: 0.406 # [0.5, 32] or [0.406, 42]
-  scale: 42 # [0.50, 32] or [0.406, 42]
+  margin: 0.5 # 1,2:[0.5,50], 3:[0.3,30], 4:[0.5,64], 5:[0.3,64]
+  scale: 50 
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
   n_classes:
 
@@ -72,7 +72,7 @@ solver:
   use_swa: False #Stochastic Weight Averaging (SWA) to help improve generalization
   swa_lr: 0.035
   swa_start: 24
-  lr_max: 0.0001
+  lr_max: 0.001
   lr_start: 3e-06
   lr_ramp_ep: 8
 
