@@ -11,18 +11,24 @@ def wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=Non
   # Convert similarity to NumPy for KnnClassifier
   similarity_np = similarity.cpu().numpy() if isinstance(similarity, torch.Tensor) else similarity
 
-  if query_identities is not None:
+
+
+  if query_identities is not None and gallery_identities is not None:
+    if isinstance(gallery_identities[0], torch.Tensor): # happens when identities are numbers
       gallery_np = np.array([t.detach().cpu().numpy() for t in gallery_identities])
-      query_np   = (
-            np.stack([t.detach().cpu().numpy() for t in query_identities])
-            if isinstance(query_identities, (list, tuple))
-            else query_identities.detach().cpu().numpy()
-        )
+      query_np = (
+          np.stack([t.detach().cpu().numpy() for t in query_identities])
+          if isinstance(query_identities, (list, tuple))
+          else query_identities.detach().cpu().numpy()
+      )
+    else: # happens when identities are alphanumeric
+        gallery_np = np.array(gallery_identities)
+        query_np = np.array(query_identities)
       
-      classifier = KnnClassifier(k=1, database_labels=gallery_np)
-      predictions = classifier(similarity_np)
-      accuracy = np.mean(query_np == predictions)
-      return accuracy
+    classifier = KnnClassifier(k=1, database_labels=gallery_np)
+    predictions = classifier(similarity_np)
+    accuracy = np.mean(query_np == predictions)
+    return accuracy
 
   else:
     # Convert gallery_labels to numpy if necessary
