@@ -252,9 +252,7 @@ class ResNetPlusModel(pl.LightningModule):
         # Compute mAP
         # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
         mAP = evaluate_map(distmat, query_identities=query_identities, gallery_identities=gallery_identities)
-        mAP5 = evaluate_map(distmat, query_identities=query_labels, gallery_identities=gallery_labels, top_k=5)
         self.log('val/mAP', mAP)
-        self.log('val/mAP5', mAP5)
 
         recall_at_k = evaluate_recall_at_k(distmat, query_identities=query_identities, gallery_identities=gallery_identities, k=5)
         self.log(f'val/Recall@5', recall_at_k)

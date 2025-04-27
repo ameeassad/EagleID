@@ -217,4 +217,6 @@ if __name__ == '__main__':
     pprint(config)
 
     trainer.fit(model, data)
+
+    wandb.define_metric("val/mAP", summary="max")
         
