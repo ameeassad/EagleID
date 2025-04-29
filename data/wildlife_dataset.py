@@ -27,7 +27,7 @@ from data.transforms import RGBTransforms, ResizeAndPadRGB, ValTransforms, Synch
 from data.data_utils import CustomClosedSetSplit, StratifiedSpeciesSplit, SplitQueryDatabase, analyze_split, RandomIdentitySampler, PaddedBatchSampler
 from data.raptors_wildlife import RaptorsWildlife
 
-from preprocess.preprocess_utils import create_mask, create_skeleton_channel, create_multichannel_heatmaps, simple_multichannel_heatmaps
+from preprocess.preprocess_utils import create_mask, create_skeleton_channel, create_multichannel_heatmaps
 from preprocess.component_gen import component_generation_module
 from preprocess.mmpose_fill import get_keypoints_info, get_skeleton_info
 
