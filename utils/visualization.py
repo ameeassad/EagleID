@@ -13,6 +13,8 @@ from data.data_utils import unnormalize
 from preprocess.preprocess_utils import create_mask
 from preprocess.mmpose_fill import get_keypoints_info
 
+from data.transforms import denormalize
+from data.transforms import denorm_RGB_components
 
 # Function to load an image from a given path
 def load_image(path):
@@ -472,3 +474,157 @@ def new_query_prediction_results_similarity(
     except Exception as e:
         print(f"Error in query_prediction_results_similarity: {e}")
         return None
+    
+
+def viz_skeleton(mean, std, dataloader):
+
+    batch = next(iter(dataloader))
+    images, labels = batch['img'], batch['label']
+
+    print("Batch Size:", images.size(0))
+    print("Image Shape:", images.shape)
+    print("Labels Shape:", labels.shape)
+
+    # Plot the images and their skeletons side by side
+    fig, axes = plt.subplots(4, 2, figsize=(10, 20))  # 4 rows, 2 columns (RGB and skeleton for each image)
+    axes = axes.flatten()
+
+    for i in range(4):  # Assuming batch size is at least 4
+        # Unnormalize the RGB part
+        rgb_image = unnormalize(images[i], mean, std).permute(1, 2, 0).numpy()  # First 3 channels (RGB)
+        skeleton_image = images[i][3].cpu().numpy()  # 4th channel (Skeleton)
+
+        # Plot RGB image
+        ax_rgb = axes[i * 2]
+        ax_rgb.imshow(np.clip(rgb_image, 0, 1))  # Clip values to [0, 1] for valid image display
+        ax_rgb.set_title(f'RGB Image - Label: {labels[i].item()}')
+        ax_rgb.axis('off')
+
+        # Plot Skeleton image (grayscale)
+        ax_skel = axes[i * 2 + 1]
+        ax_skel.imshow(skeleton_image, cmap='gray')  # Plot skeleton channel as a grayscale image
+        ax_skel.set_title(f'Skeleton Channel - Label: {labels[i].item()}')
+        ax_skel.axis('off')
+
+    plt.tight_layout()
+    plt.show()
+
+def viz_heatmaps(mean, std, dataloader):
+    kp_names = get_keypoints_info()
+
+    batch = next(iter(dataloader))
+    images, labels = batch['img'], batch['label']
+
+    print("Batch Size:", images.size(0))
+    print("Image Shape:", images.shape)  # Should be [Batch, 3 + num_heatmaps, H, W]
+    print("Labels Shape:", labels.shape)
+
+    # Define the number of heatmaps (channels) after the RGB channels
+    num_heatmaps = images.shape[1] - 3  # Subtract RGB channels
+
+    # Plot the images and their heatmaps side by side
+    fig, axes = plt.subplots(4, num_heatmaps + 1, figsize=(20, 5))  # 4 rows, num_heatmaps + 1 columns
+    axes = axes.flatten()
+
+    for i in range(4):  # Assuming batch size is at least 4
+        # Extract the RGB channels
+        image_np = images[i][:3].numpy()  # Take first 3 channels (RGB)
+        image_np = denormalize(image_np, mean, std)  # Denormalize the RGB channels
+        image_np = np.transpose(image_np, (1, 2, 0))  # Convert from (C, H, W) to (H, W, C) for plotting
+        label = labels[i].item()  # Convert label tensor to Python scalar using .item()
+
+        # Plot RGB image
+        ax_rgb = axes[i * (num_heatmaps + 1)]
+        ax_rgb.imshow(image_np)  # Remove clipping here, as image_np should be in [0, 1] range now
+        ax_rgb.set_title(f'{labels[i].item()}')
+        ax_rgb.axis('off')
+
+        # Plot each heatmap (grayscale)
+        for j in range(num_heatmaps):
+            heatmap = images[i][3 + j].cpu().numpy()  # Get the heatmap (after the 3 RGB channels)
+            
+            # Normalize the heatmap if necessary (if values are too small/large)
+            if heatmap.max() > 0:
+                heatmap = heatmap / heatmap.max()  # Normalize to [0, 1]
+
+            # Plot the heatmap
+            ax_heatmap = axes[i * (num_heatmaps + 1) + (j + 1)]
+            ax_heatmap.imshow(heatmap, cmap='hot')  # Plot heatmap as a grayscale image
+            ax_heatmap.set_title(kp_names[j], fontsize=7) 
+            ax_heatmap.axis('off')
+
+    plt.tight_layout()
+    plt.show()
+
+def viz_components(mean, std, dataloader):
+    # Fetch a batch of images (assuming batch size is 8 for example)
+    batch = next(iter(dataloader))
+    images, labels = batch['img'], batch['label']
+    print("Batch Size:", images.size(0))
+    print("Image Shape:", images.shape)  # Expected shape: (batch_size, channels, height, width)
+    print("Labels Shape:", labels.shape)
+
+    for i in range(images.size(0)):  # Loop through each image in the batch
+        fig, axes = plt.subplots(1, 6, figsize=(15, 5))  # Create 2x3 grid for each image
+        axes = axes.flatten()
+
+        # Extract the full image with RGB + component channels
+        full_image = images[i].numpy()  # Shape: (channels, height, width)
+
+        # Denormalize the full image (including RGB and component channels)
+        full_image_denorm = denorm_RGB_components(full_image, mean, std)
+
+        # Plot RGB image (first 3 channels)
+        rgb_image = full_image_denorm[:3]  # Extract the first 3 channels (RGB)
+        rgb_image = np.transpose(rgb_image, (1, 2, 0))  # Convert to (H, W, C) for plotting
+        
+        ax = axes[0]
+        ax.imshow(rgb_image.astype(np.uint8))  # Convert back to integer type for proper visualization
+        ax.set_title(f'Label: {labels[i].item()} - RGB')
+        ax.axis('off')
+
+        # Plot component channels (next 5 sets of 3 channels each)
+        for j in range(5):  # Assuming 5 components, each with 3 channels
+            # Extract the next set of 3 channels for the current component
+            component_channels = full_image_denorm[3 + (j * 3): 3 + (j * 3) + 3]  # Extract the component channels
+            component_image = np.transpose(component_channels, (1, 2, 0))  # Convert to (H, W, C) for plotting
+
+            ax = axes[j + 1]  # Move to the next subplot (j + 1 because axes[0] is used for RGB)
+            ax.imshow(component_image.astype(np.uint8))  # Convert back to integer type for proper visualization
+            ax.set_title(f'Component {j + 1}')
+            ax.axis('off')
+
+        plt.tight_layout()
+        plt.show()
+
+def viz_imgs(mean, std, dataloader, denorm=True):
+    # Fetch a batch of images (assuming batch size is 8 for example)
+    batch = next(iter(dataloader))
+    images,labels = batch['img'], batch['label']
+    print("Batch Size:", images.size(0))
+    print("Image Shape:", images.shape)
+    print("Labels Shape:", labels.shape)
+
+    # Extract images and labels from the batch
+    images, labels = batch  # This assumes batch is structured as (images, labels)
+
+    # Plot the images
+    fig, axes = plt.subplots(2, 4, figsize=(15, 7))
+    axes = axes.flatten()
+
+    for i in range(8):  # Assuming batch size is 8
+        # image_np = unnormalize(images[i], mean, std).permute(1, 2, 0).numpy()  # [:3] selects RGB channels
+
+        image_np = images[i].numpy()  # Convert from PyTorch tensor to numpy array
+        if denorm:
+            image_np = denormalize(image_np, mean, std)  # Denormalize the image
+
+        image_np = np.transpose(image_np, (1, 2, 0))  # Convert from (C, H, W) to (H, W, C) for plotting
+        label = labels[i].item()  # Convert label tensor to Python scalar using .item()
+        ax = axes[i]
+        ax.imshow(image_np)
+        ax.set_title(f'Label: {label}')
+        ax.axis('off')
+
+    plt.tight_layout()
+    plt.show()

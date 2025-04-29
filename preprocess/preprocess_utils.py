@@ -6,7 +6,6 @@ import json
 import pandas as pd
 import ast
 
-
 def create_mask(image_size, segmentation):
         """
         Creates a *binary mask* based on the segmentation of the object.
@@ -155,7 +154,7 @@ def create_multichannel_heatmaps(keypoints, height, width, bbox_width, bbox_heig
     height = int(height * scale)
     width = int(width * scale)
     heatmaps = []
-    sigma = sigma * max(bbox_width, bbox_height) / 1000.0 * scale  # Adjust sigma too!
+    sigma = sigma * max(bbox_width, bbox_height) / 1000.0 * scale 
     tmp_size = int(3 * sigma)
 
     for i in range(0, len(keypoints), 3):

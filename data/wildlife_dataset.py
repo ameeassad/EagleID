@@ -27,7 +27,7 @@ from data.transforms import RGBTransforms, ResizeAndPadRGB, ValTransforms, Synch
 from data.data_utils import CustomClosedSetSplit, StratifiedSpeciesSplit, SplitQueryDatabase, analyze_split, RandomIdentitySampler, PaddedBatchSampler
 from data.raptors_wildlife import RaptorsWildlife
 
-from preprocess.preprocess_utils import create_mask, create_skeleton_channel, create_multichannel_heatmaps
+from preprocess.preprocess_utils import create_mask, create_skeleton_channel, create_multichannel_heatmaps, simple_multichannel_heatmaps
 from preprocess.component_gen import component_generation_module
 from preprocess.mmpose_fill import get_keypoints_info, get_skeleton_info
 
@@ -719,7 +719,8 @@ class PrecomputedWildlife(WildlifeDataset):
         # img_key = os.path.splitext(os.path.basename(img_path))[0]
         img = self.get_image(img_path)
         
-        # First crop the image, bc saved seg and keypoint is relative to crop
+        # --- before transforms ---
+        # 1. Crop image (bc saved seg and keypoint is relative to crop)
         if not ("bbox" in data):
             raise ValueError(f"{self.img_load} selected but no bbox found.")
         bbox = self._parse_bbox(data)
@@ -853,7 +854,8 @@ class PrecomputedWildlife(WildlifeDataset):
     def _compute_heatmaps(self, keypoints, bbox, height, width):
         x, y, w, h = bbox
         heatmaps = create_multichannel_heatmaps(keypoints, height, width, w, h, 25)
-        return [heatmap[y:y+h, x:x+w] for heatmap in heatmaps]
+        return heatmaps
+        # return [heatmap[y:y+h, x:x+w] for heatmap in heatmaps]
 
     def _compute_components(self, img, bbox, keypoints, segmentation):
         img_array = np.array(img.convert("RGB"))

@@ -63,7 +63,7 @@ def rotate_image(image, angle):
     height, width = image.shape[:2]
     center = (width // 2, height // 2)
     rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-    rotated_image = cv2.warpAffine(image, rotation_matrix, (width, height), flags=cv2.INTER_LINEAR)
+    rotated_image = cv2.warpAffine(image, rotation_matrix, (width, height), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
     return rotated_image
 
 def resize_and_pad(image, size, skeleton_channel=None):
@@ -304,6 +304,7 @@ class SynchMultiChannelTransforms:
         self.some_of_transforms = get_some_transforms()
 
         self.normalize_transform = A.Normalize(mean=mean, std=std)
+
         
     def __call__(self, rgb_img, heatmap_channels=None):
         """
@@ -324,27 +325,27 @@ class SynchMultiChannelTransforms:
         rgb_img = rotate_image(rgb_img, angle)  # Rotate RGB (NumPy array)
         heatmap_channels = [rotate_image(hm, angle) for hm in heatmap_channels]  # Rotate all heatmap channels
 
-        # Apply some of the transforms to the RGB image
+        # Apply some of the color transforms to the RGB image
         if self.color_and_gaussian:
             rgb_img = self.some_of_transforms(image=rgb_img)['image']
 
         # Apply normalization to the RGB image
         rgb_img = self.normalize_transform(image=rgb_img)['image']
 
-        # Ensure heatmap channels have the same spatial dimensions as the rgb_img.
-        if heatmap_channels is not None:
-            rgb_h, rgb_w, _ = rgb_img.shape
-            new_heatmaps = []
-            for hm in heatmap_channels:
-                # Check if current heatmap's dimensions match the RGB image.
-                hm_h, hm_w = hm.shape[:2]
-                if (hm_h, hm_w) != (rgb_h, rgb_w):
-                    # Resize heatmap to match: note that cv2.resize expects (width, height)
-                    hm_resized = cv2.resize(hm, (rgb_w, rgb_h), interpolation=cv2.INTER_LINEAR)
-                else:
-                    hm_resized = hm
-                new_heatmaps.append(hm_resized)
-            heatmap_channels = new_heatmaps
+        # # Ensure heatmap channels have the same spatial dimensions as the rgb_img.
+        # if heatmap_channels is not None:
+        #     rgb_h, rgb_w, _ = rgb_img.shape
+        #     new_heatmaps = []
+        #     for hm in heatmap_channels:
+        #         # Check if current heatmap's dimensions match the RGB image.
+        #         hm_h, hm_w = hm.shape[:2]
+        #         if (hm_h, hm_w) != (rgb_h, rgb_w):
+        #             # Resize heatmap to match: note that cv2.resize expects (width, height)
+        #             hm_resized = cv2.resize(hm, (rgb_w, rgb_h), interpolation=cv2.INTER_LINEAR)
+        #         else:
+        #             hm_resized = hm
+        #         new_heatmaps.append(hm_resized)
+        #     heatmap_channels = new_heatmaps
         
         # Convert both RGB image and heatmap channels to tensors
         rgb_img = torch.tensor(rgb_img, dtype=torch.float32).permute(2, 0, 1)  # [3, H, W] for RGB
