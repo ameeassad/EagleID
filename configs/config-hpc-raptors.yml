@@ -1,4 +1,4 @@
-# BEFORE RUN, CHECK: cache_path, splitter, precompute, arcface_loss.activate, epochs
+# BEFORE RUN, CHECK: cache_path, splitter, precompute, arcface_loss.activate, epochs, loss hyperparams for lvl
 
 project_name: eagleID-preprocess-new
 notes: 

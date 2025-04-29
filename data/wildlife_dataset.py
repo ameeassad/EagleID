@@ -360,6 +360,9 @@ class WildlifeDataModule(pl.LightningDataModule):
             # remove 'float' keypoints because NaN is treated as float
             df_all = df_all[df_all['keypoints'].apply(lambda x: not isinstance(x, float))]
 
+        print(df_all.columns)
+        print(df_all.head())
+
         # Split the dataset according to closed or open or default via metadata values
         if self.splitter == 'original_split':
             df_train = df_all[df_all['original_split'] == 'train']
