@@ -19,7 +19,7 @@ precompute: True
 model_architecture: ResNetPlusModel # ResNetPlusModel, TripletModel, FusionModel, EfficientNet, TransformerModel
 backbone_name: resnet50 # efficientnet_b0, resnet50, swin_tiny_patch4_window7_224
 checkpoint: 
-preprocess_lvl: 5 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
+preprocess_lvl: 4 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
 
 batch_size: 64 # 32, 64, 128 (Larger can provide more diverse triplets in each batch -> impprove quality of mined triplets)
 img_size: 224 # 224, 256, 384, 512
@@ -28,7 +28,7 @@ save_interval: 10
 n_gpu: 1
 num_workers: 8
 gpu_ids: 
-seed: 7 #42, 1234, 7, 2025
+seed: 42 #42, 1234, 7, 2025
 
 use_gradcam: True
 val_viz: False
@@ -46,7 +46,7 @@ triplet_loss:
   distance_matrix: cosine
 arcface_loss:
   activate: True # Set to False if using triplet loss
-  margin: 0.3 # 1,2:[0.5,50], 3:[0.3,30], 4:[0.5,64], 5:[0.3,64]
+  margin: 0.5 # 1,2:[0.5,50], 3:[0.3,30], 4:[0.5,64], 5:[0.3,64]
   scale: 64 
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
   n_classes:
