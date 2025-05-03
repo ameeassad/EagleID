@@ -119,7 +119,7 @@ class ResNetPlusModel(pl.LightningModule):
         self.embedding = nn.Sequential(
             nn.Linear(self.backbone.feature_info[-1]['num_chs'], self.embedding_size),
             nn.BatchNorm1d(self.embedding_size),
-            nn.Dropout(p=0.4)  # Regularization
+            nn.Dropout(p=0.5)  # Regularization
         )
         
         # Loss and mining
