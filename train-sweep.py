@@ -169,6 +169,7 @@ def get_model(config):
 
 def sweep_iteration():
     wandb.init()
+    wandb.define_metric("val/mAP", summary="max")
     # config=wandb.config
     # print(config)
     config = config_yml.copy()
@@ -217,7 +218,6 @@ if __name__ == '__main__':
 
 
     sweep_id = wandb.sweep(sweep_config, project="sweepy-may")
-    wandb.define_metric("val/mAP", summary="max")
 
     # agent that will iterate over the sweep parameters with specified search method
     wandb.agent(sweep_id, function=sweep_iteration)
