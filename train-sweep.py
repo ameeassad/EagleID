@@ -50,7 +50,7 @@ def get_basic_callbacks(config, model) -> list:
         filename='epoch{epoch:03d}',
         auto_insert_metric_name=False,
         save_top_k=1,
-        monitor='val/mAP5', # returned metrics: ['random_val/mAP', 'lr-SGD', 'train/loss', 'train/loss_step', 'val/mAP', 'val/mAP1', 'val/mAP5', 'val/Recall@5', 'val/accuracy', 'train/loss_epoch', 'epoch', 'step']
+        monitor='val/mAP', # returned metrics: ['random_val/mAP', 'lr-SGD', 'train/loss', 'train/loss_step', 'val/mAP', 'val/mAP1', 'val/mAP5', 'val/Recall@5', 'val/accuracy', 'train/loss_epoch', 'epoch', 'step']
         mode='min',
         every_n_epochs=int(config['save_interval']),
         save_last=True,
@@ -205,7 +205,7 @@ if __name__ == '__main__':
 
     # override epochs
     config_yml['epochs'] = 15
-    
+
     # Update sweep config to include base parameters from config.yaml
     if len(config_yml['animal_cat'].split(',')) > 1:
         sweep_multi = True

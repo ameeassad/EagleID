@@ -6,7 +6,7 @@ metric:
 
 parameters:
   preprocess_lvl:
-    values: [2, 3, 4, 5]
+    values: [4, 5]
 
   seed:
     values: [42, 1234, 7]
