@@ -19,7 +19,7 @@ import pytorch_lightning as pl
 from pytorch_metric_learning import losses, miners
 from torch import nn
 
-from utils.metrics import evaluate_map, compute_average_precision
+from utils.metrics import evaluate_map, compute_average_precision, similarity_matrix
 from utils.re_ranking import re_ranking
 from data.data_utils import calculate_num_channels
 from utils.metrics import compute_distance_matrix, evaluate_recall_at_k, wildlife_accuracy
@@ -119,7 +119,7 @@ class ResNetPlusModel(pl.LightningModule):
         self.embedding = nn.Sequential(
             nn.Linear(self.backbone.feature_info[-1]['num_chs'], self.embedding_size),
             nn.BatchNorm1d(self.embedding_size),
-            nn.Dropout(p=0.3)  # Regularization
+            nn.Dropout(p=0.4)  # Regularization
         )
         
         # Loss and mining
@@ -230,30 +230,34 @@ class ResNetPlusModel(pl.LightningModule):
                 self.gallery_identity.append(identity)
 
     def on_validation_epoch_end(self):
-        # Concatenate all embeddings and labels
+        # Concatenate all embeddings and identities
         query_embeddings = torch.cat(self.query_embeddings)
-        query_labels = torch.cat(self.query_labels)
+        # query_labels = torch.cat(self.query_labels)
         gallery_embeddings = torch.cat(self.gallery_embeddings)
-        gallery_labels = torch.cat(self.gallery_labels)
+        # gallery_labels = torch.cat(self.gallery_labels)
         if not self.incl_metadata:
             raise ValueError("incl_metadata must be True to collect query_identity and gallery_identity")
         query_identities = [item for sublist in self.query_identity for item in sublist]
         gallery_identities = [item for sublist in self.gallery_identity for item in sublist]
 
-        accuracy = wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=query_identities, gallery_identities=gallery_identities)
+        distmat = compute_distance_matrix(self.distance_matrix, query_embeddings, gallery_embeddings)
+        sim_mx = 1 + distmat
+
+        accuracy = wildlife_accuracy(sim_mx, query_identities=query_identities, gallery_identities=gallery_identities)
         self.log('val/accuracy', accuracy)
 
-        # Compute distance matrix
         if self.re_ranking:
-            distmat = re_ranking(query_embeddings, gallery_embeddings, k1=20, k2=6, lambda_value=0.3)
-        else:
-            distmat = compute_distance_matrix(self.distance_matrix, query_embeddings, gallery_embeddings, wildlife=True)
+            distmat_rr = re_ranking(query_embeddings, gallery_embeddings, k1=20, k2=6, lambda_value=0.3)
+            mAP_rr = evaluate_map(distmat_rr, query_identities=query_identities, gallery_identities=gallery_identities)
+            self.log('val/mAP_rr', mAP_rr)
+            recall_at_k_rr = evaluate_recall_at_k(distmat_rr, query_identities=query_identities, gallery_identities=gallery_identities, k=5)
+            self.log(f'val/Recall@5_rr', recall_at_k_rr)
 
         # Compute mAP
         # mAP = torchreid.metrics.evaluate_rank(distmat, query_labels.cpu().numpy(), gallery_labels.cpu().numpy(), use_cython=False)[0]['mAP']
         mAP = evaluate_map(distmat, query_identities=query_identities, gallery_identities=gallery_identities)
         self.log('val/mAP', mAP)
-
+        
         recall_at_k = evaluate_recall_at_k(distmat, query_identities=query_identities, gallery_identities=gallery_identities, k=5)
         self.log(f'val/Recall@5', recall_at_k)
 
@@ -286,11 +290,11 @@ class ResNetPlusModel(pl.LightningModule):
             if valid_query_indices:
                 query_embeddings_subset = query_embeddings[valid_query_indices]
                 query_identities_subset = [query_identity_flat[i] for i in valid_query_indices]
-                print("▶ Valid gallery identities:", valid_identities[:5])
-                print("▶ Valid query identities:  ", [query_identity_flat[i] for i in valid_query_indices][:5])
-                print("▶ Identity intersection:   ", list(set(query_identities_subset) & set(gallery_identities_subset)))
+                # print("▶ Valid gallery identities:", valid_identities[:5])
+                # print("▶ Valid query identities:  ", [query_identity_flat[i] for i in valid_query_indices][:5])
+                # print("▶ Identity intersection:   ", list(set(query_identities_subset) & set(gallery_identities_subset)))
                 if len(query_embeddings_subset) > 0 and len(gallery_embeddings_subset) > 0:
-                    distmat_subset = compute_distance_matrix(self.distance_matrix, query_embeddings_subset, gallery_embeddings_subset, wildlife=True)
+                    distmat_subset = compute_distance_matrix(self.distance_matrix, query_embeddings_subset, gallery_embeddings_subset)
                     mAP_subset = evaluate_map(distmat_subset, query_identities_subset, gallery_identities_subset)
                     self.log('val/mAP_raptors', mAP_subset)
                 else:
