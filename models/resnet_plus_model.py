@@ -255,7 +255,10 @@ class ResNetPlusModel(pl.LightningModule):
         gallery_identities = [item for sublist in self.gallery_identity for item in sublist]
 
         distmat = compute_distance_matrix(self.distance_matrix, query_embeddings, gallery_embeddings)
-        sim_mx = 1 + distmat
+        if self.distance_matrix == "euclidean":
+            sim_mx = -distmat
+        elif self.distance_matrix == "cosine":
+            sim_mx = 1 - distmat
 
         accuracy = wildlife_accuracy(sim_mx, query_identities=query_identities, gallery_identities=gallery_identities)
         self.log('val/accuracy', accuracy)
