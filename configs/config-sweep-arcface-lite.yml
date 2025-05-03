@@ -1,4 +1,4 @@
-name: arcface-lite-sweep
+name: arcface-tuning-alllvls
 method: grid 
 metric:
   name: val/mAP
@@ -13,12 +13,6 @@ parameters:
 
   embedding_size:
     values: [256]
-
-  solver.lr_max:
-    distribution: log_uniform_values
-    min: 1e-5
-    max: 5e-3
-
 
   arcface_loss.margin:
     values: [0.3, 0.4, 0.5]
