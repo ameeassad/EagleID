@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
+from torch import Tensor
+
 import json
 import pandas as pd
 import numpy as np
@@ -13,8 +15,7 @@ from data.data_utils import unnormalize
 from preprocess.preprocess_utils import create_mask
 from preprocess.mmpose_fill import get_keypoints_info
 
-from data.transforms import denormalize
-from data.transforms import denorm_RGB_components
+from data.transforms import denormalize, denorm_RGB_components
 
 # Function to load an image from a given path
 def load_image(path):
@@ -416,14 +417,14 @@ def new_query_prediction_results_similarity(
         if preprocess_lvl >= 3 and query_task_img is not None:
             if preprocess_lvl == 3:
                 # Level 3: Single skeleton channel
-                query_skeleton = query_task_img.cpu().numpy() if isinstance(query_task_img, torch.Tensor) else query_task_img
-                predicted_skeleton = predicted_task_img.cpu().numpy() if isinstance(predicted_task_img, torch.Tensor) else predicted_task_img
+                query_skeleton = query_task_img.cpu().numpy() if isinstance(query_task_img, Tensor) else query_task_img
+                predicted_skeleton = predicted_task_img.cpu().numpy() if isinstance(predicted_task_img, Tensor) else predicted_task_img
 
-                axes[4].imshow(query_skeleton, cmap='gray')
+                axes[4].imshow(query_skeleton[0], cmap='gray')
                 axes[4].set_title(f'Query Skeleton:\n{query_title}', fontsize=10)
                 axes[4].axis('off')
 
-                axes[5].imshow(predicted_skeleton, cmap='gray')
+                axes[5].imshow(predicted_skeleton[0], cmap='gray')
                 axes[5].set_title(f'Predicted Skeleton:\n{predicted_title}', fontsize=10, color='green' if is_correct else 'red')
                 axes[5].axis('off')
 
@@ -432,14 +433,14 @@ def new_query_prediction_results_similarity(
                 num_components = query_task_img.shape[0] // 3
                 for i in range(num_components):
                     # Query component
-                    query_component = query_task_img[3*i:3*(i+1)].cpu().numpy() if isinstance(query_task_img, torch.Tensor) else query_task_img[3*i:3*(i+1)]
+                    query_component = query_task_img[3*i:3*(i+1)].cpu().numpy() if isinstance(query_task_img, Tensor) else query_task_img[3*i:3*(i+1)]
                     query_component = np.transpose(query_component, (1, 2, 0))  # (C, H, W) to (H, W, C)
                     axes[4 + 2*i].imshow(query_component.astype(np.uint8))
                     axes[4 + 2*i].set_title(f'Query Component {i+1}:\n{query_title}', fontsize=10)
                     axes[4 + 2*i].axis('off')
 
                     # Predicted component
-                    predicted_component = predicted_task_img[3*i:3*(i+1)].cpu().numpy() if isinstance(predicted_task_img, torch.Tensor) else predicted_task_img[3*i:3*(i+1)]
+                    predicted_component = predicted_task_img[3*i:3*(i+1)].cpu().numpy() if isinstance(predicted_task_img, Tensor) else predicted_task_img[3*i:3*(i+1)]
                     predicted_component = np.transpose(predicted_component, (1, 2, 0))  # (C, H, W) to (H, W, C)
                     axes[5 + 2*i].imshow(predicted_component.astype(np.uint8))
                     axes[5 + 2*i].set_title(f'Predicted Component {i+1}:\n{predicted_title}', fontsize=10, color='green' if is_correct else 'red')
@@ -450,7 +451,7 @@ def new_query_prediction_results_similarity(
                 num_heatmaps = query_task_img.shape[0]
                 for i in range(num_heatmaps):
                     # Query heatmap
-                    query_heatmap = query_task_img[i].cpu().numpy() if isinstance(query_task_img, torch.Tensor) else query_task_img[i]
+                    query_heatmap = query_task_img[i].cpu().numpy() if isinstance(query_task_img, Tensor) else query_task_img[i]
                     if query_heatmap.max() > 0:
                         query_heatmap = query_heatmap / query_heatmap.max()  # Normalize to [0, 1]
                     axes[4 + 2*i].imshow(query_heatmap, cmap='hot')
@@ -458,7 +459,7 @@ def new_query_prediction_results_similarity(
                     axes[4 + 2*i].axis('off')
 
                     # Predicted heatmap
-                    predicted_heatmap = predicted_task_img[i].cpu().numpy() if isinstance(predicted_task_img, torch.Tensor) else predicted_task_img[i]
+                    predicted_heatmap = predicted_task_img[i].cpu().numpy() if isinstance(predicted_task_img, Tensor) else predicted_task_img[i]
                     if predicted_heatmap.max() > 0:
                         predicted_heatmap = predicted_heatmap / predicted_heatmap.max()  # Normalize to [0, 1]
                     axes[5 + 2*i].imshow(predicted_heatmap, cmap='hot')
@@ -472,7 +473,8 @@ def new_query_prediction_results_similarity(
             plt.show()
             return None
     except Exception as e:
-        print(f"Error in query_prediction_results_similarity: {e}")
+        print(f"Error in new_query_prediction_results_similarity: {e}")
+        
         return None
     
 

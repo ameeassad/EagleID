@@ -204,8 +204,8 @@ if __name__ == '__main__':
     seed_everything(config_yml['seed'], workers=True)
 
     # override epochs
-    config_yml['epochs'] = 20
-
+    config_yml['epochs'] = 15
+    
     # Update sweep config to include base parameters from config.yaml
     if len(config_yml['animal_cat'].split(',')) > 1:
         sweep_multi = True

@@ -3,16 +3,17 @@ from wildlife_tools.similarity.base import Similarity
 import torch.nn.functional as F
 from utils.triplet_loss_utils import KnnClassifier
 
+def similarity_matrix(query_embeddings, gallery_embeddings, manual=False):
+  if not manual:
+    similarity_function = CosineSimilarity()
+    similarity = similarity_function(query_embeddings, gallery_embeddings)["cosine"]
+  else:
+    query_embeddings = F.normalize(query_embeddings, p=2, dim=1)
+    gallery_embeddings = F.normalize(gallery_embeddings, p=2, dim=1)
+    similarity = torch.mm(query_embeddings, gallery_embeddings.t()) #cosine
+  return similarity
 
-def wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=None, gallery_identities=None, query_labels=None, gallery_labels=None):
-  similarity_function = CosineSimilarity()
-  similarity = similarity_function(query_embeddings, gallery_embeddings)["cosine"]
-
-  # Convert similarity to NumPy for KnnClassifier
-  similarity_np = similarity.cpu().numpy() if isinstance(similarity, torch.Tensor) else similarity
-
-
-
+def wildlife_accuracy(similarity, query_identities=None, gallery_identities=None, query_labels=None, gallery_labels=None):
   if query_identities is not None and gallery_identities is not None:
     if isinstance(gallery_identities[0], torch.Tensor): # happens when identities are numbers
       gallery_np = np.array([t.detach().cpu().numpy() for t in gallery_identities])
@@ -25,11 +26,12 @@ def wildlife_accuracy(query_embeddings, gallery_embeddings, query_identities=Non
         gallery_np = np.array(gallery_identities)
         query_np = np.array(query_identities)
       
+    # Convert similarity to NumPy for KnnClassifier
+    similarity_np = similarity.cpu().numpy() if isinstance(similarity, torch.Tensor) else similarity
     classifier = KnnClassifier(k=1, database_labels=gallery_np)
     predictions = classifier(similarity_np)
     accuracy = np.mean(query_np == predictions)
     return accuracy
-
   else:
     # Convert gallery_labels to numpy if necessary
     gallery_labels = gallery_labels.cpu().numpy() if isinstance(gallery_labels, torch.Tensor) else gallery_labels
@@ -126,22 +128,13 @@ def evaluate_recall_at_k(distmat, query_identities=None, gallery_identities=None
     return recall_at_k
 
 
-def compute_distance_matrix(distance_matrix, query_embeddings, gallery_embeddings, wildlife=False):
+def compute_distance_matrix(distance_matrix, query_embeddings, gallery_embeddings):
     if distance_matrix == "euclidean":
         # Compute Euclidean distance between query and gallery embeddings
         distmat = torch.cdist(query_embeddings, gallery_embeddings)
     elif distance_matrix == "cosine":
-        if wildlife:
-            similarity_function = CosineSimilarity()
-            similarity = similarity_function(query_embeddings, gallery_embeddings)['cosine']
-            distmat = 1 - similarity # Convert similarity to distance if necessary
-            # print(f"Distance matrix type should be np for rerankin: {type(distmat)}")
-        else:
-            query_embeddings = F.normalize(query_embeddings, p=2, dim=1)
-            gallery_embeddings = F.normalize(gallery_embeddings, p=2, dim=1)
-            cosine_similarity = torch.mm(query_embeddings, gallery_embeddings.t())
-            distmat = 1 - cosine_similarity # Convert similarity to distance if necessary
-            # print(f"Distance matrix type should be np for reranking: {type(distmat)}")
+        similarity = similarity_matrix(query_embeddings, gallery_embeddings)
+        distmat = 1-similarity
     else:
         raise ValueError(f"Invalid distance matrix type: {distance_matrix}")
     return distmat

@@ -18,50 +18,50 @@ import pandas as pd
 from utils.visualization import query_prediction_results_similarity
 
 
-class SimilarityVizCallback(Callback):
-    def __init__(self, config, outdir='results', log_every_n_epochs=10):
-        self.config = config
-        self.outdir = outdir
-        self.log_every_n_epochs = log_every_n_epochs
+# class SimilarityVizCallback(Callback):
+#     def __init__(self, config, outdir='results', log_every_n_epochs=10):
+#         self.config = config
+#         self.outdir = outdir
+#         self.log_every_n_epochs = log_every_n_epochs
 
-    def on_validation_epoch_end(self, trainer, pl_module):
-        epoch = trainer.current_epoch
-        if epoch % self.log_every_n_epochs != 0:
-            return
-        if pl_module.distmat is None:
-            return  # or log a warning
+#     def on_validation_epoch_end(self, trainer, pl_module):
+#         epoch = trainer.current_epoch
+#         if epoch % self.log_every_n_epochs != 0:
+#             return
+#         if pl_module.distmat is None:
+#             return  # or log a warning
         
-        root = self.config['dataset']
+#         root = self.config['dataset']
 
-        distmat = pl_module.distmat
-        query_metadata = pd.DataFrame([
-            {'path': path, 'identity': id_}
-            for paths, ids in zip(pl_module.query_path_epoch, pl_module.query_identity_epoch)
-            for path, id_ in zip(paths, ids)
-        ])
+#         distmat = pl_module.distmat
+#         query_metadata = pd.DataFrame([
+#             {'path': path, 'identity': id_}
+#             for paths, ids in zip(pl_module.query_path_epoch, pl_module.query_identity_epoch)
+#             for path, id_ in zip(paths, ids)
+#         ])
 
-        gallery_metadata = pd.DataFrame([
-            {'path': path, 'identity': id_}
-            for paths, ids in zip(pl_module.gallery_path_epoch, pl_module.gallery_identity_epoch)
-            for path, id_ in zip(paths, ids)
-        ])
+#         gallery_metadata = pd.DataFrame([
+#             {'path': path, 'identity': id_}
+#             for paths, ids in zip(pl_module.gallery_path_epoch, pl_module.gallery_identity_epoch)
+#             for path, id_ in zip(paths, ids)
+#         ])
 
-        # Generate and log the visualization
-        fig = query_prediction_results_similarity(
-            root=root,
-            query_metadata=query_metadata,
-            db_metadata=gallery_metadata,
-            query_start=0,
-            similarity_scores=-distmat,  # negate distance for similarity
-            num_images=10,
-            to_save=True)
+#         # Generate and log the visualization
+#         fig = query_prediction_results_similarity(
+#             root=root,
+#             query_metadata=query_metadata,
+#             db_metadata=gallery_metadata,
+#             query_start=0,
+#             similarity_scores=-distmat,  # negate distance for similarity
+#             num_images=10,
+#             to_save=True)
 
-        if self.config.get('use_wandb', False):
-            wandb_img = wandb.Image(fig, caption=f"Val retrieval epoch {trainer.current_epoch + 1}")
-            pl_module.logger.experiment.log({"Val Retrieval": wandb_img})
-        else:
-            os.makedirs(self.outdir, exist_ok=True)
-            fig.savefig(os.path.join(self.outdir, f'val_retrieval_epoch{trainer.current_epoch + 1}_fig.png'))
+#         if self.config.get('use_wandb', False):
+#             wandb_img = wandb.Image(fig, caption=f"Val retrieval epoch {trainer.current_epoch + 1}")
+#             pl_module.logger.experiment.log({"Val Retrieval": wandb_img})
+#         else:
+#             os.makedirs(self.outdir, exist_ok=True)
+#             fig.savefig(os.path.join(self.outdir, f'val_retrieval_epoch{trainer.current_epoch + 1}_fig.png'))
 
 import os
 import random
@@ -94,7 +94,6 @@ class SimilarityVizCallback(Callback):
             img, path, identity = batch['img'], batch['path'], batch['identity']
             rand_idx = random.randint(0, len(img) - 1)
             self.batch_samples.append({
-                'raw_img': img[rand_idx].clone(),
                 'preprocessed_img': img[rand_idx].clone(),
                 'path': path[rand_idx],
                 'identity': identity[rand_idx]
@@ -123,7 +122,6 @@ class SimilarityVizCallback(Callback):
             sample = random.choice(self.batch_samples)
             query_path = sample['path']
             query_identity = sample['identity']
-            query_raw_img = sample['raw_img']
             query_preprocessed_img = sample['preprocessed_img']
             print(f"Epoch {epoch}: Selected sample, query_path: {query_path}, query_identity: {query_identity}, channels: {query_preprocessed_img.shape[0]}")
 
@@ -147,8 +145,8 @@ class SimilarityVizCallback(Callback):
                 return
 
             # Denormalize only RGB channels (first 3 channels)
-            rgb_mean = [0.485, 0.456, 0.406]
-            rgb_std = [0.229, 0.224, 0.225]
+            rgb_mean = self.config['transforms']['mean']
+            rgb_std = self.config['transforms']['std']
             denorm_rgb = T.Normalize(mean=[-m/s for m, s in zip(rgb_mean, rgb_std)], std=[1/s for s in rgb_std])
 
             query_rgb = query_preprocessed_img[:3]

@@ -522,18 +522,6 @@ def denormalize(x, mean, std):
     return x
 
 
-# def denorm_RGB_components(image, mean, std):
-#     # image: Tensor of shape (C, H, W) or (H, W, C)
-#     # mean and std should be lists of length 3 to represent RGB mean and std.
-    
-#     # Denormalize each channel
-#     for c in range(image.shape[0]):
-#         image[c] = (image[c] * std[c % 3]) + mean[c % 3]
-    
-#     # Scale back to [0, 255]
-#     image = image * 255.0
-#     return image
-
 def denorm_RGB_components(image, mean, std):
     """
     Denormalizes an image tensor that includes RGB and component channels.
