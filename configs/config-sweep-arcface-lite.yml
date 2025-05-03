@@ -6,7 +6,7 @@ metric:
 
 parameters:
   preprocess_lvl:
-    values: [4, 5]
+    values: [2,3]
 
   seed:
     values: [42, 1234]
@@ -15,7 +15,7 @@ parameters:
     values: [256]
 
   arcface_loss.margin:
-    values: [0.4, 0.5]
+    values: [0.3,0.4, 0.5]
 
   arcface_loss.scale:
     values: [30, 50, 64]
