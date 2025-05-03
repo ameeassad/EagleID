@@ -99,6 +99,20 @@ class ResNetPlusModel(pl.LightningModule):
             )
             # print(f"New conv weight shape: {new_conv.weight.shape}")  # Should be [64, total_channels, 7, 7]
             if pretrained and total_channels >= 3:
+                if self.preprocess_lvl == 4:
+                # Repeat pretrained weights for every 3 input channels
+                    with torch.no_grad():
+                        repeat_times = total_channels // 3  # Number of full 3-channel groups
+                        remainder = total_channels % 3      # Leftover channels
+                        if repeat_times > 0:
+                            # Repeat the [64, 3, 7, 7] weights along in_channels dimension
+                            repeated_weights = old_conv.weight.data.repeat(1, repeat_times, 1, 1)
+                            # Shape becomes [64, 3*repeat_times, 7, 7]
+                            new_conv.weight.data[:, :3*repeat_times, :, :] = repeated_weights
+                        if remainder > 0:
+                            # Handle remaining channels by copying the first 'remainder' channels
+                            new_conv.weight.data[:, 3*repeat_times:3*repeat_times+remainder, :, :] = \
+                                old_conv.weight.data[:, :remainder, :, :]
                 nn.init.kaiming_normal_(new_conv.weight, mode='fan_out', nonlinearity='relu')
                 with torch.no_grad():
                     # Copy the pretrained weights for the first 3 channels
@@ -119,7 +133,7 @@ class ResNetPlusModel(pl.LightningModule):
         self.embedding = nn.Sequential(
             nn.Linear(self.backbone.feature_info[-1]['num_chs'], self.embedding_size),
             nn.BatchNorm1d(self.embedding_size),
-            nn.Dropout(p=0.5)  # Regularization
+            nn.Dropout(p=0.4)  # Regularization
         )
         
         # Loss and mining
