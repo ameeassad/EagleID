@@ -1,7 +1,7 @@
 # BEFORE RUN, CHECK: cache_path, splitter, precompute, arcface_loss.activate, epochs
 
-project_name: eagleID-testing-new
-notes: 
+project_name: eagleID-dataset-scope
+notes: goleag
 use_wandb: True
 wandb_entity: winniethepooh
 
