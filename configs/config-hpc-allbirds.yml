@@ -1,6 +1,6 @@
 # BEFORE RUN, CHECK: cache_path, splitter, precompute, arcface_loss.activate, epochs
 
-project_name: eagleID-multispecies
+project_name: eagleID-dataset-scope
 notes: allbirds
 use_wandb: True
 wandb_entity: winniethepooh
