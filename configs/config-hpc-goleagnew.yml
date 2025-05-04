@@ -9,7 +9,7 @@ wildlife_name: goleag
 animal_cat: bird
 outdir: results
 dataset: /proj/nobackup/aiforeagles/raptor_individuals_cropped/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/goleag_cache_split.csv # _split.csv if using metadata_split
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_goleag_split.csv # _split.csv if using metadata_split
 splitter: metadata_split # custom_closed / metadata_split 
 split_ratio: 0.8
 

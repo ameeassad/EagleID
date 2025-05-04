@@ -309,7 +309,7 @@ class ResNetPlusModel(pl.LightningModule):
                 # print("▶ Identity intersection:   ", list(set(query_identities_subset) & set(gallery_identities_subset)))
                 if len(query_embeddings_subset) > 0 and len(gallery_embeddings_subset) > 0:
                     distmat_subset = compute_distance_matrix(self.distance_matrix, query_embeddings_subset, gallery_embeddings_subset)
-                    mAP_subset = evaluate_map(distmat_subset, query_identities_subset, gallery_identities_subset)
+                    mAP_subset = evaluate_map(distmat_subset, query_identities=query_identities_subset, gallery_identities=gallery_identities_subset)
                     self.log('val/mAP_raptors', mAP_subset)
                 else:
                     print("No valid query-gallery pairs after filtering. Skipping mAP_raptors.")
