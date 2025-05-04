@@ -23,12 +23,12 @@ preprocess_lvl: 2 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: componen
 
 batch_size: 64 # 32, 64, 128 (Larger can provide more diverse triplets in each batch -> impprove quality of mined triplets)
 img_size: 224 # 224, 256, 384, 512
-epochs: 60
+epochs: 50
 save_interval: 10
 n_gpu: 1
 num_workers: 8
 gpu_ids: 
-seed: 42 #42, 1234, 7, 2025
+seed: 1234 #42, 1234, 7, 2025
 
 use_gradcam: True
 val_viz: True
