@@ -38,7 +38,7 @@ def get_dataset(config, hardcode=None, sweep=False):
     if names == {'goleag'}:
         _update_wandb('bird',
                       '/proj/nobackup/aiforeagles/raptor_individuals_cropped/',
-                      '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/goleag_cache.csv')
+                      '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_goleag_split.csv')
         ds = GoldensWildlife(root=config['dataset'], include_video=False)
         return WildlifeDataModule(metadata=ds.df, config=config)
     

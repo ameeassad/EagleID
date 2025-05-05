@@ -332,6 +332,7 @@ class WildlifeDataModule(pl.LightningDataModule):
         if isinstance(self.only_cache, bool):
             self.only_cache = [self.only_cache, self.only_cache]
         if self.only_cache[0]:
+            print("Loading from cache only...")
             cache_df = pd.read_csv(self.cache_path)
             print(f"Dataset size before pre-processing and cleaning: {len(cache_df)}")
             df_all = cache_df.copy()
