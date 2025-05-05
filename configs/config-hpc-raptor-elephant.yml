@@ -76,4 +76,4 @@ solver:
   lr_start: 3e-06
   lr_ramp_ep: 8
 
-re_ranking: True
+re_ranking: TrFalseue

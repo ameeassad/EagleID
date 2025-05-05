@@ -28,10 +28,10 @@ save_interval: 10
 n_gpu: 1
 num_workers: 8
 gpu_ids: 
-seed: 42 #42, 1234, 7, 2025
+seed: 1234 #42, 1234, 7, 2025
 
-use_gradcam: True
-val_viz: True
+use_gradcam: False
+val_viz: False
 
 transforms:
   mean: [0.485, 0.456, 0.406]
@@ -73,6 +73,6 @@ solver:
   swa_start: 24
   lr_max: 0.0001
   lr_start: 3e-06
-  lr_ramp_ep: 8
+  lr_ramp_ep: 0
 
-re_ranking: True
+re_ranking: False
