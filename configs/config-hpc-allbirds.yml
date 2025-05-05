@@ -23,7 +23,7 @@ preprocess_lvl: 2 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: componen
 
 batch_size: 64 # 32, 64, 128 (Larger can provide more diverse triplets in each batch -> impprove quality of mined triplets)
 img_size: 224 # 224, 256, 384, 512
-epochs: 50
+epochs: 20
 save_interval: 10
 n_gpu: 1
 num_workers: 8
@@ -75,4 +75,4 @@ solver:
   lr_start: 3e-06
   lr_ramp_ep: 8
 
-re_ranking: True
+re_ranking: False
