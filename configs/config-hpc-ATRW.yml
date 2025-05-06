@@ -74,7 +74,7 @@ solver:
   lr_ramp_ep: 0
   lr_decay: 0.8
 
-re_ranking: True
+re_ranking: False
 
 param_grid:
   use_grid: True
