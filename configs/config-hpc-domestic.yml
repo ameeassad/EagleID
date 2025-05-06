@@ -2,7 +2,7 @@
 
 project_name: eagleID-dataset-scope
 notes: raptors + MPDD
-use_wandb: True
+use_wandb: True 
 wandb_entity: winniethepooh
 
 wildlife_name: raptors, MPDD
