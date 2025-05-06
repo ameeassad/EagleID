@@ -217,7 +217,7 @@ if __name__ == '__main__':
     sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters']})
 
 
-    sweep_id = wandb.sweep(sweep_config, project="sweepy-may")
+    sweep_id = wandb.sweep(sweep_config, project="sweepy-species")
 
     # agent that will iterate over the sweep parameters with specified search method
     wandb.agent(sweep_id, function=sweep_iteration)
