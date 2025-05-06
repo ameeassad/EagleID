@@ -71,7 +71,7 @@ solver:
   swa_start: 24
   lr_max: 0.0005
   lr_start: 1.71e-06
-  lr_ramp_ep: 15
+  lr_ramp_ep: 0
   lr_decay: 0.8
 
 re_ranking: True

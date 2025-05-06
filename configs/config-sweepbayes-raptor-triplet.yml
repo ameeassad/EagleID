@@ -72,5 +72,5 @@ early_terminate:
 #   swa_start: 24
 #   lr_max: 0.0001
 #   lr_start: 1e-05
-#   lr_ramp_ep: 8
+#   lr_ramp_ep: 0
 #   lr_decay: 0.8

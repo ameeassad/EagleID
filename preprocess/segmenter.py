@@ -15,6 +15,7 @@ import ast
 
 
 
+
 def get_segs(polygon, image):
     segmentation = [polygon]
 
@@ -113,7 +114,37 @@ def add_segmentations(df, image_dir="", testing=False, cache_path=None, only_cac
             bbox_exists = False
 
         # If no cache or segmentation is missing, run YOLOv8 model
-        model = YOLO('../checkpoints/yolov8x-seg.pt')
+        import torch
+        from ultralytics.nn.tasks import SegmentationModel
+        from ultralytics.nn.modules.conv import Conv
+        from ultralytics.nn.modules.block import C2f, SPPF, C3, C3k2
+        from torch.nn.modules.container import Sequential
+        from torch.nn.modules.conv import Conv2d
+        from torch.nn.modules.batchnorm import BatchNorm2d
+        from torch.nn.modules.activation import SiLU
+        from torch.nn.modules.pooling import MaxPool2d
+        from torch.nn.modules.linear import Linear
+        from torch.nn.modules.dropout import Dropout
+        from ultralytics import YOLO
+
+        # In the add_segmentations function, update the model loading part
+        with torch.serialization.safe_globals([
+            SegmentationModel,
+            Sequential,
+            Conv,
+            Conv2d,
+            BatchNorm2d,
+            SiLU,
+            MaxPool2d,
+            Linear,
+            Dropout,
+            C2f,
+            SPPF,
+            C3,
+            C3k2
+        ]):
+            model = YOLO('../checkpoints/yolo11x-seg.pt')
+        # model = YOLO('../checkpoints/yolo11x-seg.pt')
         results = model(image)
         if len(results)>1:
             print("WARNING: Multiple objects detected in image")
