@@ -1,0 +1,23 @@
+name: arcface-tuning-single-lvl
+method: grid 
+metric:
+  name: val/mAP
+  goal: maximize
+
+parameters:
+  seed:
+    values: [42, 1234]
+
+  use_gradcam: 
+    values: [True]
+  val_viz: 
+    values: [True]
+
+  embedding_size:
+    values: [256]
+
+  arcface_loss.margin:
+    values: [0.3,0.4, 0.5]
+
+  arcface_loss.scale:
+    values: [30, 50, 64]

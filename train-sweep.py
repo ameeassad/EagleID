@@ -169,7 +169,7 @@ def get_model(config):
 
 def sweep_iteration():
     wandb.init()
-    wandb.define_metric("val/mAP", summary="max")
+    # wandb.define_metric("val/mAP", summary="max")
     # config=wandb.config
     # print(config)
     config = config_yml.copy()
@@ -178,7 +178,7 @@ def sweep_iteration():
     for k, v in wandb.config.items():
         config[k] = v
 
-    data =  get_dataset(config, sweep=sweep_multi)
+    data =  get_dataset(config)
     model = get_model(config)
 
     # setup Trainer
@@ -208,13 +208,13 @@ if __name__ == '__main__':
     config_yml['epochs'] = 15
 
     # Update sweep config to include base parameters from config.yaml
-    if len(config_yml['animal_cat'].split(',')) > 1:
-        sweep_multi = True
-        sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters'] and 
-                                        key not in ['animal_cat', 'dataset', 'cache_path']})
-    else: # only one animal, don't change cache and dataset
-        sweep_multi = False
-        sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters']})
+    # if len(config_yml['animal_cat'].split(',')) > 1:
+    #     sweep_multi = True
+    #     sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters'] and 
+    #                                     key not in ['animal_cat', 'dataset', 'cache_path']})
+    # else: # only one animal, don't change cache and dataset
+    sweep_multi = False
+    sweep_config['parameters'].update({key: {'value': val} for key, val in config_yml.items() if key not in sweep_config['parameters']})
 
 
     sweep_id = wandb.sweep(sweep_config, project="sweepy-may")
