@@ -13,11 +13,7 @@ parameters:
   val_viz: 
     values: [False]
 
-  batch_size:
-    values: [64, 128, 256]
-
-  embedding_size:
-    values: [256, 512]
-
-  solver.BASE_LR:
-    values: [0.001, 0.002]
+  arcface_loss.margin:
+    values: [0.3, 0.5]
+  arcface_loss.scale:
+    values: [50, 30]
