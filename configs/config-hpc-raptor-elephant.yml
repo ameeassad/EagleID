@@ -46,7 +46,7 @@ triplet_loss:
 arcface_loss:
   activate: True # Set to False if using triplet loss
   margin: 0.5 # 1,2:[0.5,30], 3:[0.3,50], 4,5:[0.4,50]
-  scale: 30
+  scale: 50
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
   n_classes:
 early_stopping:
