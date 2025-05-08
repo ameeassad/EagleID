@@ -1,15 +1,15 @@
 # BEFORE RUN, CHECK: cache_path, splitter, precompute, arcface_loss.activate, epochs
 
 project_name: eagleID-dataset-scope
-notes: raptors + MPDD
+notes: raptor with mammals- ELPephant, SealID, hyenas
 use_wandb: True
 wandb_entity: winniethepooh
 
-wildlife_name: raptors, MPDD
-animal_cat: bird, mammal
+wildlife_name: raptors, ELPephant, SealID, hyenas
+animal_cat: bird, mammal, mammal, mammal
 outdir: results
 dataset: /proj/nobackup/aiforeagles/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_domestic_split.csv # _split.csv if using metadata_split
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_mammals_split.csv # _split.csv if using metadata_split
 splitter: metadata_split # custom_closed / metadata_split 
 split_ratio: 0.8
 
@@ -28,10 +28,10 @@ save_interval: 10
 n_gpu: 1
 num_workers: 8
 gpu_ids: 
-seed: 42 #42, 1234, 7, 2025
+seed: 1234 #42, 1234, 7, 2025
 
-use_gradcam: True
-val_viz: True
+use_gradcam: False
+val_viz: False
 
 transforms:
   mean: [0.485, 0.456, 0.406]
@@ -46,7 +46,7 @@ triplet_loss:
   distance_matrix: cosine
 arcface_loss:
   activate: True # Set to False if using triplet loss
-  margin: 0.5 # 1,2:[0.5,30], 3:[0.3,50], 4,5:[0.4,50] ; multispecies:[0.3,50]
+  margin: 0.5 # 1,2:[0.5,30], 3:[0.3,50], 4,5:[0.4,50]
   scale: 30
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
   n_classes:
