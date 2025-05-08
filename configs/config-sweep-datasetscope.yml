@@ -1,4 +1,4 @@
-name: arcface-tuning-single-lvl
+name: finetune-single-lvl
 method: grid 
 metric:
   name: val/mAP
