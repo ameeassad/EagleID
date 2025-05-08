@@ -9,15 +9,15 @@ parameters:
     values: [42, 1234]
 
   use_gradcam: 
-    values: [True]
+    values: [False]
   val_viz: 
-    values: [True]
+    values: [False]
+
+  batch_size:
+    values: [64, 128, 256]
 
   embedding_size:
-    values: [256]
+    values: [256, 512]
 
-  arcface_loss.margin:
-    values: [0.3,0.4, 0.5]
-
-  arcface_loss.scale:
-    values: [50]
+  solver.BASE_LR:
+    values: [0.001, 0.002]
