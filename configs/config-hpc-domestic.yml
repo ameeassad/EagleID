@@ -46,8 +46,8 @@ triplet_loss:
   distance_matrix: cosine
 arcface_loss:
   activate: True # Set to False if using triplet loss
-  margin: 0.5 # 1,2:[0.5,30], 3:[0.3,50], 4,5:[0.4,50]
-  scale: 30
+  margin: 0.3 # 1,2:[0.5,30], 3:[0.3,50], 4,5:[0.4,50] ; multispecies:[0.3,50]
+  scale: 50
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
   n_classes:
 early_stopping:
@@ -63,7 +63,7 @@ solver:
   WEIGHT_DECAY: 0.0001 # 0.001, 0.0001 (small dataset)
   MOMENTUM: 0.9  # only when OPT is sgd
   BASE_LR: 0.001 # if SGD use 0.01 / if Adam use 0.001
-  LR_SCHEDULER: cosine_annealing  # step, multistep, reduce_on_plateau, cosine_annealing
+  LR_SCHEDULER: reduce_on_plateau  # step, multistep, reduce_on_plateau, cosine_annealing
   LR_DECAY_RATE: 0.1
   LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
   LR_STEP_MILESTONES: [20, 30]  # only when LR_SCHEDULER is multistep
