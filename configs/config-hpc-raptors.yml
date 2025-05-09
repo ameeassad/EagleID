@@ -1,6 +1,6 @@
 # BEFORE RUN, CHECK: cache_path, splitter, precompute, arcface_loss.activate, epochs, loss hyperparams for lvl
 
-project_name: eagleID-preprocess-final
+project_name: eagleID-preprocess-final2
 notes: 
 use_wandb: True
 wandb_entity: winniethepooh
