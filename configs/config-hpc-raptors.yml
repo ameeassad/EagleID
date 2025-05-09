@@ -9,8 +9,8 @@ wildlife_name: raptors
 animal_cat: bird
 outdir: results
 dataset: /proj/nobackup/aiforeagles/raptor_individuals_cropped/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors_split.csv # _split.csv if using metadata_split
-splitter: metadata_split # custom_closed / metadata_split 
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors.csv # _split.csv if using metadata_split
+splitter: custom_closed # custom_closed / metadata_split 
 split_ratio: 0.8
 
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
@@ -28,10 +28,10 @@ save_interval: 10
 n_gpu: 1
 num_workers: 8
 gpu_ids: 
-seed: 42 #42, 1234, 7, 2025
+seed: 7 #42, 1234, 7, 2025
 
-use_gradcam: False
-val_viz: False
+use_gradcam: True
+val_viz: True
 
 transforms:
   mean: [0.485, 0.456, 0.406]

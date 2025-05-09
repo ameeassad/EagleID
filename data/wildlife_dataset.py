@@ -408,7 +408,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             df_all.loc[idx_train, 'metadata_split'] = 'train'
             df_all.loc[idx_test, 'metadata_split'] = 'test'
             original_path = Path(self.cache_path)
-            df_all.to_csv(original_path.with_name(original_path.stem + '_split.csv'), index=False)
+            df_all.to_csv(original_path.with_name(original_path.stem + '_split2.csv'), index=False)
 
         # Happens for all split options, assuming 'query' column is present
         if df_all['query'].isna().any():
