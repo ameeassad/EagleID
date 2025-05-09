@@ -1,12 +1,12 @@
 # BEFORE RUN, CHECK: cache_path, splitter, precompute, arcface_loss.activate, epochs
 
 project_name: eagleID-dataset-scope
-notes: fliers- raptors, BirdIndividualID, whaleshark, dolphin
+notes: fliers- raptors, BirdIndividualID, whaleshark, dolphin, turtle
 use_wandb: True
 wandb_entity: winniethepooh
 
-wildlife_name: raptors, BirdIndividualID, whaleshark, NDD20
-animal_cat: bird, bird, fish, fish
+wildlife_name: raptors, BirdIndividualID, whaleshark, NDD20, turtle
+animal_cat: bird, bird, fish, fish, reptile
 outdir: results
 dataset: /proj/nobackup/aiforeagles/
 cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_fliers_split.csv # _split.csv if using metadata_split
