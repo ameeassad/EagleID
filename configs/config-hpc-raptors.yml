@@ -1,6 +1,6 @@
 # BEFORE RUN, CHECK: cache_path, splitter, precompute, arcface_loss.activate, epochs, loss hyperparams for lvl
 
-project_name: eagleID-preprocess-final2
+project_name: eagleID-preprocess-final
 notes: 
 use_wandb: True
 wandb_entity: winniethepooh
@@ -9,7 +9,7 @@ wildlife_name: raptors
 animal_cat: bird
 outdir: results
 dataset: /proj/nobackup/aiforeagles/raptor_individuals_cropped/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors_split2.csv # _split.csv if using metadata_split
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors_split.csv # _split.csv if using metadata_split
 splitter: metadata_split # custom_closed / metadata_split 
 split_ratio: 0.8
 
@@ -19,7 +19,7 @@ precompute: False
 model_architecture: ResNetPlusModel # ResNetPlusModel, TripletModel, FusionModel, EfficientNet, TransformerModel
 backbone_name: resnet50 # efficientnet_b0, resnet50, swin_tiny_patch4_window7_224
 checkpoint: 
-preprocess_lvl: 1 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
+preprocess_lvl: 4 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
 
 batch_size: 64 # 32, 64, 128 (Larger can provide more diverse triplets in each batch -> impprove quality of mined triplets)
 img_size: 224 # 224, 256, 384, 512
@@ -46,7 +46,7 @@ triplet_loss:
   distance_matrix: cosine
 arcface_loss:
   activate: True # Set to False if using triplet loss
-  margin: 0.5 # 1,2:[0.5,30] 3:[0.3,50], 4!,5!:0.3,30, 4,5:[0.4,50]
+  margin: 0.3 # 1,2:[0.5,30] 3:[0.3,50], 4!,5!:0.3,30, 4,5:[0.4,50]
   scale: 30
   theta_zero: 0.785 # ArcFace Sub-Center Dynamic Loss
   n_classes:
