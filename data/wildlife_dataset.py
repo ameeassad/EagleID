@@ -383,7 +383,7 @@ class WildlifeDataModule(pl.LightningDataModule):
             elif self.splitter == 'closed_species_stratified':
                 splitter = StratifiedSpeciesSplit(self.split_ratio)
             elif self.splitter == 'custom_closed':
-                splitter = CustomClosedSetSplit(self.split_ratio)
+                splitter = CustomClosedSetSplit(ratio_train=self.split_ratio, seed=config['seed'])
             else:
                 print(f"Unknown splitter: {self.splitter}. Using closed-set split.")
                 splitter = splits.ClosedSetSplit(self.split_ratio)

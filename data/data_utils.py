@@ -253,7 +253,11 @@ class CustomClosedSetSplit(splits.ClosedSetSplit):
         identity_skip: str = 'unknown',
         tolerance: float = 0.05
     ) -> None:
-        super().__init__(ratio_train, seed, identity_skip)
+        super().__init__(
+            ratio_train=ratio_train,
+            seed=seed,
+            identity_skip=identity_skip
+        )
         self.tolerance = tolerance
 
     def general_split(
