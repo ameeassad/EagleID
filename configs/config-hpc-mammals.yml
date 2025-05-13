@@ -9,7 +9,7 @@ wildlife_name: raptors, ELPephant, SealID, hyenas
 animal_cat: bird, mammal, mammal, mammal
 outdir: results
 dataset: /proj/nobackup/aiforeagles/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_mammals_split.csv # _split.csv if using metadata_split
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_mammals_split2.csv # _split.csv if using metadata_split
 splitter: metadata_split # custom_closed / metadata_split 
 split_ratio: 0.8
 
@@ -30,8 +30,8 @@ num_workers: 8
 gpu_ids: 
 seed: 7 #42, 1234, 7, 2025
 
-use_gradcam: False
-val_viz: False
+use_gradcam: True
+val_viz: True
 
 transforms:
   mean: [0.485, 0.456, 0.406]

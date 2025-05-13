@@ -9,7 +9,7 @@ wildlife_name: raptors, BirdIndividualID, whaleshark, NDD20, turtle
 animal_cat: bird, bird, fish, fish, reptile
 outdir: results
 dataset: /proj/nobackup/aiforeagles/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_fliers_split.csv # _split.csv if using metadata_split
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_fliers_split2.csv # _split.csv if using metadata_split
 splitter: metadata_split # custom_closed / metadata_split 
 split_ratio: 0.8
 
