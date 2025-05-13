@@ -9,7 +9,7 @@ wildlife_name: raptors, ELPephant, SealID, hyenas, ATRW, BirdIndividualID, whale
 animal_cat: bird, mammal, mammal, mammal, mammal, bird, fish, mammal, mammal, reptile
 outdir: results
 dataset: /proj/nobackup/aiforeagles/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_mixed_split.csv # _split.csv if using metadata_split
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_mixed_split2.csv # _split.csv if using metadata_split
 splitter: metadata_split # custom_closed / metadata_split 
 split_ratio: 0.8
 
