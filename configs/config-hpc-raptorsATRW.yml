@@ -28,10 +28,10 @@ save_interval: 10
 n_gpu: 1
 num_workers: 8
 gpu_ids: 
-seed: 1234 #42, 1234, 7, 2025
+seed: 7 #42, 1234, 7, 2025
 
-use_gradcam: False
-val_viz: False
+use_gradcam: True
+val_viz: True
 
 transforms:
   mean: [0.485, 0.456, 0.406]
