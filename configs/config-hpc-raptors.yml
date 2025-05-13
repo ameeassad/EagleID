@@ -1,6 +1,6 @@
 # BEFORE RUN, CHECK: cache_path, splitter, precompute, arcface_loss.activate, epochs, loss hyperparams for lvl
 
-project_name: eagleID-dataset-scope-testing
+project_name: eagleID-preprocess-final
 notes: 
 use_wandb: True
 wandb_entity: winniethepooh
@@ -9,7 +9,7 @@ wildlife_name: raptors
 animal_cat: bird
 outdir: results
 dataset: /proj/nobackup/aiforeagles/raptor_individuals_cropped/
-cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors_spli2.csv # _split.csv if using metadata_split
+cache_path: /proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_raptors_split.csv # _split.csv if using metadata_split
 splitter: metadata_split # custom_closed / metadata_split 
 split_ratio: 0.8
 
