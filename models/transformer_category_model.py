@@ -97,8 +97,8 @@ class TransformerCategory(pl.LightningModule):
         self.criterion = nn.CrossEntropyLoss()
         
         # Metrics
-        self.train_acc = Accuracy(num_classes=self.num_classes)
-        self.val_acc = Accuracy(num_classes=self.num_classes)
+        self.train_acc = Accuracy(task='multiclass', num_classes=self.num_classes)
+        self.val_acc = Accuracy(task='multiclass', num_classes=self.num_classes)
         
         # Store predictions for confusion matrix
         self.val_preds = []
