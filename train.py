@@ -16,6 +16,7 @@ from models.simple_model import SimpleModel
 from models.fusion_model import FusionModel
 from models.megadescriptor import MegaDescriptor
 from models.transformer_model import TransformerModel
+from models.transformer_category_model import TransformerCategory
 from models.efficientnet import EfficientNet
 from models.resnet_plus_model import ResNetPlusModel
 from models.triplet_loss_model import TripletModel
@@ -35,13 +36,22 @@ def get_args() -> argparse.Namespace:
 
 def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
     lr_callback = LearningRateMonitor(logging_interval='epoch')
+    
+    # Determine the monitor metric based on model type
+    if config.get('model_architecture') in ['TransformerCategory', 'SimpleModel']:
+        monitor_metric = 'val/acc'
+        monitor_mode = 'max'
+    else:
+        monitor_metric = 'val/mAP'
+        monitor_mode = 'max'
+    
     ckpt_callback = ModelCheckpoint(
         dirpath=f"checkpoints-{config['project_name']}",
         filename='epoch{epoch:03d}',
         auto_insert_metric_name=False,
         save_top_k=1,
-        monitor='val/mAP', # returned metrics: ['random_val/mAP', 'lr-SGD', 'train/loss', 'train/loss_step', 'val/mAP', 'val/mAP1', 'val/mAP5', 'val/Recall@5', 'val/accuracy', 'train/loss_epoch', 'epoch', 'step']
-        mode='max',
+        monitor=monitor_metric,
+        mode=monitor_mode,
         every_n_epochs=checkpoint_interval,
         save_last=True,
     )
@@ -190,6 +200,8 @@ if __name__ == '__main__':
         'TripletModel': TripletModel,
         'FusionModel': FusionModel,
         'TransformerModel': TransformerModel,
+        'TransformerCategory': TransformerCategory,
+        'SimpleModel': SimpleModel,
         'EfficientNet': EfficientNet,
         'MegaDescriptor': MegaDescriptor,
         'ResNetPlusModel': ResNetPlusModel,

@@ -18,5 +18,6 @@ __pycache__/model.cpython-312.pyc
 dataset/dataframe/
 dataset/data_cache/
 dataset/raptor_data_cache/
+dataset/artportalen_cache/
 scripts/
 notebooks/train_trial_results/

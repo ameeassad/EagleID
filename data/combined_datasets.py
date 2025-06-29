@@ -1,6 +1,7 @@
 from wildlife_datasets import analysis, datasets, loader
 from data.raptors_wildlife import Raptors, GoldensWildlife
 from data.wildlife_dataset import WildlifeDataModule
+from data.artportalen_goleag import ArtportalenDataModule
 import os
 import sys
 import wandb
@@ -41,6 +42,29 @@ def get_dataset(config, hardcode=None, sweep=False):
                       '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_goleag_split.csv')
         ds = GoldensWildlife(root=config['dataset'], include_video=False)
         return WildlifeDataModule(metadata=ds.df, config=config)
+    
+    if names == {'artportalen'}:
+        _update_wandb('bird',
+                      '/proj/nobackup/aiforeagles/artportalen/artportalen_goeag/',
+                      '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_artportalen.csv')
+        
+        # Create ArtportalenDataModule with the same parameters as in the notebook
+        data_module = ArtportalenDataModule(
+            data_dir=config['dataset'],
+            preprocess_lvl=config['preprocess_lvl'],
+            batch_size=config['batch_size'],
+            size=config['img_size'],
+            mean=config['transforms']['mean'],
+            std=config['transforms']['std'],
+            cache_dir=config['cache_dir']
+        )
+        
+        # Use the existing CSV files
+        train_csv = '/proj/nobackup/aiforeagles/artportalen/final_train_sep_sightings.csv'
+        val_csv = '/proj/nobackup/aiforeagles/artportalen/train_sep_sightings.csv'
+        
+        data_module.setup_from_csv(train_csv, val_csv)
+        return data_module
     
     if names == {'BirdIndividualID'}:
         _update_wandb('bird',
