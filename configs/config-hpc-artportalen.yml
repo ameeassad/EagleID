@@ -31,22 +31,23 @@ num_workers: 8
 gpu_ids: 
 seed: 42 #42, 1234, 7, 2025
 
-use_gradcam: True
+use_gradcam: False
 val_viz: False
 
 transforms:
   mean: [0.485, 0.456, 0.406]
   std: [0.229, 0.224, 0.225]
+  use_advanced_aug: False
 classic_transform: False
 
 # Age classification specific settings
 num_classes: 5 # 5 age classes
 
-# Classifier hyperparameters
+# Optimized classifier hyperparameters for 5 classes
 classifier:
-  dropout_rate1: 0.5  # First dropout rate after backbone features
-  dropout_rate2: 0.3  # Second dropout rate before final classification
-  hidden_dim: 512     # Hidden dimension in the classification head
+  dropout_rate1: 0.3  # Reduced dropout for simpler head
+  hidden_dim: 256     # Smaller hidden dimension for 5 classes
+  label_smoothing: 0.1 # Label smoothing for better generalization
 
 early_stopping:
   enabled: True

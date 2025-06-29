@@ -19,6 +19,7 @@ from torchvision.transforms import (
     Pad,
     RandomRotation,
     ColorJitter,
+    RandomErasing,
 )
 import torchvision.transforms.functional as F
 import torch.nn.functional
@@ -37,6 +38,7 @@ def get_some_transforms():
         # n=2,
         p=1.0
     )
+
 def get_color_transforms():
     return A.Compose([
         A.HueSaturationValue(hue_shift_limit=5, sat_shift_limit=5, val_shift_limit=0, p=0.5),
@@ -48,6 +50,89 @@ def get_blur_transforms():
             A.GaussianBlur(blur_limit=(3, 5), p=1.0),
             A.GaussNoise(var_limit=(0.0, 0.01 * 255), p=1.0),
         ], p=0.5)
+
+# Advanced augmentations for transformer models
+def get_advanced_transforms():
+    """Advanced augmentations specifically for transformer models"""
+    return A.Compose([
+        # AutoAugment-style policies
+        A.OneOf([
+            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, p=1.0),
+            A.ElasticTransform(alpha=1, sigma=50, alpha_affine=50, p=1.0),
+            A.GridDistortion(num_steps=5, distort_limit=0.3, p=1.0),
+        ], p=0.5),
+        
+        # Color augmentations
+        A.OneOf([
+            A.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1, p=1.0),
+            A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=1.0),
+            A.RGBShift(r_shift_limit=20, g_shift_limit=20, b_shift_limit=20, p=1.0),
+        ], p=0.5),
+        
+        # Noise and blur
+        A.OneOf([
+            A.GaussNoise(var_limit=(10.0, 50.0), p=1.0),
+            A.GaussianBlur(blur_limit=(3, 7), p=1.0),
+            A.MotionBlur(blur_limit=7, p=1.0),
+        ], p=0.3),
+        
+        # Geometric augmentations
+        A.OneOf([
+            A.OpticalDistortion(distort_limit=0.2, shift_limit=0.15, p=1.0),
+            A.Perspective(scale=(0.05, 0.1), p=1.0),
+        ], p=0.3),
+    ], p=1.0)
+
+def mixup_data(x, y, alpha=0.2):
+    """MixUp augmentation"""
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1
+
+    batch_size = x.size()[0]
+    index = torch.randperm(batch_size).to(x.device)
+
+    mixed_x = lam * x + (1 - lam) * x[index, :]
+    y_a, y_b = y, y[index]
+    return mixed_x, y_a, y_b, lam
+
+def cutmix_data(x, y, alpha=1.0):
+    """CutMix augmentation"""
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1
+
+    batch_size = x.size()[0]
+    index = torch.randperm(batch_size).to(x.device)
+
+    y_a, y_b = y, y[index]
+    bbx1, bby1, bbx2, bby2 = rand_bbox(x.size(), lam)
+    x[:, :, bbx1:bbx2, bby1:bby2] = x[index, :, bbx1:bbx2, bby1:bby2]
+
+    # Adjust lambda to exactly match pixel ratio
+    lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (x.size()[-1] * x.size()[-2]))
+    return x, y_a, y_b, lam
+
+def rand_bbox(size, lam):
+    """Generate random bounding box for CutMix"""
+    W = size[2]
+    H = size[3]
+    cut_rat = np.sqrt(1. - lam)
+    cut_w = np.int(W * cut_rat)
+    cut_h = np.int(H * cut_rat)
+
+    # uniform
+    cx = np.random.randint(W)
+    cy = np.random.randint(H)
+
+    bbx1 = np.clip(cx - cut_w // 2, 0, W)
+    bby1 = np.clip(cy - cut_h // 2, 0, H)
+    bbx2 = np.clip(cx + cut_w // 2, 0, W)
+    bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+    return bbx1, bby1, bbx2, bby2
 
 def rotate_image(image, angle):    
 
@@ -114,6 +199,88 @@ def resize_and_pad(image, size, skeleton_channel=None):
         return padded_image, padded_skeleton_channel
     else: 
         return padded_image
+
+
+class TransformerRGBTransforms:
+    """
+    Advanced transforms for transformer models with MixUp, CutMix, Random Erasing, and AutoAugment-style augmentations.
+    Designed to work with the resize_and_pad pipeline.
+    """
+    def __init__(self, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5), 
+                 mixup_alpha=0.2, cutmix_alpha=1.0, mixup_prob=0.3, cutmix_prob=0.3,
+                 random_erasing_prob=0.3, advanced_aug_prob=0.8):
+        self.mean = mean
+        self.std = std
+        self.mixup_alpha = mixup_alpha
+        self.cutmix_alpha = cutmix_alpha
+        self.mixup_prob = mixup_prob
+        self.cutmix_prob = cutmix_prob
+        self.random_erasing_prob = random_erasing_prob
+        self.advanced_aug_prob = advanced_aug_prob
+        
+        # Advanced augmentations
+        self.advanced_transforms = get_advanced_transforms()
+        
+        # Basic transforms
+        self.basic_transforms = A.Compose([
+            A.HorizontalFlip(p=0.5),
+            A.RandomRotate90(p=0.3),
+            A.Transpose(p=0.3),
+        ])
+        
+        # Normalization
+        self.normalize_transform = A.Normalize(mean=mean, std=std)
+        
+        # Random Erasing (applied after tensor conversion)
+        self.random_erasing = RandomErasing(
+            p=random_erasing_prob, 
+            scale=(0.02, 0.33), 
+            ratio=(0.3, 3.3), 
+            value=0
+        )
+
+    def __call__(self, rgb_img):
+        """
+        Apply transforms to the image.
+        Note: This is called AFTER resize_and_pad, so the image is already square and padded.
+        """
+        # Convert PIL to numpy if needed
+        if isinstance(rgb_img, Image.Image):
+            rgb_img = np.array(rgb_img)
+        
+        # Apply basic geometric transforms
+        if random.random() < 0.8:
+            rgb_img = self.basic_transforms(image=rgb_img)['image']
+        
+        # Apply advanced augmentations
+        if random.random() < self.advanced_aug_prob:
+            rgb_img = self.advanced_transforms(image=rgb_img)['image']
+        
+        # Normalization
+        rgb_img = self.normalize_transform(image=rgb_img)['image']
+        
+        # Convert to Tensor
+        rgb_img = torch.tensor(rgb_img, dtype=torch.float32).permute(2, 0, 1)  # [C, H, W]
+        
+        # Apply Random Erasing
+        if random.random() < self.random_erasing_prob:
+            rgb_img = self.random_erasing(rgb_img)
+        
+        return rgb_img
+
+    def apply_mixup_cutmix(self, batch_x, batch_y):
+        """
+        Apply MixUp or CutMix to a batch of data.
+        This should be called in the training step, not in the transform.
+        """
+        if random.random() < self.mixup_prob:
+            batch_x, y_a, y_b, lam = mixup_data(batch_x, batch_y, self.mixup_alpha)
+            return batch_x, y_a, y_b, lam, 'mixup'
+        elif random.random() < self.cutmix_prob:
+            batch_x, y_a, y_b, lam = cutmix_data(batch_x, batch_y, self.cutmix_alpha)
+            return batch_x, y_a, y_b, lam, 'cutmix'
+        else:
+            return batch_x, batch_y, batch_y, 1.0, 'none'
 
 
 class ResizeAndPadBoth:

@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-from torchmetrics import Accuracy
+from torchmetrics import Accuracy, Precision, Recall, F1Score
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -11,7 +11,7 @@ import numpy as np
 
 class TransformerCategory(pl.LightningModule):
     """
-    Transformer-based model for age classification with 5 classes.
+    Transformer-based model
     Uses cross-entropy loss for multi-class classification.
     """
     
@@ -37,9 +37,9 @@ class TransformerCategory(pl.LightningModule):
             outdir = config['outdir']
             
             # Get classifier hyperparameters from config
-            self.dropout_rate1 = config.get('classifier', {}).get('dropout_rate1', 0.5)
-            self.dropout_rate2 = config.get('classifier', {}).get('dropout_rate2', 0.3)
-            self.hidden_dim = config.get('classifier', {}).get('hidden_dim', 512)
+            self.dropout_rate1 = config.get('classifier', {}).get('dropout_rate1', 0.3)
+            self.hidden_dim = config.get('classifier', {}).get('hidden_dim', 256)
+            self.label_smoothing = config.get('classifier', {}).get('label_smoothing', 0.1)
         else:
             self.backbone_model_name = backbone_model_name
             self.num_classes = num_classes
@@ -49,9 +49,9 @@ class TransformerCategory(pl.LightningModule):
             outdir = outdir
             
             # Default values if no config provided
-            self.dropout_rate1 = 0.5
-            self.dropout_rate2 = 0.3
-            self.hidden_dim = 512
+            self.dropout_rate1 = 0.3
+            self.hidden_dim = 256
+            self.label_smoothing = 0.1
 
         # Validate backbone model
         supported_models = [
@@ -84,21 +84,26 @@ class TransformerCategory(pl.LightningModule):
                 features = features[-1]  # Use the last feature level
             feature_dim = features.shape[1] if len(features.shape) == 2 else features.flatten(1).shape[1]
         
-        # Classification head with configurable parameters
+        # Simplified classification head for 5 classes
         self.classifier = nn.Sequential(
-            nn.Dropout(self.dropout_rate1),
             nn.Linear(feature_dim, self.hidden_dim),
             nn.ReLU(),
-            nn.Dropout(self.dropout_rate2),
+            nn.Dropout(self.dropout_rate1),
             nn.Linear(self.hidden_dim, self.num_classes)
         )
         
-        # Loss function for multi-class classification
-        self.criterion = nn.CrossEntropyLoss()
+        # Loss function with label smoothing for better generalization
+        self.criterion = nn.CrossEntropyLoss(label_smoothing=self.label_smoothing)
         
-        # Metrics
+        # Comprehensive metrics for 5-class classification
         self.train_acc = Accuracy(task='multiclass', num_classes=self.num_classes)
         self.val_acc = Accuracy(task='multiclass', num_classes=self.num_classes)
+        self.top2_acc = Accuracy(task='multiclass', num_classes=self.num_classes, top_k=2)
+        
+        # Per-class metrics
+        self.val_precision = Precision(task="multiclass", num_classes=self.num_classes, average="macro")
+        self.val_recall = Recall(task="multiclass", num_classes=self.num_classes, average="macro")
+        self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
         
         # Store predictions for confusion matrix
         self.val_preds = []
@@ -129,13 +134,31 @@ class TransformerCategory(pl.LightningModule):
         return logits
     
     def training_step(self, batch, batch_idx):
-        """Training step"""
+        """Training step with support for MixUp and CutMix"""
         images, labels = batch
-        logits = self(images)
-        loss = self.criterion(logits, labels)
         
-        # Calculate accuracy
-        acc = self.train_acc(logits.softmax(dim=-1), labels)
+        # Apply MixUp or CutMix if the transform supports it
+        if hasattr(self.trainer.datamodule.train_dataset, 'transform') and hasattr(self.trainer.datamodule.train_dataset.transform, 'apply_mixup_cutmix'):
+            images, labels_a, labels_b, lam, aug_type = self.trainer.datamodule.train_dataset.transform.apply_mixup_cutmix(images, labels)
+            
+            # Forward pass
+            logits = self(images)
+            
+            # Compute loss with MixUp/CutMix
+            loss_a = self.criterion(logits, labels_a)
+            loss_b = self.criterion(logits, labels_b)
+            loss = lam * loss_a + (1 - lam) * loss_b
+            
+            # Calculate accuracy (use original labels for accuracy)
+            acc = self.train_acc(logits.softmax(dim=-1), labels_a)
+            
+            # Log augmentation type
+            self.log('train/aug_type', 1.0 if aug_type != 'none' else 0.0, prog_bar=False)
+        else:
+            # Standard training without MixUp/CutMix
+            logits = self(images)
+            loss = self.criterion(logits, labels)
+            acc = self.train_acc(logits.softmax(dim=-1), labels)
         
         # Log metrics
         self.log('train/loss', loss, prog_bar=True)
@@ -144,22 +167,32 @@ class TransformerCategory(pl.LightningModule):
         return loss
     
     def validation_step(self, batch, batch_idx):
-        """Validation step"""
+        """Validation step with comprehensive metrics"""
         images, labels = batch
         logits = self(images)
         loss = self.criterion(logits, labels)
         
-        # Calculate accuracy
+        # Calculate various accuracy metrics
         acc = self.val_acc(logits.softmax(dim=-1), labels)
+        top2_acc = self.top2_acc(logits.softmax(dim=-1), labels)
+        
+        # Calculate precision, recall, and F1
+        precision = self.val_precision(logits.softmax(dim=-1), labels)
+        recall = self.val_recall(logits.softmax(dim=-1), labels)
+        f1 = self.val_f1(logits.softmax(dim=-1), labels)
         
         # Store predictions for confusion matrix
         preds = logits.argmax(dim=-1)
         self.val_preds.extend(preds.cpu().numpy())
         self.val_targets.extend(labels.cpu().numpy())
         
-        # Log metrics
+        # Log comprehensive metrics
         self.log('val/loss', loss, prog_bar=True)
         self.log('val/acc', acc, prog_bar=True)
+        self.log('val/top2_acc', top2_acc, prog_bar=True)
+        self.log('val/precision', precision, prog_bar=False)
+        self.log('val/recall', recall, prog_bar=False)
+        self.log('val/f1', f1, prog_bar=False)
         
         return loss
     

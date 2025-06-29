@@ -48,6 +48,9 @@ def get_dataset(config, hardcode=None, sweep=False):
                       '/proj/nobackup/aiforeagles/artportalen/artportalen_goeag/',
                       '/proj/nobackup/aiforeagles/EagleID/dataset/dataframe/cache_artportalen.csv')
         
+        # Determine if we should use advanced augmentations based on model architecture
+        use_advanced_aug = config.get('model_architecture') == 'TransformerCategory'
+        
         # Create ArtportalenDataModule with the same parameters as in the notebook
         data_module = ArtportalenDataModule(
             data_dir=config['dataset'],
@@ -56,7 +59,8 @@ def get_dataset(config, hardcode=None, sweep=False):
             size=config['img_size'],
             mean=config['transforms']['mean'],
             std=config['transforms']['std'],
-            cache_dir=config['cache_dir']
+            cache_dir=config['cache_dir'],
+            use_advanced_aug=use_advanced_aug
         )
         
         # Use the existing CSV files

@@ -29,7 +29,7 @@ import pytorch_lightning as pl
 
 from .skeleton_category import AKSkeletonCategory
 from preprocess.segmenterCOCO import COCOBuilder
-from data.transforms import SynchTransforms, RGBTransforms, ValTransforms, resize_and_pad, rotate_image
+from data.transforms import SynchTransforms, RGBTransforms, TransformerRGBTransforms, ValTransforms, resize_and_pad, rotate_image
 from preprocess.preprocess_utils import create_mask, create_skeleton_channel
 
 
@@ -54,12 +54,13 @@ class ArtportalenDataModule(pl.LightningDataModule):
         std (float or tuple): Standard deviation for normalization.
         test (bool): Flag to indicate if in test mode.
         cache_dir (str): Path to the directory for caching preprocessed images.
+        use_advanced_aug (bool): Whether to use advanced augmentations for transformer models.
         
     Attributes:
         train_transforms (callable): Transformations applied to the training dataset.
         val_transforms (callable): Transformations applied to the validation dataset.
     """
-    def __init__(self, data_dir, preprocess_lvl=0, batch_size=8, size=256, mean=0.5, std=0.5, test=False, cache_dir='dataset/data_cache'):
+    def __init__(self, data_dir, preprocess_lvl=0, batch_size=8, size=256, mean=0.5, std=0.5, test=False, cache_dir='dataset/data_cache', use_advanced_aug=False):
         super().__init__()
         self.data_dir = data_dir
         self.preprocess_lvl = preprocess_lvl
@@ -69,6 +70,7 @@ class ArtportalenDataModule(pl.LightningDataModule):
         self.std = (std, std, std) if isinstance(std, float) else tuple(std)
         self.test = test
         self.cache_dir = cache_dir
+        self.use_advanced_aug = use_advanced_aug
 
         if preprocess_lvl == 3:
             self.skeleton = True
@@ -81,7 +83,21 @@ class ArtportalenDataModule(pl.LightningDataModule):
             self.train_transforms = SynchTransforms(mean=self.mean, std=self.std)
             self.val_transforms = ValTransforms(mean=self.mean, std=self.std, skeleton=True)
         else:
-            self.train_transforms = RGBTransforms(mean=self.mean, std=self.std)
+            # Use advanced augmentations for transformer models if specified
+            if self.use_advanced_aug:
+                self.train_transforms = TransformerRGBTransforms(
+                    mean=self.mean, 
+                    std=self.std,
+                    mixup_alpha=0.2,
+                    cutmix_alpha=1.0,
+                    mixup_prob=0.3,
+                    cutmix_prob=0.3,
+                    random_erasing_prob=0.3,
+                    advanced_aug_prob=0.8
+                )
+            else:
+                self.train_transforms = RGBTransforms(mean=self.mean, std=self.std)
+            
             self.val_transforms = Compose([
                 # Resize(self.size),
                 # Pad((self.size - 1, self.size - 1), padding_mode='constant'),
