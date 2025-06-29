@@ -37,7 +37,7 @@ val_viz: False
 transforms:
   mean: [0.485, 0.456, 0.406]
   std: [0.229, 0.224, 0.225]
-  use_advanced_aug: False
+  use_advanced_aug: True
 classic_transform: False
 
 # Age classification specific settings
