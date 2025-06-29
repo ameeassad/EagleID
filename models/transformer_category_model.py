@@ -202,10 +202,10 @@ class TransformerCategory(pl.LightningModule):
             # Calculate confusion matrix
             cm = confusion_matrix(self.val_targets, self.val_preds)
             
-            # Log confusion matrix as figure
-            if hasattr(self, 'logger') and self.logger:
-                fig = self._plot_confusion_matrix(cm)
-                self.logger.experiment.add_figure('confusion_matrix', fig, self.current_epoch)
+            # # Log confusion matrix as figure
+            # if hasattr(self, 'logger') and self.logger:
+            #     fig = self._plot_confusion_matrix(cm)
+            #     self.logger.experiment.add_figure('confusion_matrix', fig, self.current_epoch)
             
             # Reset for next epoch
             self.val_preds = []
