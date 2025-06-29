@@ -4,12 +4,14 @@ from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR
 def get_optimizer(config, parameters) -> torch.optim.Optimizer:
     if config['solver']['OPT'] == 'adam':
         optimizer = torch.optim.Adam(parameters, lr=config['solver']['BASE_LR'], weight_decay=config['solver']['WEIGHT_DECAY'])
+    elif config['solver']['OPT'] == 'adamw':
+        optimizer = torch.optim.AdamW(parameters, lr=config['solver']['BASE_LR'], weight_decay=config['solver']['WEIGHT_DECAY'])
     elif config['solver']['OPT'] == 'sgd':
         optimizer = torch.optim.SGD(
             parameters, lr=config['solver']['BASE_LR'], weight_decay=config['solver']['WEIGHT_DECAY'], momentum=config['solver']['MOMENTUM']
         )
     else:
-        raise NotImplementedError()
+        raise NotImplementedError(f"Optimizer {config['solver']['OPT']} not implemented. Supported optimizers: adam, adamw, sgd")
 
     return optimizer
 
@@ -59,6 +61,6 @@ def get_lr_scheduler_config(config, optimizer: torch.optim.Optimizer) -> dict:
             'frequency': 1,
         }
     else:
-        raise NotImplementedError
+        raise NotImplementedError(f"LR scheduler {config['solver']['LR_SCHEDULER']} not implemented. Supported schedulers: step, multistep, reduce_on_plateau, cosine_annealing")
 
     return lr_scheduler_config
