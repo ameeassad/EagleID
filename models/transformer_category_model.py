@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-from pytorch_lightning.metrics import Accuracy
+from torchmetrics import Accuracy
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -97,8 +97,8 @@ class TransformerCategory(pl.LightningModule):
         self.criterion = nn.CrossEntropyLoss()
         
         # Metrics
-        self.train_acc = Accuracy(task='multiclass', num_classes=self.num_classes)
-        self.val_acc = Accuracy(task='multiclass', num_classes=self.num_classes)
+        self.train_acc = Accuracy(num_classes=self.num_classes)
+        self.val_acc = Accuracy(num_classes=self.num_classes)
         
         # Store predictions for confusion matrix
         self.val_preds = []
