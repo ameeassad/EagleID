@@ -149,8 +149,8 @@ class TransformerCategory(pl.LightningModule):
             loss_b = self.criterion(logits, labels_b)
             loss = lam * loss_a + (1 - lam) * loss_b
             
-            # Calculate accuracy (use original labels for accuracy)
-            acc = self.train_acc(logits.softmax(dim=-1), labels_a)
+            # Update accuracy metric (use original labels for accuracy)
+            self.train_acc.update(logits.softmax(dim=-1), labels_a)
             
             # Log augmentation type
             self.log('train/aug_type', 1.0 if aug_type != 'none' else 0.0, prog_bar=False)
@@ -158,13 +158,21 @@ class TransformerCategory(pl.LightningModule):
             # Standard training without MixUp/CutMix
             logits = self(images)
             loss = self.criterion(logits, labels)
-            acc = self.train_acc(logits.softmax(dim=-1), labels)
+            self.train_acc.update(logits.softmax(dim=-1), labels)
         
-        # Log metrics
+        # Log loss (this updates every step)
         self.log('train/loss', loss, prog_bar=True)
-        self.log('train/acc', acc, prog_bar=True)
         
         return loss
+    
+    def on_train_epoch_end(self):
+        """End of training epoch - compute and log training metrics"""
+        # Compute training accuracy
+        train_acc = self.train_acc.compute()
+        self.log('train/acc', train_acc, prog_bar=True)
+        
+        # Reset training metrics for next epoch
+        self.train_acc.reset()
     
     def validation_step(self, batch, batch_idx):
         """Validation step with comprehensive metrics"""
@@ -172,44 +180,58 @@ class TransformerCategory(pl.LightningModule):
         logits = self(images)
         loss = self.criterion(logits, labels)
         
-        # Calculate various accuracy metrics
-        acc = self.val_acc(logits.softmax(dim=-1), labels)
-        top2_acc = self.top2_acc(logits.softmax(dim=-1), labels)
-        
-        # Calculate precision, recall, and F1
-        precision = self.val_precision(logits.softmax(dim=-1), labels)
-        recall = self.val_recall(logits.softmax(dim=-1), labels)
-        f1 = self.val_f1(logits.softmax(dim=-1), labels)
+        # Update metrics (they will be computed at epoch end)
+        self.val_acc.update(logits.softmax(dim=-1), labels)
+        self.top2_acc.update(logits.softmax(dim=-1), labels)
+        self.val_precision.update(logits.softmax(dim=-1), labels)
+        self.val_recall.update(logits.softmax(dim=-1), labels)
+        self.val_f1.update(logits.softmax(dim=-1), labels)
         
         # Store predictions for confusion matrix
         preds = logits.argmax(dim=-1)
         self.val_preds.extend(preds.cpu().numpy())
         self.val_targets.extend(labels.cpu().numpy())
         
-        # Log comprehensive metrics
+        # Log loss (this updates every step)
         self.log('val/loss', loss, prog_bar=True)
+        
+        return loss
+    
+    def on_validation_epoch_end(self):
+        """End of validation epoch - compute and log all metrics"""
+        # Compute all metrics
+        acc = self.val_acc.compute()
+        top2_acc = self.top2_acc.compute()
+        precision = self.val_precision.compute()
+        recall = self.val_recall.compute()
+        f1 = self.val_f1.compute()
+        
+        # Log all metrics
         self.log('val/acc', acc, prog_bar=True)
         self.log('val/top2_acc', top2_acc, prog_bar=True)
         self.log('val/precision', precision, prog_bar=False)
         self.log('val/recall', recall, prog_bar=False)
         self.log('val/f1', f1, prog_bar=False)
         
-        return loss
-    
-    def on_validation_epoch_end(self):
-        """End of validation epoch - compute confusion matrix"""
+        # Reset metrics for next epoch
+        self.val_acc.reset()
+        self.top2_acc.reset()
+        self.val_precision.reset()
+        self.val_recall.reset()
+        self.val_f1.reset()
+        
         # Calculate confusion matrix if we have predictions
         if len(self.val_preds) > 0:
             # Calculate confusion matrix
             cm = confusion_matrix(self.val_targets, self.val_preds)
             
             # Log confusion matrix as figure if logger is available
-            if hasattr(self, 'logger') and self.logger:
-                try:
-                    fig = self._plot_confusion_matrix(cm)
-                    self.logger.experiment.add_figure('confusion_matrix', fig, self.current_epoch)
-                except Exception as e:
-                    print(f"Warning: Could not plot confusion matrix: {e}")
+            # if hasattr(self, 'logger') and self.logger:
+            #     try:
+            #         fig = self._plot_confusion_matrix(cm)
+            #         self.logger.experiment.add_figure('confusion_matrix', fig, self.current_epoch)
+            #     except Exception as e:
+            #         print(f"Warning: Could not plot confusion matrix: {e}")
             
             # Reset for next epoch
             self.val_preds = []
