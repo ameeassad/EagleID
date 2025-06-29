@@ -148,8 +148,8 @@ class ArtportalenDataModule(pl.LightningDataModule):
         print(f"Test: {len(test_df)}")
         self.num_classes = 5
         print(f"Number of classes: {self.num_classes}")
-        self.train_dataset = EagleDataset(test_df, self.data_dir, self.train_transforms)
-        self.val_dataset = EagleDataset(test_df, self.data_dir, self.val_transforms, test=self.test)
+        self.train_dataset = EagleDataset(test_df, self.data_dir, self.train_transforms, size=self.size)
+        self.val_dataset = EagleDataset(test_df, self.data_dir, self.val_transforms, size=self.size, test=self.test)
 
     def setup_from_csv(self, train_csv, val_csv, stage=None):
         """
@@ -186,8 +186,8 @@ class ArtportalenDataModule(pl.LightningDataModule):
         print(f"Train: {len(train_df)} Val: {len(val_df)}")
 
         # Initialize the datasets
-        self.train_dataset = EagleDataset(train_df, self.data_dir, self.train_transforms, preprocess_lvl=self.preprocess_lvl, cache_dir=self.cache_dir)
-        self.val_dataset = EagleDataset(val_df, self.data_dir, self.val_transforms, preprocess_lvl=self.preprocess_lvl, cache_dir=self.cache_dir)
+        self.train_dataset = EagleDataset(train_df, self.data_dir, self.train_transforms, size=self.size, preprocess_lvl=self.preprocess_lvl, cache_dir=self.cache_dir)
+        self.val_dataset = EagleDataset(val_df, self.data_dir, self.val_transforms, size=self.size, preprocess_lvl=self.preprocess_lvl, cache_dir=self.cache_dir)
 
         # Check the number of unique classes
         unique_classes = train_df['category_id'].unique()
@@ -220,8 +220,8 @@ class ArtportalenDataModule(pl.LightningDataModule):
 
         print(f"Train: {len(train_df)} Val: {len(val_df)}")
 
-        self.train_dataset = EagleDataset(train_df, self.data_dir, self.train_transforms, preprocess_lvl=self.preprocess_lvl, cache_dir=self.cache_dir)
-        self.val_dataset = EagleDataset(val_df, self.data_dir, self.val_transforms, preprocess_lvl=self.preprocess_lvl, cache_dir=self.cache_dir)
+        self.train_dataset = EagleDataset(train_df, self.data_dir, self.train_transforms, size=self.size, preprocess_lvl=self.preprocess_lvl, cache_dir=self.cache_dir)
+        self.val_dataset = EagleDataset(val_df, self.data_dir, self.val_transforms, size=self.size, preprocess_lvl=self.preprocess_lvl, cache_dir=self.cache_dir)
 
         # Check number of classes
         unique_classes = train_df['category_id'].unique()
