@@ -61,7 +61,7 @@ def get_dataset(config, hardcode=None, sweep=False):
         
         # Use the existing CSV files
         train_csv = '/proj/nobackup/aiforeagles/artportalen/final_train_sep_sightings.csv'
-        val_csv = '/proj/nobackup/aiforeagles/artportalen/train_sep_sightings.csv'
+        val_csv = '/proj/nobackup/aiforeagles/artportalen/final_val_sep_sightings.csv'
         
         data_module.setup_from_csv(train_csv, val_csv)
         return data_module
