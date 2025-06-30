@@ -28,6 +28,9 @@ class SimpleModel(LightningModule):
         self.save_hyperparameters()
         self.config = config
 
+        if num_classes is None:
+            num_classes = config.get('num_classes', 5)  # Default to 5 if not in config
+
         self.model = timm.create_model(model_name=config['backbone_name'], pretrained=pretrained, num_classes=num_classes)
 
         # if skeleton, accept 4 channels instead of 3
