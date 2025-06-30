@@ -22,7 +22,7 @@ backbone_name: resnet152 # swin_base_patch4_window7_224, swin_large_patch4_windo
 checkpoint: 
 preprocess_lvl: 2 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
 
-batch_size: 32 # Smaller batch size for transformer models
+batch_size: 64 # Smaller batch size for transformer models
 img_size: 224 # 224 for swin models, 384 for larger models
 epochs: 100
 save_interval: 10
@@ -31,7 +31,7 @@ num_workers: 8
 gpu_ids: 
 seed: 42 #42, 1234, 7, 2025
 
-use_gradcam: False
+use_gradcam: True
 val_viz: False
 
 transforms:
@@ -61,7 +61,7 @@ solver:
   OPT: adamw  # adamw for transformers
   WEIGHT_DECAY: 0.01 # Higher weight decay for transformers
   MOMENTUM: 0.9  # only when OPT is sgd
-  BASE_LR: 0.0003 # Lower learning rate for transformers
+  BASE_LR: 0.001 # Lower learning rate for transformers
   LR_SCHEDULER: cosine_annealing  # step, multistep, reduce_on_plateau, cosine_annealing
   LR_DECAY_RATE: 0.1
   LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
