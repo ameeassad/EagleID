@@ -45,9 +45,13 @@ class GradCAMCallback(Callback):
             print("Validation dataloaders not found or empty.")
             return  # Exit if no validation dataloader is available
 
-        target_layer = self.get_resnet50_layer4(pl_module)
+        if self.config['model_architecture'] in ['SimpleModel']:
+            target_layer = self.get_target_layer(pl_module)
+        else:
+            target_layer = self.get_resnet50_layer4(pl_module)
+        
         if target_layer is None:
-            print("ResNet50 layer4 not found.")
+            print("Target layer not found for GradCAM.")
             return
         
         # Proceed with GradCAM logic if dataloaders exist
@@ -84,30 +88,38 @@ class GradCAMCallback(Callback):
             with torch.enable_grad():
                 # cam = GradCAM(model=self.model, target_layers=[self.model.layer4[-1]])
                 cam = GradCAM(model=pl_module, target_layers=[target_layer])
-                # Following targets fails if self.model outputs embeddings of size 128, and class indices higher
-                # targets = [ClassifierOutputTarget(class_idx) for class_idx in target] # only works for class logits, NOT embedding models
-                # 
-                # alternative for embedding model:
-                embeddings = pl_module(x)
-                if self.arcface:
-                    # ArcFace target for the query image
-                    query_label = target[idx].item()
-                    
-                    # Access ArcFace loss module
-                    arcface_loss = pl_module.loss_fn if hasattr(pl_module, 'loss_fn') else None
-                    if arcface_loss is None or not pl_module.config["arcface_loss"]["activate"]:
-                        print(f"Warning: ArcFace loss not found in batch {batch_idx}, using norm fallback")
-                        targets = [lambda _: torch.norm(embeddings[idx], p=2)]
-                    else:
-                        def arcface_target(embeds):
-                            # Compute logits for the single embedding
-                            logits = arcface_loss.get_logits(embeds.unsqueeze(0))  #  ensure scalar
-                            return logits[0, query_label]
-                        targets = [arcface_target]
+
+                if self.config['model_architecture'] in ['SimpleModel']:
+                    # For classification models, use the predicted class
+                    with torch.no_grad():
+                        logits = pl_module(x[idx:idx+1])
+                        pred_class = torch.argmax(logits, dim=1).item()
+                    targets = [ClassifierOutputTarget(pred_class)]
                 else:
-                    # maximize sum of embeddings, forcing the model to focus on regions that contribute to a strong embedding (possibly discriminative features)
-                    print('Using norm of query embedding as fallback')
-                    targets = [lambda _: torch.sum(embeddings)]
+                    # Following targets fails if self.model outputs embeddings of size 128, and class indices higher
+                    # targets = [ClassifierOutputTarget(class_idx) for class_idx in target] # only works for class logits, NOT embedding models
+                    # 
+                    # alternative for embedding model:
+                    embeddings = pl_module(x)
+                    if self.arcface:
+                        # ArcFace target for the query image
+                        query_label = target[idx].item()
+                        
+                        # Access ArcFace loss module
+                        arcface_loss = pl_module.loss_fn if hasattr(pl_module, 'loss_fn') else None
+                        if arcface_loss is None or not pl_module.config["arcface_loss"]["activate"]:
+                            print(f"Warning: ArcFace loss not found in batch {batch_idx}, using norm fallback")
+                            targets = [lambda _: torch.norm(embeddings[idx], p=2)]
+                        else:
+                            def arcface_target(embeds):
+                                # Compute logits for the single embedding
+                                logits = arcface_loss.get_logits(embeds.unsqueeze(0))  #  ensure scalar
+                                return logits[0, query_label]
+                            targets = [arcface_target]
+                    else:
+                        # maximize sum of embeddings, forcing the model to focus on regions that contribute to a strong embedding (possibly discriminative features)
+                        print('Using norm of query embedding as fallback')
+                        targets = [lambda _: torch.sum(embeddings)]
                 # 
 
                 grayscale_cam = cam(input_tensor=x[idx:idx+1], targets=targets)[0, :]
@@ -171,12 +183,40 @@ class GradCAMCallback(Callback):
                 return model.backbone.layer4[-1]
             print("layer4 not found.")
             return None
+            
         except Exception as e:
             print(f"Error accessing layer4: {e}")
             return None
-        
 
-
-        backbone = model.backbone
-        if hasattr(backbone, 'layer4'):
-            return backbone.layer4[-1]  # Return the last block of layer4 for GradCAM
+    def get_target_layer(self, model):
+        """
+        Retrieve the target layer for GradCAM visualization.
+        Supports ResNet variants (ResNet50, ResNet152, etc.) and other models.
+        """
+        try:
+            # For SimpleModel and TransformerCategory with ResNet backbones
+            if hasattr(model, 'model') and hasattr(model.model, 'layer4'):
+                return model.model.layer4[-1]  # Return the last block of layer4 for GradCAM
+            
+            # For models with backbone attribute (embedding models)
+            if hasattr(model, 'backbone') and hasattr(model.backbone, 'layer4'):
+                return model.backbone.layer4[-1]
+            
+            # For direct ResNet models
+            if hasattr(model, 'layer4'):
+                return model.layer4[-1]
+            
+            # For other architectures, try to find suitable layers
+            if hasattr(model, 'model'):
+                # Try to find the last convolutional layer
+                for name, module in reversed(list(model.model.named_modules())):
+                    if isinstance(module, torch.nn.Conv2d):
+                        print(f"Using convolutional layer '{name}' for GradCAM")
+                        return module
+            
+            print("No suitable target layer found for GradCAM.")
+            return None
+            
+        except Exception as e:
+            print(f"Error accessing target layer: {e}")
+            return None
