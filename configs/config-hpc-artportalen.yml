@@ -75,3 +75,5 @@ solver:
   lr_ramp_ep: 0
 
 re_ranking: False 
+arcface_loss:
+  activate: False
