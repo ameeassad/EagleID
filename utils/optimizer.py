@@ -67,10 +67,10 @@ def get_lr_scheduler_config(config, optimizer: torch.optim.Optimizer) -> dict:
         total_epochs = config.get('epochs', 100)
         min_lr = config['solver'].get('MIN_LR', 1e-6)
         
-        # Create warmup scheduler (linear warmup from 0 to BASE_LR)
+        # Create warmup scheduler (linear warmup from 0.1 to 1.0 to avoid LinearLR issue)
         warmup_scheduler = LinearLR(
             optimizer, 
-            start_factor=0.0, 
+            start_factor=0.1,  # Start from 10% of base LR instead of 0
             end_factor=1.0, 
             total_iters=warmup_epochs
         )
