@@ -1,4 +1,5 @@
 import torch
+import math
 from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR
 
 def get_optimizer(config, parameters) -> torch.optim.Optimizer:
@@ -60,7 +61,40 @@ def get_lr_scheduler_config(config, optimizer: torch.optim.Optimizer) -> dict:
             'interval': 'epoch',
             'frequency': 1,
         }
+    elif config['solver']['LR_SCHEDULER'] == 'cosine_with_warmup':
+        # Get warmup epochs from config
+        warmup_epochs = config['solver'].get('WARMUP_EPOCHS', 5)
+        total_epochs = config.get('epochs', 100)
+        min_lr = config['solver'].get('MIN_LR', 1e-6)
+        
+        # Create warmup scheduler (linear warmup from 0 to BASE_LR)
+        warmup_scheduler = LinearLR(
+            optimizer, 
+            start_factor=0.0, 
+            end_factor=1.0, 
+            total_iters=warmup_epochs
+        )
+        
+        # Create cosine annealing scheduler (from BASE_LR to min_lr)
+        cosine_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=total_epochs - warmup_epochs,
+            eta_min=min_lr
+        )
+        
+        # Combine warmup and cosine annealing
+        scheduler = SequentialLR(
+            optimizer,
+            schedulers=[warmup_scheduler, cosine_scheduler],
+            milestones=[warmup_epochs]
+        )
+        
+        lr_scheduler_config = {
+            'scheduler': scheduler,
+            'interval': 'epoch',
+            'frequency': 1,
+        }
     else:
-        raise NotImplementedError(f"LR scheduler {config['solver']['LR_SCHEDULER']} not implemented. Supported schedulers: step, multistep, reduce_on_plateau, cosine_annealing")
+        raise NotImplementedError(f"LR scheduler {config['solver']['LR_SCHEDULER']} not implemented. Supported schedulers: step, multistep, reduce_on_plateau, cosine_annealing, cosine_with_warmup")
 
     return lr_scheduler_config

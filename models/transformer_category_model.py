@@ -8,10 +8,11 @@ from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 
 class TransformerCategory(pl.LightningModule):
     """
-    Transformer-based model
+    Transformer-based model with improved training strategies
     Uses cross-entropy loss for multi-class classification.
     """
     
@@ -36,10 +37,17 @@ class TransformerCategory(pl.LightningModule):
             self.lr = config['solver']['BASE_LR']
             outdir = config['outdir']
             
-            # Get classifier hyperparameters from config
-            self.dropout_rate1 = config.get('classifier', {}).get('dropout_rate1', 0.3)
-            self.hidden_dim = config.get('classifier', {}).get('hidden_dim', 256)
-            self.label_smoothing = config.get('classifier', {}).get('label_smoothing', 0.1)
+            # Get classifier hyperparameters from config with better defaults
+            self.dropout_rate1 = config.get('classifier', {}).get('dropout_rate1', 0.5)  # Increased dropout
+            self.dropout_rate2 = config.get('classifier', {}).get('dropout_rate2', 0.3)  # Additional dropout layer
+            self.hidden_dim = config.get('classifier', {}).get('hidden_dim', 512)  # Larger hidden dim
+            self.label_smoothing = config.get('classifier', {}).get('label_smoothing', 0.05)  # Reduced for small classes
+            
+            # Training hyperparameters
+            self.weight_decay = config.get('solver', {}).get('WEIGHT_DECAY', 0.05)  # Higher weight decay
+            self.warmup_epochs = config.get('solver', {}).get('WARMUP_EPOCHS', 5)
+            self.min_lr = config.get('solver', {}).get('MIN_LR', 1e-6)
+            self.layer_decay = config.get('solver', {}).get('LAYER_DECAY', 0.65)  # LLRD factor
         else:
             self.backbone_model_name = backbone_model_name
             self.num_classes = num_classes
@@ -48,10 +56,15 @@ class TransformerCategory(pl.LightningModule):
             self.lr = lr
             outdir = outdir
             
-            # Default values if no config provided
-            self.dropout_rate1 = 0.3
-            self.hidden_dim = 256
-            self.label_smoothing = 0.1
+            # Better default values for transformer training
+            self.dropout_rate1 = 0.5
+            self.dropout_rate2 = 0.3
+            self.hidden_dim = 512
+            self.label_smoothing = 0.05  # Reduced from 0.1
+            self.weight_decay = 0.05
+            self.warmup_epochs = 5
+            self.min_lr = 1e-6
+            self.layer_decay = 0.65
 
         # Validate backbone model
         supported_models = [
@@ -68,11 +81,13 @@ class TransformerCategory(pl.LightningModule):
         if self.backbone_model_name not in supported_models:
             raise ValueError(f"Backbone model {self.backbone_model_name} not supported. Supported models: {supported_models}")
 
-        # Create backbone model
+        # Create backbone model with better initialization
         self.backbone = timm.create_model(
             self.backbone_model_name, 
             num_classes=0,  # Remove classification head
-            pretrained=pretrained
+            pretrained=pretrained,
+            drop_rate=0.1,  # Add dropout to backbone
+            drop_path_rate=0.1  # Add stochastic depth
         )
         
         # Get feature dimension from backbone
@@ -84,15 +99,20 @@ class TransformerCategory(pl.LightningModule):
                 features = features[-1]  # Use the last feature level
             feature_dim = features.shape[1] if len(features.shape) == 2 else features.flatten(1).shape[1]
         
-        # Simplified classification head for 5 classes
+        # Enhanced classification head with better regularization
         self.classifier = nn.Sequential(
             nn.Linear(feature_dim, self.hidden_dim),
+            nn.LayerNorm(self.hidden_dim),  # Add layer normalization
             nn.ReLU(),
             nn.Dropout(self.dropout_rate1),
-            nn.Linear(self.hidden_dim, self.num_classes)
+            nn.Linear(self.hidden_dim, self.hidden_dim // 2),
+            nn.LayerNorm(self.hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(self.dropout_rate2),
+            nn.Linear(self.hidden_dim // 2, self.num_classes)
         )
         
-        # Loss function with label smoothing for better generalization
+        # Loss function with reduced label smoothing for small class count
         self.criterion = nn.CrossEntropyLoss(label_smoothing=self.label_smoothing)
         
         # Comprehensive metrics for 5-class classification - use proper epoch-level metrics
@@ -109,15 +129,19 @@ class TransformerCategory(pl.LightningModule):
         self.val_preds = []
         self.val_targets = []
         
-        # Initialize weights
+        # Initialize weights with better initialization
         self.apply(self._init_weights)
     
     def _init_weights(self, module):
-        """Initialize weights for the classifier layers"""
+        """Initialize weights with better strategies for transformers"""
         if isinstance(module, nn.Linear):
-            nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+            # Use Xavier initialization for linear layers
+            nn.init.xavier_uniform_(module.weight)
             if module.bias is not None:
                 nn.init.constant_(module.bias, 0)
+        elif isinstance(module, nn.LayerNorm):
+            nn.init.constant_(module.weight, 1.0)
+            nn.init.constant_(module.bias, 0)
     
     def forward(self, x):
         """Forward pass"""
@@ -134,11 +158,15 @@ class TransformerCategory(pl.LightningModule):
         return logits
     
     def training_step(self, batch, batch_idx):
-        """Training step with support for MixUp and CutMix"""
+        """Training step with controlled augmentation"""
         images, labels = batch
         
-        # Apply MixUp or CutMix if the transform supports it
-        if hasattr(self.trainer.datamodule.train_dataset, 'transform') and hasattr(self.trainer.datamodule.train_dataset.transform, 'apply_mixup_cutmix'):
+        # Only apply MixUp/CutMix after warmup period to avoid early confusion
+        current_epoch = self.current_epoch
+        if (hasattr(self.trainer.datamodule.train_dataset, 'transform') and 
+            hasattr(self.trainer.datamodule.train_dataset.transform, 'apply_mixup_cutmix') and
+            current_epoch >= self.warmup_epochs):  # Only after warmup
+            
             images, labels_a, labels_b, lam, aug_type = self.trainer.datamodule.train_dataset.transform.apply_mixup_cutmix(images, labels)
             
             # Forward pass
@@ -155,7 +183,7 @@ class TransformerCategory(pl.LightningModule):
             # Log augmentation type
             self.log('train/aug_type', 1.0 if aug_type != 'none' else 0.0, prog_bar=False)
         else:
-            # Standard training without MixUp/CutMix
+            # Standard training without aggressive augmentation during warmup
             logits = self(images)
             loss = self.criterion(logits, labels)
             self.train_acc.update(logits.softmax(dim=-1), labels)
@@ -253,22 +281,62 @@ class TransformerCategory(pl.LightningModule):
         plt.tight_layout()
         return fig
     
+    def get_layer_groups(self):
+        """Get parameter groups for layer-wise learning rate decay"""
+        # Separate backbone and classifier parameters
+        backbone_params = []
+        classifier_params = []
+        
+        for name, param in self.named_parameters():
+            if 'backbone' in name:
+                backbone_params.append(param)
+            else:
+                classifier_params.append(param)
+        
+        return [
+            {'params': backbone_params, 'lr': self.lr * self.layer_decay},  # Lower LR for backbone
+            {'params': classifier_params, 'lr': self.lr}  # Higher LR for classifier
+        ]
+    
     def configure_optimizers(self):
-        """Configure optimizer and learning rate scheduler"""
+        """Configure optimizer and learning rate scheduler with proper transformer training"""
         if self.config:
             from utils.optimizer import get_optimizer, get_lr_scheduler_config
-            optimizer = get_optimizer(self.config, self.parameters())
+            # Use layer-wise learning rate decay when config is provided
+            param_groups = self.get_layer_groups()
+            optimizer = get_optimizer(self.config, param_groups)
             lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
             return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
         else:
-            optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=0.01)
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode='min', factor=0.5, patience=5, verbose=True
+            # Use layer-wise learning rate decay
+            param_groups = self.get_layer_groups()
+            
+            optimizer = torch.optim.AdamW(
+                param_groups, 
+                weight_decay=self.weight_decay,
+                betas=(0.9, 0.999),
+                eps=1e-8
             )
+            
+            # Cosine annealing with warmup scheduler
+            def cosine_schedule_with_warmup(epoch):
+                if epoch < self.warmup_epochs:
+                    # Linear warmup
+                    return epoch / self.warmup_epochs
+                else:
+                    # Cosine annealing
+                    progress = (epoch - self.warmup_epochs) / (self.trainer.max_epochs - self.warmup_epochs)
+                    return 0.5 * (1 + math.cos(math.pi * progress))
+            
+            scheduler = torch.optim.lr_scheduler.LambdaLR(
+                optimizer, 
+                lr_lambda=cosine_schedule_with_warmup
+            )
+            
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {
                     "scheduler": scheduler,
-                    "monitor": "val/loss",
+                    "interval": "epoch",
                 },
             } 

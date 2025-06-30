@@ -1,9 +1,9 @@
-# Configuration for Artportalen dataset with Transformer model and advanced augmentations
-# This config uses advanced augmentations (MixUp, CutMix, Random Erasing, AutoAugment) for transformer models
+# Configuration for Artportalen dataset with Optimized Transformer model
+# This config addresses common transformer training issues on small datasets
 
 # Project settings
 project_name: eagle-ageclassifier
-notes: Transformer-based age classification with 5 classes and advanced augmentations
+notes: Optimized Transformer-based age classification with improved training strategies
 use_wandb: True
 wandb_entity: winniethepooh
 outdir: results
@@ -32,28 +32,34 @@ num_workers: 8
 gpu_ids: 
 seed: 42
 
-# Data augmentation (advanced for transformer models)
+# Data augmentation (controlled for transformer models)
 transforms:
   mean: [0.485, 0.456, 0.406]  # ImageNet normalization
   std: [0.229, 0.224, 0.225]
-  use_advanced_aug: true  # Enable advanced augmentations
+  use_advanced_aug: true  # Enable advanced augmentations but controlled by warmup
 
-# Optimized classifier hyperparameters for 5 classes
+# Enhanced classifier hyperparameters for better regularization
 classifier:
-  dropout_rate1: 0.1  # Reduced dropout for simpler head
+  dropout_rate1: 0.5  # Increased dropout for better regularization
+  dropout_rate2: 0.3  # Additional dropout layer
   hidden_dim: 512     # Hidden dimension
-  label_smoothing: 0.1 # Label smoothing for better generalization
+  label_smoothing: 0.05  # Reduced for small class count (5 classes)
 
-# Solver configuration (required by train.py)
+# Solver configuration optimized for transformers
 solver:
   OPT: adamw  # adamw for transformers
-  WEIGHT_DECAY: 0.01 # Higher weight decay for transformers
+  WEIGHT_DECAY: 0.05  # Higher weight decay for better regularization
   MOMENTUM: 0.9  # only when OPT is sgd
-  BASE_LR: 0.0001 # Lower learning rate for transformers
-  LR_SCHEDULER: cosine_annealing  # step, multistep, reduce_on_plateau, cosine_annealing
+  BASE_LR: 0.0001  # Lower learning rate for transformers
+  LR_SCHEDULER: cosine_with_warmup  # New scheduler with warmup
   LR_DECAY_RATE: 0.1
   LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
   LR_STEP_MILESTONES: [30, 50, 70]  # only when LR_SCHEDULER is multistep
+  
+  # New transformer-specific parameters
+  WARMUP_EPOCHS: 5  # Warmup period before aggressive augmentation
+  MIN_LR: 1e-6  # Minimum learning rate
+  LAYER_DECAY: 0.65  # Layer-wise learning rate decay factor
   
   use_swa: False #Stochastic Weight Averaging (SWA) to help improve generalization
   swa_lr: 0.035
@@ -62,14 +68,23 @@ solver:
   lr_start: 1e-06
   lr_ramp_ep: 0
 
-# Early stopping
+# Early stopping with better monitoring
 early_stopping:
   enabled: True
-  monitor: val/acc
+  monitor: val/f1  # Monitor F1 score instead of accuracy for better model selection
   min_delta: 0.01
   patience: 15
   verbose: true
   mode: max
+
+# Regularization configuration
+regularization:
+  # Backbone regularization
+  drop_rate: 0.1  # Dropout in backbone
+  drop_path_rate: 0.1  # Stochastic depth
+  
+  # Gradient clipping
+  gradient_clip_val: 1.0
 
 # Other settings
 use_gradcam: False
@@ -80,5 +95,15 @@ re_ranking: False
 # Wandb logging
 wandb:
   project: 'eagle-id'
-  name: 'artportalen-transformer-advanced'
-  tags: ['artportalen', 'transformer', 'advanced-aug', 'age-classification'] 
+  name: 'artportalen-transformer-optimized'
+  tags: ['artportalen', 'transformer', 'optimized', 'age-classification', 'llrd', 'warmup']
+
+# Training Strategy Notes:
+# 1. Lower learning rate (1e-4) with warmup for stable training
+# 2. Higher weight decay (0.05) for better regularization
+# 3. Layer-wise learning rate decay (0.65) for backbone vs classifier
+# 4. Reduced label smoothing (0.05) for small class count
+# 5. Aggressive augmentation only after warmup period (controlled in model)
+# 6. Enhanced classifier with additional layers and normalization
+# 7. Stochastic depth and dropout in backbone for regularization
+# 8. Monitor F1 score instead of accuracy for better model selection 
