@@ -17,8 +17,8 @@ split_ratio: 0.8
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
 precompute: False
 
-model_architecture: TransformerCategory # TransformerCategory, SimpleModel (use backbone_name: resnet152)
-backbone_name: swin_base_patch4_window7_224 # swin_base_patch4_window7_224, swin_large_patch4_window7_224, vit_base_patch16_224
+model_architecture: SimpleModel # TransformerCategory, SimpleModel (use backbone_name: resnet152)
+backbone_name: resnet152 # swin_base_patch4_window7_224, swin_large_patch4_window7_224, vit_base_patch16_224
 checkpoint: 
 preprocess_lvl: 2 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
 
@@ -45,9 +45,9 @@ num_classes: 5 # 5 age classes
 
 # Optimized classifier hyperparameters for 5 classes
 classifier:
-  dropout_rate1: 0.3  # Reduced dropout for simpler head
+  dropout_rate1: 0.1  # Reduced dropout for simpler head
   hidden_dim: 256     # Smaller hidden dimension for 5 classes
-  label_smoothing: 0.1 # Label smoothing for better generalization
+  label_smoothing: 0.05 # Label smoothing for better generalization
 
 early_stopping:
   enabled: True
@@ -61,7 +61,7 @@ solver:
   OPT: adamw  # adamw for transformers
   WEIGHT_DECAY: 0.01 # Higher weight decay for transformers
   MOMENTUM: 0.9  # only when OPT is sgd
-  BASE_LR: 0.0001 # Lower learning rate for transformers
+  BASE_LR: 0.0003 # Lower learning rate for transformers
   LR_SCHEDULER: cosine_annealing  # step, multistep, reduce_on_plateau, cosine_annealing
   LR_DECAY_RATE: 0.1
   LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
