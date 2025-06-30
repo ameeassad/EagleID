@@ -36,14 +36,14 @@ seed: 42
 transforms:
   mean: [0.485, 0.456, 0.406]  # ImageNet normalization
   std: [0.229, 0.224, 0.225]
-  use_advanced_aug: true  # Enable advanced augmentations but controlled by warmup
+  use_advanced_aug: false  # Disable advanced augmentations for first 10 epochs
 
 # Enhanced classifier hyperparameters for better regularization
 classifier:
   dropout_rate1: 0.5  # Increased dropout for better regularization
   dropout_rate2: 0.3  # Additional dropout layer
   hidden_dim: 512     # Hidden dimension
-  label_smoothing: 0.05  # Reduced for small class count (5 classes)
+  label_smoothing: 0.0  # Remove label smoothing for small class count (5 classes)
 
 # Solver configuration optimized for transformers
 solver:
@@ -58,8 +58,10 @@ solver:
   
   # New transformer-specific parameters
   WARMUP_EPOCHS: 5  # Warmup period before aggressive augmentation
+  WARMUP_FREEZE: 5  # Freeze backbone for first 5 epochs
   MIN_LR: 1e-6  # Minimum learning rate
   LAYER_DECAY: 0.65  # Layer-wise learning rate decay factor
+  HEAD_LR_MULTIPLIER: 5.0  # Head learning rate multiplier (5x higher than backbone)
   
   use_swa: False #Stochastic Weight Averaging (SWA) to help improve generalization
   swa_lr: 0.035
@@ -96,14 +98,16 @@ re_ranking: False
 wandb:
   project: 'eagle-id'
   name: 'artportalen-transformer-optimized'
-  tags: ['artportalen', 'transformer', 'optimized', 'age-classification', 'llrd', 'warmup']
+  tags: ['artportalen', 'transformer', 'optimized', 'age-classification', 'llrd', 'warmup', 'freeze']
 
 # Training Strategy Notes:
 # 1. Lower learning rate (1e-4) with warmup for stable training
 # 2. Higher weight decay (0.05) for better regularization
 # 3. Layer-wise learning rate decay (0.65) for backbone vs classifier
-# 4. Reduced label smoothing (0.05) for small class count
+# 4. Removed label smoothing (0.0) for small class count
 # 5. Aggressive augmentation only after warmup period (controlled in model)
 # 6. Enhanced classifier with additional layers and normalization
 # 7. Stochastic depth and dropout in backbone for regularization
-# 8. Monitor F1 score instead of accuracy for better model selection 
+# 8. Monitor F1 score instead of accuracy for better model selection
+# 9. Freeze backbone for first 5 epochs to let classifier learn first
+# 10. Head learning rate 5x higher than backbone for better convergence 

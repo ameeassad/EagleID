@@ -22,6 +22,7 @@ from models.resnet_plus_model import ResNetPlusModel
 from models.triplet_loss_model import TripletModel
 from utils.gradcam_callback import GradCAMCallback
 from utils.viz_callback import SimilarityVizCallback
+from utils.augmentation_callback import AugmentationCallback
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Train classifier.')
@@ -56,6 +57,12 @@ def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
         save_last=True,
     )
     callbacks = [ckpt_callback, lr_callback]
+
+    # Add augmentation callback for transformer models
+    if config.get('model_architecture') == 'TransformerCategory':
+        # Enable advanced augmentations after epoch 10
+        aug_callback = AugmentationCallback(enable_epoch=10)
+        callbacks.append(aug_callback)
 
     if config['early_stopping']['enabled']==True:
         early_stop_callback = EarlyStopping(

@@ -207,16 +207,17 @@ class TransformerRGBTransforms:
     Designed to work with the resize_and_pad pipeline.
     """
     def __init__(self, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5), 
-                 mixup_alpha=0.2, cutmix_alpha=1.0, mixup_prob=0.3, cutmix_prob=0.3,
-                 random_erasing_prob=0.3, advanced_aug_prob=0.8):
+                 mixup_alpha=0.2, cutmix_alpha=1.0, mixup_prob=0.0, cutmix_prob=0.0,
+                 random_erasing_prob=0.3, advanced_aug_prob=0.0):
         self.mean = mean
         self.std = std
         self.mixup_alpha = mixup_alpha
         self.cutmix_alpha = cutmix_alpha
-        self.mixup_prob = mixup_prob
-        self.cutmix_prob = cutmix_prob
+        self.mixup_prob = mixup_prob  # Start with 0 probability
+        self.cutmix_prob = cutmix_prob  # Start with 0 probability
         self.random_erasing_prob = random_erasing_prob
-        self.advanced_aug_prob = advanced_aug_prob
+        self.advanced_aug_prob = advanced_aug_prob  # Start with 0 probability
+        self.use_advanced_aug = False  # Flag to control advanced augmentations
         
         # Advanced augmentations
         self.advanced_transforms = get_advanced_transforms()
@@ -252,8 +253,8 @@ class TransformerRGBTransforms:
         if random.random() < 0.8:
             rgb_img = self.basic_transforms(image=rgb_img)['image']
         
-        # Apply advanced augmentations
-        if random.random() < self.advanced_aug_prob:
+        # Apply advanced augmentations only if enabled
+        if self.use_advanced_aug and random.random() < self.advanced_aug_prob:
             rgb_img = self.advanced_transforms(image=rgb_img)['image']
         
         # Normalization

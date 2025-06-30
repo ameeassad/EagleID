@@ -41,13 +41,15 @@ class TransformerCategory(pl.LightningModule):
             self.dropout_rate1 = config.get('classifier', {}).get('dropout_rate1', 0.5)  # Increased dropout
             self.dropout_rate2 = config.get('classifier', {}).get('dropout_rate2', 0.3)  # Additional dropout layer
             self.hidden_dim = config.get('classifier', {}).get('hidden_dim', 512)  # Larger hidden dim
-            self.label_smoothing = config.get('classifier', {}).get('label_smoothing', 0.05)  # Reduced for small classes
+            self.label_smoothing = config.get('classifier', {}).get('label_smoothing', 0.0)  # Removed for small classes
             
             # Training hyperparameters
             self.weight_decay = config.get('solver', {}).get('WEIGHT_DECAY', 0.05)  # Higher weight decay
             self.warmup_epochs = config.get('solver', {}).get('WARMUP_EPOCHS', 5)
+            self.warmup_freeze = config.get('solver', {}).get('WARMUP_FREEZE', 5)  # Freeze backbone for first N epochs
             self.min_lr = config.get('solver', {}).get('MIN_LR', 1e-6)
             self.layer_decay = config.get('solver', {}).get('LAYER_DECAY', 0.65)  # LLRD factor
+            self.head_lr_multiplier = config.get('solver', {}).get('HEAD_LR_MULTIPLIER', 5.0)  # Head LR multiplier
         else:
             self.backbone_model_name = backbone_model_name
             self.num_classes = num_classes
@@ -60,11 +62,13 @@ class TransformerCategory(pl.LightningModule):
             self.dropout_rate1 = 0.5
             self.dropout_rate2 = 0.3
             self.hidden_dim = 512
-            self.label_smoothing = 0.05  # Reduced from 0.1
+            self.label_smoothing = 0.0  # Removed label smoothing
             self.weight_decay = 0.05
             self.warmup_epochs = 5
+            self.warmup_freeze = 5
             self.min_lr = 1e-6
             self.layer_decay = 0.65
+            self.head_lr_multiplier = 5.0
 
         # Validate backbone model
         supported_models = [
@@ -112,7 +116,7 @@ class TransformerCategory(pl.LightningModule):
             nn.Linear(self.hidden_dim // 2, self.num_classes)
         )
         
-        # Loss function with reduced label smoothing for small class count
+        # Loss function with removed label smoothing for small class count
         self.criterion = nn.CrossEntropyLoss(label_smoothing=self.label_smoothing)
         
         # Comprehensive metrics for 5-class classification - use proper epoch-level metrics
@@ -156,6 +160,27 @@ class TransformerCategory(pl.LightningModule):
         # Classification
         logits = self.classifier(features)
         return logits
+    
+    def on_train_start(self):
+        """Freeze backbone for the first few epochs to let classifier learn first"""
+        print(f"Freezing backbone for first {self.warmup_freeze} epochs")
+        for param in self.backbone.parameters():
+            param.requires_grad = False
+        
+        # Log the freezing state
+        if hasattr(self, 'log'):
+            self.log('train/backbone_frozen', 1.0, prog_bar=False)
+    
+    def on_train_epoch_start(self):
+        """Unfreeze backbone after warmup_freeze epochs"""
+        if self.current_epoch == self.warmup_freeze:
+            print(f"Unfreezing backbone at epoch {self.current_epoch}")
+            for param in self.backbone.parameters():
+                param.requires_grad = True
+            
+            # Log the unfreezing state
+            if hasattr(self, 'log'):
+                self.log('train/backbone_frozen', 0.0, prog_bar=False)
     
     def training_step(self, batch, batch_idx):
         """Training step with controlled augmentation"""
@@ -282,7 +307,7 @@ class TransformerCategory(pl.LightningModule):
         return fig
     
     def get_layer_groups(self):
-        """Get parameter groups for layer-wise learning rate decay"""
+        """Get parameter groups for layer-wise learning rate decay with higher head LR"""
         # Separate backbone and classifier parameters
         backbone_params = []
         classifier_params = []
@@ -295,7 +320,7 @@ class TransformerCategory(pl.LightningModule):
         
         return [
             {'params': backbone_params, 'lr': self.lr * self.layer_decay},  # Lower LR for backbone
-            {'params': classifier_params, 'lr': self.lr}  # Higher LR for classifier
+            {'params': classifier_params, 'lr': self.lr * self.head_lr_multiplier}  # Higher LR for classifier
         ]
     
     def configure_optimizers(self):
