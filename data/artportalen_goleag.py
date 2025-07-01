@@ -336,9 +336,7 @@ class EagleDataset(Dataset):
         annot_info = self.dataframe.iloc[idx]
         img_path = os.path.join(self.data_dir, str(annot_info['file_name']))
         annot_id = annot_info['id']
-        label = annot_info['category_id'] - 1 
-        if self.test:
-            label = annot_info['category_id']
+        label = annot_info['category_id']
 
         # Check cache for precomputed mask and skeleton
         cache_exists = False
