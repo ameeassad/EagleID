@@ -19,7 +19,7 @@ precompute: False
 
 model_architecture: AgeModel # TransformerCategory, SimpleModel, AgeModel (use backbone_name: resnet152)
 backbone_name: resnet152 # swin_base_patch4_window7_224, swin_large_patch4_window7_224, vit_base_patch16_224
-checkpoint: /proj/nobackup/aiforeagles/ageclass-model.ckpt
+checkpoint: 
 preprocess_lvl: 2 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
 
 batch_size: 128 # Smaller batch size for transformer models

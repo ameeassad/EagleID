@@ -195,7 +195,7 @@ if __name__ == '__main__':
         config['only_cache'] = [config['only_cache'], config['only_cache']]
 
     if config['use_wandb']:
-        wandb.init(project=config['project_name'])
+        wandb.init(project=config['project_name'], settings=wandb.Settings(_disable_artifacts=True))
         wandb.config.update(config)
         print(config)
         # wandb.define_metric("val/mAP", summary="max")
