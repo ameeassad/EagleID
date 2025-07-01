@@ -87,6 +87,7 @@ class AgeModel(pl.LightningModule):
     def validation_step(self, batch, _):
         x, y = batch
         logits = self(x)
+        assert y.min() >= 0 and y.max() < self.num_classes, f"Labels must be in [0, {self.num_classes-1}], got min {y.min().item()}, max {y.max().item()}"
         levels = levels_from_labelbatch(y, self.num_classes).to(logits.device)
 
         loss = self.coral_loss(logits, levels).mean()
