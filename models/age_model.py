@@ -51,13 +51,7 @@ class AgeModel(pl.LightningModule):
         self.val_top2  = Accuracy(task="multiclass", num_classes=self.num_classes, top_k=2)
         self.val_mae   = MeanAbsoluteError()
 
-    # ---------- forward ----------
-    def forward(self, x):
-        features = self.backbone.forward_features(x)
-        if features.ndim == 4:
-            features = features.mean(dim=[2, 3])  # Global average pool
-        logits = self.coral(features)
-        return logits
+
 
     # ---------- helpers ----------
     @staticmethod
@@ -68,7 +62,30 @@ class AgeModel(pl.LightningModule):
         prob_gt = torch.cat([prob_gt, torch.ones_like(prob_gt[:, :1])], dim=1)      # pad right with 1
         prob_shift = torch.cat([torch.ones_like(prob_gt[:, :1]), prob_gt], dim=1)   # pad left with 1
         class_probs = prob_shift[:, :-1] - prob_shift[:, 1:]        # P(y == k)
+        
+        # Debug: Print logits and probabilities for first few samples
+        if logits.shape[0] > 0:
+            print(f"DEBUG: Logits shape: {logits.shape}")
+            print(f"DEBUG: Sample logits: {logits[0]}")
+            print(f"DEBUG: Sample prob_gt: {prob_gt[0]}")
+            print(f"DEBUG: Sample class_probs: {class_probs[0]}")
+            print(f"DEBUG: Sample argmax: {class_probs[0].argmax().item()}")
+        
         return class_probs.argmax(dim=1)
+    
+    def forward(self, x):
+        features = self.backbone.forward_features(x)
+        if features.ndim == 4:
+            features = features.mean(dim=[2, 3])  # Global average pool
+        logits = self.coral(features)
+        
+        # Debug: Print feature and logit statistics
+        if x.shape[0] > 0 and self.current_epoch == 0:
+            print(f"DEBUG: Features shape: {features.shape}")
+            print(f"DEBUG: Features stats: min={features.min().item():.4f}, max={features.max().item():.4f}, mean={features.mean().item():.4f}")
+            print(f"DEBUG: Logits stats: min={logits.min().item():.4f}, max={logits.max().item():.4f}, mean={logits.mean().item():.4f}")
+        
+        return logits
 
     # ---------- training ----------
     def training_step(self, batch, _):
@@ -106,6 +123,10 @@ class AgeModel(pl.LightningModule):
         self.val_f1.update(pred, y)
         self.val_top2.update(torch.softmax(torch.nn.functional.pad(logits, (0,1), value=0),
                                            dim=-1), y)   # rebuild 5-way probs for top-k
+        
+        # Ensure MAE metric is on the same device as predictions
+        if self.val_mae.device != pred.device:
+            self.val_mae = self.val_mae.to(pred.device)
         self.val_mae.update(pred, y)
 
         self.log("val/loss", loss, prog_bar=True)
