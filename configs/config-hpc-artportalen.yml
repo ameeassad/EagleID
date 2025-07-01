@@ -17,7 +17,7 @@ split_ratio: 0.8
 only_cache: True # if only_cache, will not run mmpose inference / segmentation and will only use cache results
 precompute: False
 
-model_architecture: SimpleModel # TransformerCategory, SimpleModel (use backbone_name: resnet152)
+model_architecture: AgeModel # TransformerCategory, SimpleModel, AgeModel (use backbone_name: resnet152)
 backbone_name: resnet152 # swin_base_patch4_window7_224, swin_large_patch4_window7_224, vit_base_patch16_224
 checkpoint: 
 preprocess_lvl: 2 # 0: no preprocess, 1: bbox, 2: mask, 3: skeleton, 4: components, 5: heatmaps
@@ -47,11 +47,11 @@ num_classes: 5 # 5 age classes
 classifier:
   dropout_rate1: 0.1  # Reduced dropout for simpler head
   hidden_dim: 256     # Smaller hidden dimension for 5 classes
-  label_smoothing: 0.05 # Label smoothing for better generalization
+  label_smoothing: 0
 
 early_stopping:
   enabled: True
-  monitor: val/acc
+  monitor: val/loss
   min_delta: 0.01
   patience: 15
   verbose: true

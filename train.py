@@ -13,6 +13,7 @@ import wandb
 
 from data.combined_datasets import get_dataset
 from models.simple_model import SimpleModel
+from models.age_model import AgeModel
 from models.fusion_model import FusionModel
 from models.megadescriptor import MegaDescriptor
 from models.transformer_model import TransformerModel
@@ -212,6 +213,7 @@ if __name__ == '__main__':
         'EfficientNet': EfficientNet,
         'MegaDescriptor': MegaDescriptor,
         'ResNetPlusModel': ResNetPlusModel,
+        'AgeModel': AgeModel,
     }
     model_name = config['model_architecture']
     model_class = model_classes.get(model_name)
