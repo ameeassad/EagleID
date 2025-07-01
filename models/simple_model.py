@@ -125,3 +125,8 @@ class SimpleModel(LightningModule):
         optimizer = get_optimizer(self.config, self.parameters())
         lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
+
+    @staticmethod
+    def logits_to_pred(logits):
+        """Convert CORAL logits to predicted class index (0-indexed)."""
+        return (torch.sigmoid(logits) > 0.5).sum(1) - 1

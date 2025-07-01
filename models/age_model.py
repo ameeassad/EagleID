@@ -61,13 +61,15 @@ class AgeModel(pl.LightningModule):
     # ---------- helpers ----------
     @staticmethod
     def logits_to_pred(logits):
-        """Convert CORAL logits to predicted class index."""
-        return (torch.sigmoid(logits) > 0.5).sum(1)
+        """Convert CORAL logits to predicted class index (0-indexed)."""
+        return (torch.sigmoid(logits) > 0.5).sum(1) - 1
 
     # ---------- training ----------
     def training_step(self, batch, _):
         x, y = batch
         logits = self(x)
+        # Ensure y is 0-indexed for levels_from_labelbatch
+        assert y.min() >= 0, f"Labels must be 0-indexed, got min label {y.min()}"
         levels = levels_from_labelbatch(y, self.num_classes).to(logits.device)
 
         loss = self.coral_loss(logits, levels)

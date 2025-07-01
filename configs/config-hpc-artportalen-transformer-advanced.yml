@@ -61,7 +61,7 @@ solver:
   WARMUP_FREEZE: 0  # Freeze backbone for first 5 epochs (match warmup)
   MIN_LR: 1e-6  # Minimum learning rate
   LAYER_DECAY: 0.65  # Layer-wise learning rate decay factor
-  HEAD_LR_MULTIPLIER: 10  # Head learning rate multiplier (5x higher than backbone)
+  HEAD_LR_MULTIPLIER: 2  # Head learning rate multiplier (should be 1-2 for CORAL; too high causes bias collapse)
   
   use_swa: False #Stochastic Weight Averaging (SWA) to help improve generalization
   swa_lr: 0.035
@@ -99,4 +99,9 @@ wandb:
   project: 'eagle-id'
   name: 'artportalen-transformer-optimized'
   tags: ['artportalen', 'transformer', 'optimized', 'age-classification', 'llrd', 'warmup', 'freeze']
+
+# CORAL notes:
+# - logits_to_pred should be (torch.sigmoid(logits) > 0.5).sum(1) - 1 (off-by-one bug is common)
+# - levels_from_labelbatch expects 0-indexed labels; check your CSV and dataset
+# - Label column must be integer and 0-indexed; see label check/assertion in data loader
 

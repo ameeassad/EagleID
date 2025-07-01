@@ -163,6 +163,11 @@ class ArtportalenDataModule(pl.LightningDataModule):
          # Load the CSV files
         train_df = pd.read_csv(train_csv)
         val_df = pd.read_csv(val_csv)
+        # Label check/assertion
+        print('Unique train labels:', sorted(train_df['category_id'].unique()))
+        print('Unique val labels:', sorted(val_df['category_id'].unique()))
+        assert train_df['category_id'].min() == 0, f"Train labels must be 0-indexed, got min {train_df['category_id'].min()}"
+        assert val_df['category_id'].min() == 0, f"Val labels must be 0-indexed, got min {val_df['category_id'].min()}"
 
         # Columns renaming
         column_names = {

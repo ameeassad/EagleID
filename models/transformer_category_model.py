@@ -182,9 +182,8 @@ class TransformerCategory(pl.LightningModule):
                 self.log('train/backbone_frozen', 0.0, prog_bar=False)
     
     def _decode(self, logits):
-        """Convert cumulative logits → rank label (integer class index)"""
-        probas = torch.sigmoid(logits)
-        return proba_to_label(probas)
+        """Convert cumulative logits → rank label (integer class index, 0-indexed for CORAL)."""
+        return (torch.sigmoid(logits) > 0.5).sum(1) - 1
 
     def training_step(self, batch, batch_idx):
         """Training step for CORAL ordinal regression (no MixUp/CutMix)"""
