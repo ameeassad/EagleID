@@ -40,8 +40,8 @@ transforms:
 
 # Enhanced classifier hyperparameters for better regularization
 classifier:
-  dropout_rate1: 0.5  # Increased dropout for better regularization
-  dropout_rate2: 0.3  # Additional dropout layer
+  dropout_rate1: 0.3  # Increased dropout for better regularization
+  dropout_rate2: 0.0  # Additional dropout layer
   hidden_dim: 512     # Hidden dimension
   label_smoothing: 0.0  # Remove label smoothing for small class count (5 classes)
 
@@ -50,7 +50,7 @@ solver:
   OPT: adamw  # adamw for transformers
   WEIGHT_DECAY: 0.05  # Higher weight decay for better regularization
   MOMENTUM: 0.9  # only when OPT is sgd
-  BASE_LR: 0.0001  # Lower learning rate for transformers
+  BASE_LR: 0.0003  # Lower learning rate for transformers
   LR_SCHEDULER: cosine_with_warmup  # New scheduler with warmup
   LR_DECAY_RATE: 0.1
   LR_STEP_SIZE: 10  # only when LR_SCHEDULER is step
@@ -58,10 +58,10 @@ solver:
   
   # New transformer-specific parameters
   WARMUP_EPOCHS: 5  # Warmup period before aggressive augmentation
-  WARMUP_FREEZE: 5  # Freeze backbone for first 5 epochs
+  WARMUP_FREEZE: 2  # Freeze backbone for first 5 epochs
   MIN_LR: 1e-6  # Minimum learning rate
   LAYER_DECAY: 0.65  # Layer-wise learning rate decay factor
-  HEAD_LR_MULTIPLIER: 5.0  # Head learning rate multiplier (5x higher than backbone)
+  HEAD_LR_MULTIPLIER: 10  # Head learning rate multiplier (5x higher than backbone)
   
   use_swa: False #Stochastic Weight Averaging (SWA) to help improve generalization
   swa_lr: 0.035
@@ -73,7 +73,7 @@ solver:
 # Early stopping with better monitoring
 early_stopping:
   enabled: True
-  monitor: val/f1  # Monitor F1 score instead of accuracy for better model selection
+  monitor: val/loss 
   min_delta: 0.01
   patience: 15
   verbose: true

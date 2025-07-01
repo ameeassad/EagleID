@@ -214,7 +214,9 @@ class TransformerCategory(pl.LightningModule):
             self.train_acc.update(logits.softmax(dim=-1), labels)
         
         # Log loss (this updates every step)
-        self.log('train/loss', loss, prog_bar=True)
+        self.log('train/loss_step',  loss, on_step=True, prog_bar=True,  logger=True)
+        self.log('train/loss_epoch', loss, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+
         
         return loss
     

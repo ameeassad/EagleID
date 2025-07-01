@@ -1,81 +1,118 @@
-import torch
-import torch.nn as nn
-import timm
-from pytorch_lightning import LightningModule
+import torch, torch.nn as nn, timm
+import pytorch_lightning as pl
 from torchmetrics import Accuracy, Precision, Recall, F1Score
 from coral_pytorch.layers import CoralLayer
 from coral_pytorch.losses import CoralLoss
+from coral_pytorch.dataset import levels_from_labelbatch
 
-class AgeModel(LightningModule):
+class AgeModel(pl.LightningModule):
     def __init__(self, config: dict, pretrained: bool = False, num_classes: int | None = None):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
 
-        if num_classes is None:
-            num_classes = config.get('num_classes', 5)  # Default to 5 if not in config
-        self.num_classes = num_classes
+        self.num_classes = num_classes or config.get("num_classes", 5)
 
-        # Backbone without classifier
-        self.model = timm.create_model(model_name=config['backbone_name'], pretrained=pretrained, num_classes=0)
+        # ---------------- backbone -----------------
+        self.backbone = timm.create_model(
+            config["backbone_name"],
+            pretrained=pretrained,
+            num_classes=0          # strip original head
+        )
+        feat_dim = self.backbone.num_features
 
-        # If skeleton, accept 4 channels instead of 3
-        if config['preprocess_lvl'] == 3 and config['backbone_name'].startswith('resnet'):
-            self.model.conv1 = nn.Conv2d(4, self.model.conv1.out_channels, kernel_size=self.model.conv1.kernel_size,
-                                         stride=self.model.conv1.stride, padding=self.model.conv1.padding, bias=False)
+        # accept 4-channel input if needed
+        if (config["preprocess_lvl"] == 3
+                and config["backbone_name"].startswith("resnet")):
+            self.backbone.conv1 = nn.Conv2d(
+                4, self.backbone.conv1.out_channels,
+                kernel_size=self.backbone.conv1.kernel_size,
+                stride=self.backbone.conv1.stride,
+                padding=self.backbone.conv1.padding,
+                bias=False,
+            )
 
-        # CORAL layer: output K-1 logits for K ordinal classes
-        feature_dim = self.model.num_features
-        self.model.reset_classifier(0)  # Remove original classifier
-        self.coral = CoralLayer(feature_dim, num_classes)
+        # ---------------- CORAL head ----------------
+        self.coral = CoralLayer(feat_dim, self.num_classes)
 
-        # Class balancing weights (from config or uniform)
-        class_weights = config.get('class_weights', [1.0] * (num_classes - 1))
-        self.class_weights = torch.tensor(class_weights, dtype=torch.float32)
-        self.coral_loss = CoralLoss(num_classes=num_classes, class_weights=self.class_weights)
+        # ---------------- loss ----------------------
+        self.coral_loss = CoralLoss()          # no kwargs
+        # optional manual class weighting (vector len = K)
+        cw = torch.tensor(config.get("class_weights",
+                                     [1.0] * self.num_classes))
+        self.register_buffer("class_weights", cw)
 
-        # Metrics
-        self.train_acc = Accuracy(task='multiclass', num_classes=num_classes)
-        self.val_acc = Accuracy(task='multiclass', num_classes=num_classes)
-        self.val_precision = Precision(task='multiclass', num_classes=num_classes, average='macro')
-        self.val_recall = Recall(task='multiclass', num_classes=num_classes, average='macro')
-        self.val_f1 = F1Score(task='multiclass', num_classes=num_classes, average='macro')
-        self.val_top2 = Accuracy(task='multiclass', num_classes=num_classes, top_k=2)
+        # ---------------- metrics ------------------
+        self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+        self.val_acc   = Accuracy(task="multiclass", num_classes=self.num_classes)
+        self.val_prec  = Precision(task="multiclass", num_classes=self.num_classes, average="macro")
+        self.val_rec   = Recall(task="multiclass", num_classes=self.num_classes, average="macro")
+        self.val_f1    = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
+        self.val_top2  = Accuracy(task="multiclass", num_classes=self.num_classes, top_k=2)
 
+    # ---------- forward ----------
     def forward(self, x):
-        features = self.model.forward_features(x)
-        logits = self.coral(features)
+        feats  = self.backbone.forward_features(x)
+        logits = self.coral(feats)               # (B, K-1)
         return logits
 
-    def training_step(self, batch, batch_idx):
-        x, target = batch
+    # ---------- helpers ----------
+    @staticmethod
+    def logits_to_pred(logits):
+        """Convert CORAL logits to predicted class index."""
+        return (torch.sigmoid(logits) > 0.5).sum(1)
+
+    # ---------- training ----------
+    def training_step(self, batch, _):
+        x, y = batch
         logits = self(x)
-        loss = self.coral_loss(logits, target)
-        pred = (logits > 0).sum(dim=1)
-        acc = self.train_acc(pred, target)
-        self.log('train/loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        self.log('train/acc', acc, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        levels = levels_from_labelbatch(y, self.num_classes).to(logits.device)
+
+        loss = self.coral_loss(logits, levels)
+        loss = loss * self.class_weights[y]      # manual weighting (optional)
+        loss = loss.mean()
+
+        pred = self.logits_to_pred(logits)
+        acc  = self.train_acc(pred, y)
+
+        self.log("train/loss", loss,  on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train/acc",  acc,   on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
-    def validation_step(self, batch, batch_idx):
-        x, target = batch
+    # ---------- validation ----------
+    def validation_step(self, batch, _):
+        x, y = batch
         logits = self(x)
-        loss = self.coral_loss(logits, target)
-        pred = (logits > 0).sum(dim=1)
-        acc = self.val_acc(pred, target)
-        precision = self.val_precision(pred, target)
-        recall = self.val_recall(pred, target)
-        f1 = self.val_f1(pred, target)
-        top2 = self.val_top2(logits, target)
-        self.log('val/loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val/acc', acc, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val/precision', precision, on_step=False, on_epoch=True, prog_bar=False, logger=True)
-        self.log('val/recall', recall, on_step=False, on_epoch=True, prog_bar=False, logger=True)
-        self.log('val/f1', f1, on_step=False, on_epoch=True, prog_bar=False, logger=True)
-        self.log('val/top2_acc', top2, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        levels = levels_from_labelbatch(y, self.num_classes).to(logits.device)
+
+        loss = self.coral_loss(logits, levels).mean()
+        pred = self.logits_to_pred(logits)
+
+        # metrics
+        self.val_acc.update(pred, y)
+        self.val_prec.update(pred, y)
+        self.val_rec.update(pred, y)
+        self.val_f1.update(pred, y)
+        self.val_top2.update(torch.softmax(torch.nn.functional.pad(logits, (0,1), value=0),
+                                           dim=-1), y)   # rebuild 5-way probs for top-k
+
+        self.log("val/loss", loss, prog_bar=True)
         return loss
 
+    def on_validation_epoch_end(self):
+        self.log_dict({
+            "val/acc":  self.val_acc.compute(),
+            "val/precision": self.val_prec.compute(),
+            "val/recall":    self.val_rec.compute(),
+            "val/f1":        self.val_f1.compute(),
+            "val/top2_acc":  self.val_top2.compute(),
+        }, prog_bar=True)
+        for m in (self.val_acc, self.val_prec, self.val_rec, self.val_f1, self.val_top2):
+            m.reset()
+
+    # ---------- optim ---------
     def configure_optimizers(self):
-        optimizer = get_optimizer(self.config, self.parameters())
-        lr_scheduler_config = get_lr_scheduler_config(self.config, optimizer)
-        return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config} 
+        from utils.optimizer import get_optimizer, get_lr_scheduler_config
+        opt = get_optimizer(self.config, self.parameters())
+        sched = get_lr_scheduler_config(self.config, opt)
+        return {"optimizer": opt, "lr_scheduler": sched}
