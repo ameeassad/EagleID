@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-from torchmetrics import Accuracy, Precision, Recall, F1Score, MeanAbsoluteError, QuadraticWeightedKappa
+from torchmetrics import Accuracy, Precision, Recall, F1Score, MeanAbsoluteError
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -134,7 +134,6 @@ class TransformerCategory(pl.LightningModule):
         self.train_acc = Accuracy(task='multiclass', num_classes=self.num_classes)
         self.val_acc = Accuracy(task='multiclass', num_classes=self.num_classes)
         self.val_mae = MeanAbsoluteError()
-        self.val_qwk = QuadraticWeightedKappa(num_classes=self.num_classes)
         self.val_precision = Precision(task="multiclass", num_classes=self.num_classes, average="macro")
         self.val_recall = Recall(task="multiclass", num_classes=self.num_classes, average="macro")
         self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
@@ -216,7 +215,6 @@ class TransformerCategory(pl.LightningModule):
         preds = self._decode(logits)
         self.val_acc.update(preds, labels)
         self.val_mae.update(preds, labels)
-        self.val_qwk.update(preds, labels)
         self.val_precision.update(preds, labels)
         self.val_recall.update(preds, labels)
         self.val_f1.update(preds, labels)
@@ -229,22 +227,10 @@ class TransformerCategory(pl.LightningModule):
         """End of validation epoch - compute and log all metrics"""
         acc = self.val_acc.compute()
         mae = self.val_mae.compute()
-        qwk = self.val_qwk.compute()
-        precision = self.val_precision.compute()
-        recall = self.val_recall.compute()
-        f1 = self.val_f1.compute()
         self.log('val/acc', acc, prog_bar=True)
         self.log('val/mae', mae, prog_bar=True)
-        self.log('val/qwk', qwk, prog_bar=True)
-        self.log('val/precision', precision, prog_bar=False)
-        self.log('val/recall', recall, prog_bar=False)
-        self.log('val/f1', f1, prog_bar=False)
         self.val_acc.reset()
         self.val_mae.reset()
-        self.val_qwk.reset()
-        self.val_precision.reset()
-        self.val_recall.reset()
-        self.val_f1.reset()
         if len(self.val_preds) > 0:
             cm = confusion_matrix(self.val_targets, self.val_preds)
             self.val_preds = []
