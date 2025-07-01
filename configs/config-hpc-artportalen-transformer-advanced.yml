@@ -58,7 +58,7 @@ solver:
   
   # New transformer-specific parameters
   WARMUP_EPOCHS: 5  # Warmup period before aggressive augmentation
-  WARMUP_FREEZE: 5  # Freeze backbone for first 5 epochs (match warmup)
+  WARMUP_FREEZE: 0  # Freeze backbone for first 5 epochs (match warmup)
   MIN_LR: 1e-6  # Minimum learning rate
   LAYER_DECAY: 0.65  # Layer-wise learning rate decay factor
   HEAD_LR_MULTIPLIER: 10  # Head learning rate multiplier (5x higher than backbone)
@@ -82,8 +82,8 @@ early_stopping:
 # Regularization configuration
 regularization:
   # Backbone regularization
-  drop_rate: 0.1  # Dropout in backbone
-  drop_path_rate: 0.05  # Stochastic depth (reduced for less regularization)
+  drop_rate: 0.05  # Dropout in backbone
+  drop_path_rate: 0  # Stochastic depth (reduced for less regularization)
   
   # Gradient clipping
   gradient_clip_val: 1.0

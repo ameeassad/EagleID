@@ -13,8 +13,7 @@ import math
 
 from coral_pytorch.layers import CoralLayer
 from coral_pytorch.losses import CoralLoss
-from coral_pytorch.dataset import levels_from_labels, coral_label_from_logits
-
+from coral_pytorch.dataset import coral_label_from_logits
 
 class TransformerCategory(pl.LightningModule):
     """
