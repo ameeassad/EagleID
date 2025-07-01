@@ -25,6 +25,8 @@ from utils.gradcam_callback import GradCAMCallback
 from utils.viz_callback import SimilarityVizCallback
 from utils.augmentation_callback import AugmentationCallback
 
+os.environ['WANDB_ARTIFACT_CACHE_SIZE'] = '800MB'
+
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Train classifier.')
     parser.add_argument(
@@ -195,7 +197,7 @@ if __name__ == '__main__':
         config['only_cache'] = [config['only_cache'], config['only_cache']]
 
     if config['use_wandb']:
-        wandb.init(project=config['project_name'], settings=wandb.Settings(_disable_artifacts=True))
+        wandb.init(project=config['project_name'])
         wandb.config.update(config)
         print(config)
         # wandb.define_metric("val/mAP", summary="max")
