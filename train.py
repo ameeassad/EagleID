@@ -27,6 +27,8 @@ from utils.augmentation_callback import AugmentationCallback
 from utils.wandb_cleanup_callback import WandbCacheCleanupCallback
 from utils.confusion_matrix_callback import ConfusionMatrixCallback
 
+os.environ['WANDB_ARTIFACT_CACHE_SIZE'] = '3GB'
+
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Train classifier.')

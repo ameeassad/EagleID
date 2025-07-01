@@ -1,6 +1,6 @@
 import torch, torch.nn as nn, timm
 import pytorch_lightning as pl
-from torchmetrics import Accuracy, Precision, Recall, F1Score
+from torchmetrics import Accuracy, Precision, Recall, F1Score, MeanAbsoluteError
 from coral_pytorch.layers import CoralLayer
 from coral_pytorch.losses import CoralLoss
 from coral_pytorch.dataset import levels_from_labelbatch
@@ -49,6 +49,7 @@ class AgeModel(pl.LightningModule):
         self.val_rec   = Recall(task="multiclass", num_classes=self.num_classes, average="macro")
         self.val_f1    = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
         self.val_top2  = Accuracy(task="multiclass", num_classes=self.num_classes, top_k=2)
+        self.val_mae   = MeanAbsoluteError()
 
     # ---------- forward ----------
     def forward(self, x):
@@ -62,7 +63,12 @@ class AgeModel(pl.LightningModule):
     @staticmethod
     def logits_to_pred(logits):
         """Convert CORAL logits to predicted class index (0-indexed)."""
-        return (torch.sigmoid(logits) > 0.5).sum(1) - 1
+        # logits: [B, K-1]
+        prob_gt = torch.sigmoid(logits)              # P(y > t)
+        prob_gt = torch.cat([prob_gt, torch.ones_like(prob_gt[:, :1])], dim=1)      # pad right with 1
+        prob_shift = torch.cat([torch.ones_like(prob_gt[:, :1]), prob_gt], dim=1)   # pad left with 1
+        class_probs = prob_shift[:, :-1] - prob_shift[:, 1:]        # P(y == k)
+        return class_probs.argmax(dim=1)
 
     # ---------- training ----------
     def training_step(self, batch, _):
@@ -100,11 +106,13 @@ class AgeModel(pl.LightningModule):
         self.val_f1.update(pred, y)
         self.val_top2.update(torch.softmax(torch.nn.functional.pad(logits, (0,1), value=0),
                                            dim=-1), y)   # rebuild 5-way probs for top-k
+        self.val_mae.update(pred, y)
 
         self.log("val/loss", loss, prog_bar=True)
         return loss
 
     def on_validation_epoch_end(self):
+        mae = self.val_mae.compute()
         self.log_dict({
             "val/acc":  self.val_acc.compute(),
             "val/precision": self.val_prec.compute(),
@@ -112,7 +120,8 @@ class AgeModel(pl.LightningModule):
             "val/f1":        self.val_f1.compute(),
             "val/top2_acc":  self.val_top2.compute(),
         }, prog_bar=True)
-        for m in (self.val_acc, self.val_prec, self.val_rec, self.val_f1, self.val_top2):
+        self.log('val/mae', mae, prog_bar=True)
+        for m in (self.val_acc, self.val_prec, self.val_rec, self.val_f1, self.val_top2, self.val_mae):
             m.reset()
 
     # ---------- optim ---------
