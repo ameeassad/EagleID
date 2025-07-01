@@ -60,10 +60,13 @@ class GradCAMCallback(Callback):
 
         # Proceed with GradCAM logic if dataloaders exist
         pl_module.eval()  # Ensure model is in evaluation mode
-        for batch_idx, batch in enumerate(val_loader): # first dataloader is the query images & labels
-            # x, target, *rest = batch
-            x = batch['img']
-            target = batch['label']
+        for batch_idx, batch in enumerate(val_loader):
+            # Handle both dict and tuple batches
+            if isinstance(batch, dict):
+                x = batch['img']
+                target = batch['label']
+            else:
+                x, target = batch
             
             idx = random.randint(0, x.shape[0] - 1)  # Random idx
             # Move inputs and targets to the device
