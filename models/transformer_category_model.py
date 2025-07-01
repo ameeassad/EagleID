@@ -3,12 +3,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-from torchmetrics import Accuracy, Precision, Recall, F1Score
+from torchmetrics import Accuracy, Precision, Recall, F1Score, MeanAbsoluteError, QuadraticWeightedKappa
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+
+
+from coral_pytorch.layers import CoralLayer
+from coral_pytorch.losses import CoralLoss
+from coral_pytorch.dataset import levels_from_labels, coral_label_from_logits
+
 
 class TransformerCategory(pl.LightningModule):
     """
@@ -37,11 +43,15 @@ class TransformerCategory(pl.LightningModule):
             self.lr = config['solver']['BASE_LR']
             outdir = config['outdir']
             
-            # Get classifier hyperparameters from config with better defaults
-            self.dropout_rate1 = config.get('classifier', {}).get('dropout_rate1', 0.5)  # Increased dropout
-            self.dropout_rate2 = config.get('classifier', {}).get('dropout_rate2', 0.3)  # Additional dropout layer
-            self.hidden_dim = config.get('classifier', {}).get('hidden_dim', 512)  # Larger hidden dim
-            self.label_smoothing = config.get('classifier', {}).get('label_smoothing', 0.0)  # Removed for small classes
+            # Get regularization and classifier hyperparameters from config with sensible defaults
+            reg_cfg = config.get('regularization', {}) if config else {}
+            self.drop_rate = reg_cfg.get('drop_rate', 0.1)
+            self.drop_path_rate = reg_cfg.get('drop_path_rate', 0.05)
+            self.gradient_clip_val = reg_cfg.get('gradient_clip_val', 1.0)
+            self.dropout_rate1 = config.get('classifier', {}).get('dropout_rate1', 0.3) if config else 0.3
+            self.dropout_rate2 = config.get('classifier', {}).get('dropout_rate2', 0.0) if config else 0.0
+            self.hidden_dim = config.get('classifier', {}).get('hidden_dim', 512) if config else 512
+            self.label_smoothing = config.get('classifier', {}).get('label_smoothing', 0.0) if config else 0.0
             
             # Training hyperparameters
             self.weight_decay = config.get('solver', {}).get('WEIGHT_DECAY', 0.05)  # Higher weight decay
@@ -59,8 +69,11 @@ class TransformerCategory(pl.LightningModule):
             outdir = outdir
             
             # Better default values for transformer training
-            self.dropout_rate1 = 0.5
-            self.dropout_rate2 = 0.3
+            self.drop_rate = 0.1
+            self.drop_path_rate = 0.05
+            self.gradient_clip_val = 1.0
+            self.dropout_rate1 = 0.3
+            self.dropout_rate2 = 0.0
             self.hidden_dim = 512
             self.label_smoothing = 0.0  # Removed label smoothing
             self.weight_decay = 0.05
@@ -85,13 +98,13 @@ class TransformerCategory(pl.LightningModule):
         if self.backbone_model_name not in supported_models:
             raise ValueError(f"Backbone model {self.backbone_model_name} not supported. Supported models: {supported_models}")
 
-        # Create backbone model with better initialization
+        # Create backbone model with config-driven regularization
         self.backbone = timm.create_model(
             self.backbone_model_name, 
             num_classes=0,  # Remove classification head
             pretrained=pretrained,
-            drop_rate=0.1,  # Add dropout to backbone
-            drop_path_rate=0.1  # Add stochastic depth
+            drop_rate=self.drop_rate,  # Configurable dropout
+            drop_path_rate=self.drop_path_rate  # Configurable stochastic depth
         )
         
         # Get feature dimension from backbone
@@ -103,33 +116,28 @@ class TransformerCategory(pl.LightningModule):
                 features = features[-1]  # Use the last feature level
             feature_dim = features.shape[1] if len(features.shape) == 2 else features.flatten(1).shape[1]
         
-        # Enhanced classification head with better regularization
-        self.classifier = nn.Sequential(
+        # Head: MLP before CoralLayer for more capacity
+        self.head = nn.Sequential(
             nn.Linear(feature_dim, self.hidden_dim),
-            nn.LayerNorm(self.hidden_dim),  # Add layer normalization
             nn.ReLU(),
-            nn.Dropout(self.dropout_rate1),
-            nn.Linear(self.hidden_dim, self.hidden_dim // 2),
-            nn.LayerNorm(self.hidden_dim // 2),
-            nn.ReLU(),
-            nn.Dropout(self.dropout_rate2),
-            nn.Linear(self.hidden_dim // 2, self.num_classes)
+            nn.Dropout(self.dropout_rate1)
         )
+        self.coral_layer = CoralLayer(self.hidden_dim, self.num_classes)
+
+        # Loss function: CORAL for ordinal regression
+        class_weights = None
+        if config and 'class_weights' in config:
+            class_weights = torch.tensor(config['class_weights'], dtype=torch.float32)
+        self.criterion = CoralLoss(num_classes=self.num_classes, class_weights=class_weights)
         
-        # Loss function with removed label smoothing for small class count
-        self.criterion = nn.CrossEntropyLoss(label_smoothing=self.label_smoothing)
-        
-        # Comprehensive metrics for 5-class classification - use proper epoch-level metrics
+        # Metrics for ordinal regression
         self.train_acc = Accuracy(task='multiclass', num_classes=self.num_classes)
         self.val_acc = Accuracy(task='multiclass', num_classes=self.num_classes)
-        self.top2_acc = Accuracy(task='multiclass', num_classes=self.num_classes, top_k=2)
-        
-        # Per-class metrics - use proper epoch-level metrics
+        self.val_mae = MeanAbsoluteError()
+        self.val_qwk = QuadraticWeightedKappa(num_classes=self.num_classes)
         self.val_precision = Precision(task="multiclass", num_classes=self.num_classes, average="macro")
         self.val_recall = Recall(task="multiclass", num_classes=self.num_classes, average="macro")
         self.val_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="macro")
-        
-        # Store predictions for confusion matrix
         self.val_preds = []
         self.val_targets = []
         
@@ -148,17 +156,10 @@ class TransformerCategory(pl.LightningModule):
             nn.init.constant_(module.bias, 0)
     
     def forward(self, x):
-        """Forward pass"""
-        features = self.backbone.forward_features(x)
-        if isinstance(features, (list, tuple)):
-            features = features[-1]  # Use the last feature level
-        
-        # Flatten features if needed
-        if len(features.shape) > 2:
-            features = features.flatten(1)
-        
-        # Classification
-        logits = self.classifier(features)
+        feats = self.backbone.forward_features(x)
+        if feats.ndim > 2:
+            feats = feats.flatten(1)
+        logits = self.coral_layer(self.head(feats))
         return logits
     
     def on_train_start(self):
@@ -182,42 +183,20 @@ class TransformerCategory(pl.LightningModule):
             if hasattr(self, 'log'):
                 self.log('train/backbone_frozen', 0.0, prog_bar=False)
     
+    def _decode(self, logits):
+        """Convert cumulative logits → rank label (integer class index)"""
+        return coral_label_from_logits(logits)
+
     def training_step(self, batch, batch_idx):
-        """Training step with controlled augmentation"""
+        """Training step for CORAL ordinal regression (no MixUp/CutMix)"""
         images, labels = batch
-        
-        # Only apply MixUp/CutMix after warmup period to avoid early confusion
-        current_epoch = self.current_epoch
-        if (hasattr(self.trainer.datamodule.train_dataset, 'transform') and 
-            hasattr(self.trainer.datamodule.train_dataset.transform, 'apply_mixup_cutmix') and
-            current_epoch >= self.warmup_epochs):  # Only after warmup
-            
-            images, labels_a, labels_b, lam, aug_type = self.trainer.datamodule.train_dataset.transform.apply_mixup_cutmix(images, labels)
-            
-            # Forward pass
-            logits = self(images)
-            
-            # Compute loss with MixUp/CutMix
-            loss_a = self.criterion(logits, labels_a)
-            loss_b = self.criterion(logits, labels_b)
-            loss = lam * loss_a + (1 - lam) * loss_b
-            
-            # Update accuracy metric (use original labels for accuracy)
-            self.train_acc.update(logits.softmax(dim=-1), labels_a)
-            
-            # Log augmentation type
-            self.log('train/aug_type', 1.0 if aug_type != 'none' else 0.0, prog_bar=False)
-        else:
-            # Standard training without aggressive augmentation during warmup
-            logits = self(images)
-            loss = self.criterion(logits, labels)
-            self.train_acc.update(logits.softmax(dim=-1), labels)
-        
+        logits = self(images)
+        loss = self.criterion(logits, labels)
+        preds = self._decode(logits)
+        self.train_acc.update(preds, labels)
         # Log loss (this updates every step)
         self.log('train/loss_step',  loss, on_step=True, prog_bar=True,  logger=True)
         self.log('train/loss_epoch', loss, on_step=False, on_epoch=True, prog_bar=False, logger=True)
-
-        
         return loss
     
     def on_train_epoch_end(self):
@@ -230,65 +209,44 @@ class TransformerCategory(pl.LightningModule):
         self.train_acc.reset()
     
     def validation_step(self, batch, batch_idx):
-        """Validation step with comprehensive metrics"""
+        """Validation step for CORAL ordinal regression"""
         images, labels = batch
         logits = self(images)
         loss = self.criterion(logits, labels)
-        
-        # Update metrics (they will be computed at epoch end)
-        self.val_acc.update(logits.softmax(dim=-1), labels)
-        self.top2_acc.update(logits.softmax(dim=-1), labels)
-        self.val_precision.update(logits.softmax(dim=-1), labels)
-        self.val_recall.update(logits.softmax(dim=-1), labels)
-        self.val_f1.update(logits.softmax(dim=-1), labels)
-        
-        # Store predictions for confusion matrix
-        preds = logits.argmax(dim=-1)
+        preds = self._decode(logits)
+        self.val_acc.update(preds, labels)
+        self.val_mae.update(preds, labels)
+        self.val_qwk.update(preds, labels)
+        self.val_precision.update(preds, labels)
+        self.val_recall.update(preds, labels)
+        self.val_f1.update(preds, labels)
         self.val_preds.extend(preds.cpu().numpy())
         self.val_targets.extend(labels.cpu().numpy())
-        
-        # Log loss (this updates every step)
         self.log('val/loss', loss, prog_bar=True)
-        
         return loss
     
     def on_validation_epoch_end(self):
         """End of validation epoch - compute and log all metrics"""
-        # Compute all metrics
         acc = self.val_acc.compute()
-        top2_acc = self.top2_acc.compute()
+        mae = self.val_mae.compute()
+        qwk = self.val_qwk.compute()
         precision = self.val_precision.compute()
         recall = self.val_recall.compute()
         f1 = self.val_f1.compute()
-        
-        # Log all metrics
         self.log('val/acc', acc, prog_bar=True)
-        self.log('val/top2_acc', top2_acc, prog_bar=True)
+        self.log('val/mae', mae, prog_bar=True)
+        self.log('val/qwk', qwk, prog_bar=True)
         self.log('val/precision', precision, prog_bar=False)
         self.log('val/recall', recall, prog_bar=False)
         self.log('val/f1', f1, prog_bar=False)
-        
-        # Reset metrics for next epoch
         self.val_acc.reset()
-        self.top2_acc.reset()
+        self.val_mae.reset()
+        self.val_qwk.reset()
         self.val_precision.reset()
         self.val_recall.reset()
         self.val_f1.reset()
-        
-        # Calculate confusion matrix if we have predictions
         if len(self.val_preds) > 0:
-            # Calculate confusion matrix
             cm = confusion_matrix(self.val_targets, self.val_preds)
-            
-            # Log confusion matrix as figure if logger is available
-            # if hasattr(self, 'logger') and self.logger:
-            #     try:
-            #         fig = self._plot_confusion_matrix(cm)
-            #         self.logger.experiment.add_figure('confusion_matrix', fig, self.current_epoch)
-            #     except Exception as e:
-            #         print(f"Warning: Could not plot confusion matrix: {e}")
-            
-            # Reset for next epoch
             self.val_preds = []
             self.val_targets = []
     
