@@ -59,9 +59,28 @@ class AgeModel(pl.LightningModule):
         """Convert CORAL logits to predicted class index (0-indexed)."""
         # logits: [B, K-1]
         prob_gt = torch.sigmoid(logits)              # P(y > t)
-        prob_gt = torch.cat([prob_gt, torch.ones_like(prob_gt[:, :1])], dim=1)      # pad right with 1
-        prob_shift = torch.cat([torch.ones_like(prob_gt[:, :1]), prob_gt], dim=1)   # pad left with 1
-        class_probs = prob_shift[:, :-1] - prob_shift[:, 1:]        # P(y == k)
+        
+        # Correct CORAL decoder: P(y = k) = P(y > k-1) - P(y > k)
+        # For K classes, we need K-1 thresholds
+        # P(y = 0) = 1 - P(y > 0)
+        # P(y = k) = P(y > k-1) - P(y > k) for 0 < k < K-1
+        # P(y = K-1) = P(y > K-2)
+        
+        batch_size = logits.shape[0]
+        num_classes = logits.shape[1] + 1  # K = K-1 + 1
+        
+        # Initialize class probabilities
+        class_probs = torch.zeros(batch_size, num_classes, device=logits.device)
+        
+        # P(y = 0) = 1 - P(y > 0)
+        class_probs[:, 0] = 1.0 - prob_gt[:, 0]
+        
+        # P(y = k) = P(y > k-1) - P(y > k) for 0 < k < K-1
+        for k in range(1, num_classes - 1):
+            class_probs[:, k] = prob_gt[:, k-1] - prob_gt[:, k]
+        
+        # P(y = K-1) = P(y > K-2)
+        class_probs[:, -1] = prob_gt[:, -1]
         
         # Debug: Print logits and probabilities for first few samples
         if logits.shape[0] > 0:
