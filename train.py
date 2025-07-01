@@ -24,8 +24,9 @@ from models.triplet_loss_model import TripletModel
 from utils.gradcam_callback import GradCAMCallback
 from utils.viz_callback import SimilarityVizCallback
 from utils.augmentation_callback import AugmentationCallback
+from utils.wandb_cleanup_callback import WandbCacheCleanupCallback
+from utils.confusion_matrix_callback import ConfusionMatrixCallback
 
-os.environ['WANDB_ARTIFACT_CACHE_SIZE'] = '800MB'
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Train classifier.')
@@ -94,6 +95,18 @@ def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
                 )
         callbacks.append(viz_callback)
 
+    # Clean W&B cache every epoch
+    callbacks.append(WandbCacheCleanupCallback(every_n_epochs=1))
+
+    # Add confusion matrix callback for classification models
+    if config.get('model_architecture') in ['AgeModel', 'SimpleModel', 'TransformerCategory']:
+        confusion_callback = ConfusionMatrixCallback(
+            config=config,
+            outdir=config['outdir'],
+            log_every_n_epochs=1,  # Log every epoch
+            num_classes=config.get('num_classes', 5)
+        )
+        callbacks.append(confusion_callback)
 
     return callbacks
 
