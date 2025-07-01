@@ -3,8 +3,8 @@ import torch.nn as nn
 import timm
 from pytorch_lightning import LightningModule
 from torchmetrics import Accuracy, Precision, Recall, F1Score
-from coral_pytorch.layer import CoralLayer
-from coral_pytorch.losses import coral_loss
+from coral_pytorch.layers import CoralLayer
+from coral_pytorch.losses import CoralLoss
 
 class AgeModel(LightningModule):
     def __init__(self, config: dict, pretrained: bool = False, num_classes: int | None = None):
@@ -49,7 +49,7 @@ class AgeModel(LightningModule):
     def training_step(self, batch, batch_idx):
         x, target = batch
         logits = self(x)
-        loss = coral_loss(logits, target, self.class_weights.to(self.device))
+        loss = CoralLoss(logits, target, self.class_weights.to(self.device))
         pred = (logits > 0).sum(dim=1)
         acc = self.train_acc(pred, target)
         self.log('train/loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
@@ -59,7 +59,7 @@ class AgeModel(LightningModule):
     def validation_step(self, batch, batch_idx):
         x, target = batch
         logits = self(x)
-        loss = coral_loss(logits, target, self.class_weights.to(self.device))
+        loss = CoralLoss(logits, target, self.class_weights.to(self.device))
         pred = (logits > 0).sum(dim=1)
         acc = self.val_acc(pred, target)
         precision = self.val_precision(pred, target)
