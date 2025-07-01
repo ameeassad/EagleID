@@ -52,8 +52,10 @@ class AgeModel(pl.LightningModule):
 
     # ---------- forward ----------
     def forward(self, x):
-        feats  = self.backbone.forward_features(x)
-        logits = self.coral(feats)               # (B, K-1)
+        features = self.backbone.forward_features(x)
+        if features.ndim == 4:
+            features = features.mean(dim=[2, 3])  # Global average pool
+        logits = self.coral(features)
         return logits
 
     # ---------- helpers ----------
