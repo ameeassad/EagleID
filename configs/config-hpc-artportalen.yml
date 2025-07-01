@@ -50,7 +50,7 @@ classifier:
   label_smoothing: 0
 
 early_stopping:
-  enabled: True
+  enabled: False
   monitor: val/loss
   min_delta: 0.01
   patience: 15
