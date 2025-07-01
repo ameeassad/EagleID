@@ -13,7 +13,7 @@ import math
 
 from coral_pytorch.layers import CoralLayer
 from coral_pytorch.losses import CoralLoss
-from coral_pytorch.dataset import coral_label_from_logits
+from coral_pytorch.dataset import proba_to_label
 
 class TransformerCategory(pl.LightningModule):
     """
@@ -183,7 +183,8 @@ class TransformerCategory(pl.LightningModule):
     
     def _decode(self, logits):
         """Convert cumulative logits → rank label (integer class index)"""
-        return coral_label_from_logits(logits)
+        probas = torch.sigmoid(logits)
+        return proba_to_label(probas)
 
     def training_step(self, batch, batch_idx):
         """Training step for CORAL ordinal regression (no MixUp/CutMix)"""
