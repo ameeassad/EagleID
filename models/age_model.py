@@ -25,13 +25,14 @@ class AgeModel(LightningModule):
                                          stride=self.model.conv1.stride, padding=self.model.conv1.padding, bias=False)
 
         # CORAL layer: output K-1 logits for K ordinal classes
-        feature_dim = self.model.get_classifier().in_features
+        feature_dim = self.model.num_features
         self.model.reset_classifier(0)  # Remove original classifier
         self.coral = CoralLayer(feature_dim, num_classes)
 
         # Class balancing weights (from config or uniform)
         class_weights = config.get('class_weights', [1.0] * (num_classes - 1))
         self.class_weights = torch.tensor(class_weights, dtype=torch.float32)
+        self.coral_loss = CoralLoss(num_classes=num_classes, class_weights=self.class_weights)
 
         # Metrics
         self.train_acc = Accuracy(task='multiclass', num_classes=num_classes)
@@ -49,7 +50,7 @@ class AgeModel(LightningModule):
     def training_step(self, batch, batch_idx):
         x, target = batch
         logits = self(x)
-        loss = CoralLoss(logits, target, self.class_weights.to(self.device))
+        loss = self.coral_loss(logits, target)
         pred = (logits > 0).sum(dim=1)
         acc = self.train_acc(pred, target)
         self.log('train/loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
@@ -59,7 +60,7 @@ class AgeModel(LightningModule):
     def validation_step(self, batch, batch_idx):
         x, target = batch
         logits = self(x)
-        loss = CoralLoss(logits, target, self.class_weights.to(self.device))
+        loss = self.coral_loss(logits, target)
         pred = (logits > 0).sum(dim=1)
         acc = self.val_acc(pred, target)
         precision = self.val_precision(pred, target)
