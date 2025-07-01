@@ -40,7 +40,7 @@ def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
     lr_callback = LearningRateMonitor(logging_interval='epoch')
     
     # Determine the monitor metric based on model type
-    if config.get('model_architecture') in ['TransformerCategory', 'SimpleModel']:
+    if config.get('model_architecture') in ['TransformerCategory', 'SimpleModel', 'AgeModel']:
         monitor_metric = 'val/acc'
         monitor_mode = 'max'
     else:
@@ -198,7 +198,7 @@ if __name__ == '__main__':
         wandb.init(project=config['project_name'])
         wandb.config.update(config)
         print(config)
-        wandb.define_metric("val/mAP", summary="max")
+        # wandb.define_metric("val/mAP", summary="max")
         
 
     # setup dataset
