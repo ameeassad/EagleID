@@ -55,7 +55,7 @@ early_stopping:
   min_delta: 0.01
   patience: 15
   verbose: true
-  mode: max
+  mode: min
 
 solver:
   OPT: adamw  # adamw for transformers
