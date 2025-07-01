@@ -14,5 +14,8 @@ class WandbCacheCleanupCallback(Callback):
                 try:
                     shutil.rmtree(cache_path)
                     print(f"🧹 Cleared W&B cache at epoch {current_epoch}")
+                    # Recreate the W&B artifact cache folder (in case wandb wants to write into it)
+                    cache_path = os.path.expanduser("~/.cache/wandb/artifacts")
+                    os.makedirs(cache_path, exist_ok=True)
                 except Exception as e:
                     print(f"⚠️ Failed to clear W&B cache: {e}") 

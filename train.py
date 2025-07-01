@@ -97,8 +97,8 @@ def get_basic_callbacks(checkpoint_interval: int = 1) -> list:
                 )
         callbacks.append(viz_callback)
 
-    # Clean W&B cache every epoch
-    callbacks.append(WandbCacheCleanupCallback(every_n_epochs=1))
+    # Clean W&B cache every 10 epochs
+    callbacks.append(WandbCacheCleanupCallback(every_n_epochs=10))
 
     # Add confusion matrix callback for classification models
     if config.get('model_architecture') in ['AgeModel', 'SimpleModel', 'TransformerCategory']:

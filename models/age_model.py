@@ -12,6 +12,10 @@ class AgeModel(pl.LightningModule):
         self.config = config
 
         self.num_classes = num_classes or config.get("num_classes", 5)
+        
+        # Two-stage training parameters
+        self.coral_warmup_epochs = config.get("coral_warmup_epochs", 3)
+        self.coral_warmup_lr = config.get("coral_warmup_lr", 0.001)
 
         # ---------------- backbone -----------------
         self.backbone = timm.create_model(
@@ -34,6 +38,9 @@ class AgeModel(pl.LightningModule):
 
         # ---------------- CORAL head ----------------
         self.coral = CoralLayer(feat_dim, self.num_classes)
+        
+        # Initialize CORAL layer properly for two-stage training
+        self._init_coral_layer()
 
         # ---------------- loss ----------------------
         self.coral_loss = CoralLoss()          # no kwargs
@@ -105,6 +112,36 @@ class AgeModel(pl.LightningModule):
             print(f"DEBUG: Logits stats: min={logits.min().item():.4f}, max={logits.max().item():.4f}, mean={logits.mean().item():.4f}")
         
         return logits
+    
+    def _init_coral_layer(self):
+        """Initialize CORAL layer for two-stage training"""
+        # Initialize bias to 0.0 to put sigmoid ≈ 0.5
+        torch.nn.init.constant_(self.coral.bias, 0.0)
+        print(f"Initialized CORAL layer bias to 0.0 (sigmoid ≈ 0.5)")
+    
+    def on_train_start(self):
+        """Start two-stage training: freeze backbone, train CORAL layer first"""
+        print(f"Starting two-stage training: CORAL warmup for {self.coral_warmup_epochs} epochs")
+        
+        # Freeze backbone completely
+        for p in self.backbone.parameters():
+            p.requires_grad = False
+        print("Backbone frozen for CORAL layer training")
+        
+        # Log the freezing state
+        if hasattr(self, 'log'):
+            self.log('train/backbone_frozen', 1.0, prog_bar=False)
+    
+    def on_train_epoch_start(self):
+        """Unfreeze backbone after CORAL warmup epochs"""
+        if self.current_epoch == self.coral_warmup_epochs:
+            print(f"Unfreezing backbone at epoch {self.current_epoch} after CORAL warmup")
+            for param in self.backbone.parameters():
+                param.requires_grad = True
+            
+            # Log the unfreezing state
+            if hasattr(self, 'log'):
+                self.log('train/backbone_frozen', 0.0, prog_bar=False)
 
     # ---------- training ----------
     def training_step(self, batch, _):
@@ -167,6 +204,22 @@ class AgeModel(pl.LightningModule):
     # ---------- optim ---------
     def configure_optimizers(self):
         from utils.optimizer import get_optimizer, get_lr_scheduler_config
-        opt = get_optimizer(self.config, self.parameters())
-        sched = get_lr_scheduler_config(self.config, opt)
-        return {"optimizer": opt, "lr_scheduler": sched}
+        
+        # Create two parameter groups with different learning rates
+        backbone_params = [p for n, p in self.named_parameters() if "backbone" in n]
+        head_params = [p for n, p in self.named_parameters() if "coral" in n]
+        
+        base_lr = self.config["solver"]["BASE_LR"]
+        opt = torch.optim.AdamW([
+            {"params": backbone_params, "lr": base_lr},
+            {"params": head_params, "lr": base_lr * 0.1},
+        ])
+        
+        # param group 0 → backbone, group 1 → coral
+        # freeze backbone LR for warm-up
+        lambda_fns = [
+            lambda epoch: 0.0 if epoch < self.coral_warmup_epochs else 1.0,
+            lambda epoch: 1.0,
+        ]
+        scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lambda_fns)
+        return {"optimizer": opt, "lr_scheduler": scheduler}
