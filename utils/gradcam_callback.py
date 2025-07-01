@@ -53,10 +53,14 @@ class GradCAMCallback(Callback):
         if target_layer is None:
             print("Target layer not found for GradCAM.")
             return
-        
+
+        val_loader = trainer.val_dataloaders
+        if isinstance(val_loader, list):
+            val_loader = val_loader[0]
+
         # Proceed with GradCAM logic if dataloaders exist
         pl_module.eval()  # Ensure model is in evaluation mode
-        for batch_idx, batch in enumerate(trainer.val_dataloaders[0]): # first dataloader is the query images & labels
+        for batch_idx, batch in enumerate(val_loader): # first dataloader is the query images & labels
             # x, target, *rest = batch
             x = batch['img']
             target = batch['label']
