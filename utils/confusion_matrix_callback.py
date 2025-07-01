@@ -78,12 +78,16 @@ class ConfusionMatrixCallback(Callback):
                     # For standard classification models
                     pred = torch.argmax(logits, dim=1)
 
-                all_predictions.append(pred.cpu())
-                all_targets.append(target.cpu())
+                all_predictions.append(pred)
+                all_targets.append(target)
 
         # Concatenate all predictions and targets
         all_predictions = torch.cat(all_predictions)
         all_targets = torch.cat(all_targets)
+
+        # Move to the same device as the confusion matrix metric
+        all_predictions = all_predictions.to(self.confusion_matrix.device)
+        all_targets = all_targets.to(self.confusion_matrix.device)
 
         # Compute confusion matrix
         self.confusion_matrix.update(all_predictions, all_targets)
