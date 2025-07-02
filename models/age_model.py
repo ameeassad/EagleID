@@ -118,8 +118,16 @@ class AgeModel(pl.LightningModule):
         # Initialize weights to small values for better threshold learning
         if hasattr(self.coral, 'weight'):
             torch.nn.init.xavier_uniform_(self.coral.weight, gain=0.1)
+        
+        # Put the thresholds on the log-odds scale where you expect them to lie
         if hasattr(self.coral, 'bias') and self.coral.bias is not None:
-            torch.nn.init.constant_(self.coral.bias, 0.0)
+            # e.g. [-2, -1, 0, +1]       (σ ~ [0.12, 0.27, 0.50, 0.73])
+            init = torch.linspace(2, -2, steps=self.num_classes - 1)
+            self.coral.bias.data.copy_(init)
+            print("CORAL bias initialised to:", init.cpu().tolist())
+        else:
+            print("CORAL layer has no bias parameter")
+        
         print(f"Initialized CORAL layer for two-stage training")
     
     def on_train_start(self):
@@ -214,8 +222,8 @@ class AgeModel(pl.LightningModule):
         
         base_lr = self.config["solver"]["BASE_LR"]
         opt = torch.optim.AdamW([
-            {"params": backbone_params, "lr": base_lr},
-            {"params": head_params, "lr": base_lr * 0.1},
+            {"params": backbone_params, "lr": base_lr},        # e.g. 1e-3
+            {"params": head_params, "lr": base_lr * 0.01},     # e.g. 1e-5 (100x smaller)
         ])
         
         # param group 0 → backbone, group 1 → coral
