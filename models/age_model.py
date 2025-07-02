@@ -115,9 +115,12 @@ class AgeModel(pl.LightningModule):
     
     def _init_coral_layer(self):
         """Initialize CORAL layer for two-stage training"""
-        # Initialize bias to 0.0 to put sigmoid ≈ 0.5
-        torch.nn.init.constant_(self.coral.bias, 0.0)
-        print(f"Initialized CORAL layer bias to 0.0 (sigmoid ≈ 0.5)")
+        # Initialize weights to small values for better threshold learning
+        if hasattr(self.coral, 'weight'):
+            torch.nn.init.xavier_uniform_(self.coral.weight, gain=0.1)
+        if hasattr(self.coral, 'bias') and self.coral.bias is not None:
+            torch.nn.init.constant_(self.coral.bias, 0.0)
+        print(f"Initialized CORAL layer for two-stage training")
     
     def on_train_start(self):
         """Start two-stage training: freeze backbone, train CORAL layer first"""
